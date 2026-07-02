@@ -1,0 +1,3083 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SheetCNC Pro — ถอดแผ่นและจัดวาง CNC</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:#0f1117; --surface:#1a1d2e; --card:#232640; --border:#2d3154;
+  --accent:#4361ee; --accent2:#f72585; --text:#e2e8f0; --muted:#64748b;
+  --success:#10b981; --warning:#f59e0b; --danger:#ef4444; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+
+/* ── Header ── */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 16px;
+  display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+.logo{font-size:1.15rem;font-weight:800;color:var(--accent);white-space:nowrap;letter-spacing:-0.5px;}
+.logo span{color:var(--accent2);}
+.proj-input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;
+  color:var(--text);padding:6px 12px;font-size:.9rem;font-weight:600;min-width:0;}
+.proj-input:focus{outline:none;border-color:var(--accent);}
+.btn{padding:7px 14px;border-radius:8px;border:none;font-size:.82rem;font-weight:700;
+  cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:opacity .15s;}
+.btn:hover{opacity:.82;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-success{background:var(--success);color:#fff;}
+.btn-ghost{background:var(--card);color:var(--text);border:1px solid var(--border);}
+.btn-sm{padding:5px 10px;font-size:.76rem;}
+.btn-cnc{background:linear-gradient(135deg,#f72585,#7209b7);color:#fff;font-size:.95rem;padding:11px 22px;}
+
+/* ── Layout ── */
+.main{max-width:1100px;margin:0 auto;padding:16px 14px 80px;}
+
+/* ── Card ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;}
+.card-title{font-weight:700;font-size:.95rem;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.72rem;font-weight:700;}
+.badge-accent{background:var(--accent);color:#fff;}
+
+/* ── Settings ── */
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:9px;}
+.field{display:flex;flex-direction:column;gap:3px;}
+.field label{font-size:.74rem;color:var(--muted);font-weight:600;}
+.field input,.field select{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  color:var(--text);padding:7px 10px;font-size:.85rem;width:100%;}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent);}
+
+/* ── Toggle ── */
+.tog-wrap{display:flex;align-items:center;gap:7px;padding-top:18px;}
+.tog{position:relative;width:36px;height:20px;flex-shrink:0;}
+.tog input{opacity:0;width:0;height:0;}
+.tog-sl{position:absolute;inset:0;background:var(--border);border-radius:20px;cursor:pointer;transition:background .2s;}
+.tog-sl:before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;
+  background:#fff;border-radius:50%;transition:transform .2s;}
+.tog input:checked+.tog-sl{background:var(--accent);}
+.tog input:checked+.tog-sl:before{transform:translateX(16px);}
+
+/* ── Piece card ── */
+.pc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+.pc-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.pc-name{flex:1;background:var(--card);border:1px solid var(--border);border-radius:6px;
+  color:var(--text);padding:5px 10px;font-size:.85rem;font-weight:700;}
+.pc-name:focus{outline:none;border-color:var(--accent);}
+.src-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;}
+.src-tab{padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);
+  color:var(--muted);font-size:.73rem;font-weight:700;cursor:pointer;transition:all .15s;}
+.src-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.pf{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:7px;margin-top:8px;}
+
+/* ── File drop ── */
+.drop{border:2px dashed var(--border);border-radius:8px;padding:14px;text-align:center;
+  cursor:pointer;transition:border-color .2s;font-size:.82rem;color:var(--muted);}
+.drop:hover,.drop.dragover{border-color:var(--accent);color:var(--text);}
+.fres{background:var(--card);border-radius:7px;padding:8px 10px;font-size:.79rem;margin-top:7px;line-height:1.5;}
+.fres .av{color:var(--success);font-weight:800;font-size:.95rem;}
+.ferr{color:var(--danger);background:#2d1a1a;border-radius:7px;padding:7px 10px;font-size:.78rem;margin-top:6px;}
+
+/* ── Notice ── */
+.notice{background:#1a2a4a;border:1px solid #2d5a8a;border-radius:8px;
+  padding:9px 13px;font-size:.79rem;color:#93c5fd;margin-bottom:12px;}
+
+/* ── Stats ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:10px;margin-bottom:14px;}
+.stat{background:var(--surface);border-radius:10px;padding:12px;text-align:center;}
+.sv{font-size:1.5rem;font-weight:800;color:var(--accent);}
+.sv.lg{font-size:2rem;}
+.sl{font-size:.72rem;color:var(--muted);margin-top:2px;}
+.eff-bar{background:var(--surface);border-radius:4px;height:8px;overflow:hidden;margin:4px 0;}
+.eff-fill{height:100%;border-radius:4px;background:var(--success);transition:width .5s;}
+
+/* ── Table ── */
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:.8rem;}
+th{background:var(--surface);color:var(--muted);font-weight:700;padding:7px 9px;
+  text-align:left;border-bottom:1px solid var(--border);}
+td{padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+
+/* ── Canvas ── */
+.cv-wrap{background:#0a0c14;border-radius:10px;overflow:auto;padding:10px;min-height:100px;}
+canvas{display:block;}
+
+/* ── Sheet tabs ── */
+.sh-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.sh-tab{padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:var(--card);
+  color:var(--muted);font-size:.78rem;font-weight:700;cursor:pointer;}
+.sh-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* ── Action bar ── */
+.abar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);
+  border-top:1px solid var(--border);padding:11px 16px;display:flex;
+  justify-content:center;align-items:center;gap:10px;z-index:99;}
+
+/* ── Empty ── */
+.empty{text-align:center;padding:36px;color:var(--muted);}
+.empty-ico{font-size:2.2rem;margin-bottom:8px;}
+
+/* ── Multi-DXF import ── */
+.dxf-import-drop{border:2px dashed #4361ee88;border-radius:10px;padding:22px;text-align:center;
+  cursor:pointer;transition:all .2s;background:#1a2040;}
+.dxf-import-drop:hover,.dxf-import-drop.dragover{border-color:var(--accent);background:#1e2a55;}
+.dxf-import-drop .ico{font-size:2rem;margin-bottom:6px;}
+.dxf-import-drop p{font-size:.85rem;color:var(--muted);}
+.dxf-import-drop b{color:var(--accent);}
+.mdxf-result{margin-top:12px;}
+
+/* ── Inspector ── */
+.insp-steps{display:flex;gap:0;margin-bottom:14px;}
+.insp-step{flex:1;padding:8px 12px;background:var(--surface);border:1px solid var(--border);
+  font-size:.78rem;font-weight:700;color:var(--muted);text-align:center;}
+.insp-step:first-child{border-radius:8px 0 0 8px;}
+.insp-step:last-child{border-radius:0 8px 8px 0;}
+.insp-step.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.insp-step.done{background:#10b98122;color:var(--success);border-color:var(--success);}
+.insp-map-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+@media(max-width:640px){.insp-map-wrap{grid-template-columns:1fr;}}
+.insp-canvas-box{background:#080a12;border-radius:8px;border:1px solid var(--border);overflow:hidden;}
+.insp-legend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
+.insp-leg{display:flex;align-items:center;gap:5px;font-size:.74rem;padding:2px 8px;
+  border-radius:10px;background:var(--surface);}
+.insp-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.cls-badge{display:inline-block;padding:2px 7px;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;}
+.cls-outer{background:#1e3a5f;color:#60a5fa;}
+.cls-hole{background:#2d1a4a;color:#a78bfa;}
+.cls-skip{background:#2a1a1a;color:#f87171;}
+.cls-unk{background:var(--surface);color:var(--muted);}
+.insp-row-outer td{background:#0d1f35;}
+.insp-row-hole td{background:#1a0d30;}
+.insp-row-skip td{background:#200d0d;opacity:.6;}
+.coord-tag{font-family:monospace;font-size:.72rem;color:var(--muted);}
+.insp-tbl-wrap{max-height:400px;overflow-y:auto;overflow-x:auto;}
+.insp-tbl{width:100%;border-collapse:collapse;font-size:.79rem;}
+.insp-tbl th{background:var(--bg);color:var(--muted);font-weight:700;padding:6px 8px;
+  text-align:left;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;}
+.insp-tbl td{padding:6px 8px;border-bottom:1px solid #ffffff08;vertical-align:middle;}
+.insp-tbl tr:hover td{background:#ffffff06;}
+.warn-box{background:#2a1f00;border:1px solid #f59e0b44;border-radius:8px;
+  padding:10px 14px;font-size:.8rem;color:#fbbf24;margin-bottom:10px;}
+.info-box{background:#0d2040;border:1px solid #3b82f644;border-radius:8px;
+  padding:10px 14px;font-size:.8rem;color:#93c5fd;margin-bottom:10px;}
+.mdxf-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.mdxf-table-wrap{overflow-x:auto;max-height:380px;overflow-y:auto;}
+.mdxf-table{width:100%;border-collapse:collapse;font-size:.8rem;}
+.mdxf-table th{background:var(--bg);color:var(--muted);font-weight:700;
+  padding:7px 8px;text-align:left;border-bottom:1px solid var(--border);position:sticky;top:0;}
+.mdxf-table td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.mdxf-table tr:last-child td{border-bottom:none;}
+.mdxf-table tr:hover td{background:#ffffff08;}
+.mdxf-chk{width:15px;height:15px;cursor:pointer;accent-color:var(--accent);}
+.mdxf-canvas{border:1px solid var(--border);border-radius:6px;background:#0a0c14;display:block;}
+.shape-pill{display:inline-block;padding:2px 7px;border-radius:10px;font-size:.68rem;font-weight:700;}
+.shape-rect{background:#1e3a5f;color:#93c5fd;}
+.shape-free{background:#2d1a4a;color:#c4b5fd;}
+.layer-tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:.68rem;
+  background:var(--surface);color:var(--muted);border:1px solid var(--border);}
+
+/* ── Cost table ── */
+.cost-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;
+  border-bottom:1px solid var(--border);font-size:.85rem;}
+.cost-row:last-child{border-bottom:none;font-size:1rem;font-weight:800;}
+.cost-val{font-weight:700;}
+.cost-total{color:var(--accent2);}
+
+/* ── Divider ── */
+hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
+
+/* ── Legend ── */
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:.75rem;background:var(--surface);
+  border-radius:5px;padding:3px 8px;}
+.leg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+
+/* ── Layout Overview ── */
+.layout-thumb{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  cursor:pointer;transition:transform .15s;
+}
+.layout-thumb:hover{ transform:translateY(-3px); }
+.layout-thumb canvas{
+  border:2px solid var(--border);border-radius:8px;background:#080a12;
+  display:block;transition:border-color .2s;
+}
+.layout-thumb:hover canvas,.layout-thumb.active canvas{ border-color:var(--accent); }
+.layout-count-badge{
+  font-size:1.05rem;font-weight:800;color:#fff;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:4px 12px;text-align:center;white-space:nowrap;
+}
+.layout-count-badge b{ color:#f72585;font-size:1.25rem; }
+.layout-sep{
+  font-size:1.6rem;color:var(--muted);align-self:center;padding-bottom:28px;
+}
+
+/* ── Print ── */
+@media print{
+  .header,.abar,.btn,.src-tabs,.drop{display:none!important;}
+  .card{break-inside:avoid;border:1px solid #ccc;}
+  body{background:#fff;color:#000;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">Sheet<span>CNC</span></div>
+  <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
+  <button class="btn btn-ghost btn-sm" onclick="exportExcel()">📊 Excel</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ Print</button>
+  <button class="btn btn-danger btn-sm" id="resetBtn" onclick="resetAll()" data-i18n="resetBtn">🗑️ รีเซ็ต</button>
+  <button class="btn btn-ghost btn-sm" id="langBtn" onclick="toggleLang()" style="font-weight:800;letter-spacing:.5px;min-width:68px;">🌐 EN</button>
+</div>
+
+<div class="main">
+
+  <!-- Settings -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" data-i18n="settingsTitle">⚙️ ตั้งค่าแผ่นและการตัด</div>
+    </div>
+    <div class="sg">
+      <div class="field">
+        <label data-i18n="sheetW">ความกว้างแผ่น (mm)</label>
+        <input type="number" id="sw" value="1200" min="1" onchange="saveSettings()">
+      </div>
+      <div class="field">
+        <label data-i18n="sheetH">ความสูงแผ่น (mm)</label>
+        <input type="number" id="sh" value="2400" min="1" onchange="saveSettings()">
+      </div>
+      <div class="field">
+        <label data-i18n="preset">Preset ขนาดแผ่น</label>
+        <select onchange="applyPreset(this.value)">
+          <option value="" data-i18n="presetPh">— เลือก preset —</option>
+          <option value="1200,2400" data-i18n="p1">1200×2400 (มาตรฐาน)</option>
+          <option value="1220,2440">1220×2440 (4'×8')</option>
+          <option value="1000,2000">1000×2000</option>
+          <option value="600,1200" data-i18n="p4">600×1200 (ครึ่งแผ่น)</option>
+          <option value="2000,4000" data-i18n="p5">2000×4000 (แผ่นใหญ่)</option>
+          <option value="3000,6000" data-i18n="p6">3000×6000 (แผ่น XL)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-i18n="kerf">Kerf / ช่องใบเลื่อย (mm)</label>
+        <input type="number" id="kerf" value="3" min="0" step="0.5" onchange="saveSettings()">
+      </div>
+      <div class="field">
+        <label data-i18n="stlUnitLbl">หน่วยของไฟล์ STL / OBJ</label>
+        <select id="stlUnit" onchange="saveSettings()">
+          <option value="mm" data-i18n="unitMm">มิลลิเมตร (mm)</option>
+          <option value="cm" data-i18n="unitCm">เซนติเมตร (cm)</option>
+          <option value="m" data-i18n="unitM">เมตร (m)</option>
+          <option value="inch" data-i18n="unitIn">นิ้ว (inch)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-i18n="pricePerSheet">ราคาต่อแผ่น (บาท)</label>
+        <input type="number" id="priceSheet" value="0" min="0" onchange="saveSettings()">
+      </div>
+      <div class="field">
+        <label data-i18n="laborLbl">ค่าแรง CNC (บาท/m²)</label>
+        <input type="number" id="laborRate" value="0" min="0" onchange="saveSettings()">
+      </div>
+      <div class="field">
+        <label data-i18n="rotMode">การหมุนชิ้นงาน</label>
+        <select id="rotMode" onchange="saveSettings()" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:.82rem;">
+          <option value="none" data-i18n="rotNone">ไม่หมุน</option>
+          <option value="rot90" selected data-i18n="rot90Opt">หมุน 90°</option>
+          <option value="rot45" data-i18n="rot45Opt">หมุน 45° & 90°</option>
+          <option value="free" data-i18n="rotFree">อิสระ (ทุก 15°)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Multi-piece Vector Import -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" data-i18n="dxfImportTitle">📂 นำเข้าไฟล์ Vector (DXF / SVG / EPS / AI)</div>
+      <span class="badge badge-accent" style="background:#7209b7;">NEW</span>
+    </div>
+    <div class="notice" style="margin-bottom:10px;">
+      🔍 รองรับ <b>DXF</b> (AutoCAD/Rhino), <b>SVG</b>, <b>EPS</b>, <b>AI</b> — แอปอ่าน closed path อัตโนมัติ แสดง preview พร้อมขนาด แล้วเลือกเพิ่มเข้าลิสต์ได้เลย
+      &nbsp;|&nbsp; <b>DWG</b>: ไม่รองรับโดยตรง — แปลงเป็น DXF ก่อนด้วย FreeCAD หรือ LibreCAD (ฟรี)
+    </div>
+    <div class="dxf-import-drop" id="mdxfDrop"
+      onclick="document.getElementById('mdxfFi').click()"
+      ondragover="this.classList.add('dragover');event.preventDefault()"
+      ondragleave="this.classList.remove('dragover')"
+      ondrop="handleMdxfDrop(event)">
+      <div class="ico">📄</div>
+      <p>คลิกหรือลากไฟล์มาวาง</p>
+      <p style="font-size:.74rem;margin-top:4px;">รองรับ <b>.dxf &nbsp;.svg &nbsp;.eps &nbsp;.ai</b> &nbsp;(AutoCAD / Illustrator / Inkscape / Rhino)</p>
+      <input type="file" id="mdxfFi" accept=".dxf,.svg,.eps,.ai" style="display:none" onchange="handleMdxfFile(this.files[0])">
+    </div>
+    <div id="mdxfResult" class="mdxf-result" style="display:none;"></div>
+  </div>
+
+  <!-- Pieces -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📦 <span data-i18n="piecesTitle">ชิ้นงาน</span> <span class="badge badge-accent" id="pcCount">0</span></div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="addPieceDemo()" data-i18n="demoBtn">📋 ตัวอย่าง</button>
+        <button class="btn btn-primary btn-sm" onclick="addPiece()" data-i18n="addBtn">+ เพิ่มชิ้นงาน</button>
+      </div>
+    </div>
+    <div class="notice" data-i18n="piecesNotice">
+      💡 <b>รองรับไฟล์ 3 ประเภท:</b>
+      <b>STL / OBJ</b> — คำนวณพื้นที่ผิว 3D จาก triangles (freeform, solid) &nbsp;|&nbsp;
+      <b>DXF</b> — อ่าน LWPOLYLINE 2D สำหรับจัดวางและ export contour จริงไป CNC &nbsp;|&nbsp;
+      <b>กรอกขนาด</b> — ป้อน W×H โดยตรง
+    </div>
+    <div id="pcList">
+      <div class="empty"><div class="empty-ico">📐</div><p data-i18n="emptyPieces">กด "+ เพิ่มชิ้นงาน" หรือ "ตัวอย่าง" เพื่อเริ่มต้น</p></div>
+    </div>
+  </div>
+
+  <!-- Results (hidden until nesting runs) -->
+  <div id="resSection" style="display:none;">
+
+    <div class="card">
+      <div class="card-header"><div class="card-title" data-i18n="resultTitle">📊 ผลการคำนวณ</div></div>
+      <div class="stats" id="statsGrid"></div>
+      <div class="eff-bar"><div class="eff-fill" id="effFill" style="width:0%"></div></div>
+      <div id="effLabel" style="font-size:.75rem;color:var(--muted);margin-top:3px;"></div>
+    </div>
+
+    <!-- Layout Overview — all unique sheets side-by-side -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title" data-i18n="layoutTitle">✂️ การคำนวณแผ่น</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-success btn-sm" onclick="exportDXF()" data-i18n="exportAllBtn">⬇️ Export DXF รวมทุก Layout</button>
+        </div>
+      </div>
+      <div class="legend" id="legend" style="margin-bottom:10px;"></div>
+      <div id="layoutOverview" style="display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;margin-bottom:8px;"></div>
+    </div>
+
+    <!-- Detail view (shown on click) -->
+    <div class="card" id="sheetDetailCard" style="display:none;">
+      <div class="card-header">
+        <div class="card-title" id="sheetDetailTitle">✂️ <span data-i18n="detailTitle">รายละเอียด Layout</span></div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-success btn-sm" onclick="exportDXFCurrent()" data-i18n="exportBtn">⬇️ Export DXF Layout นี้</button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('sheetDetailCard').style.display='none'" data-i18n="closeBtn">✕ ปิด</button>
+        </div>
+      </div>
+      <div class="cv-wrap"><canvas id="nestCanvas"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title" data-i18n="pieceDetailTitle">📋 รายละเอียดชิ้นงาน</div></div>
+      <div class="tw">
+        <table id="resTable">
+          <thead>
+            <tr>
+              <th data-i18n="col_piece">ชิ้นงาน</th><th data-i18n="col_src">แหล่งข้อมูล</th><th data-i18n="col_qty">จำนวน</th>
+              <th>W×H (mm)</th><th data-i18n="col_area1">พื้นที่/ชิ้น (m²)</th>
+              <th data-i18n="col_area2">รวม (m²)</th><th data-i18n="col_sheets">แผ่นที่ใช้</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" id="costCard" style="display:none;">
+      <div class="card-header"><div class="card-title" data-i18n="costTitle">💰 ประมาณต้นทุน</div></div>
+      <div id="costBreak"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Action bar -->
+<div class="abar">
+  <button class="btn btn-cnc" onclick="runNesting()" data-i18n="nestBtn">✂️ จัดวาง CNC & คำนวณ</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  i18n — LANGUAGE SYSTEM
+// ═══════════════════════════════════════════════════════
+let lang = localStorage.getItem('sheetcnc_lang') || 'th';
+
+const TR = {
+  th: {
+    settingsTitle:'⚙️ ตั้งค่าแผ่นและการตัด',
+    sheetW:'ความกว้างแผ่น (mm)', sheetH:'ความสูงแผ่น (mm)',
+    preset:'Preset ขนาดแผ่น', presetPh:'— เลือก preset —',
+    p1:'1200×2400 (มาตรฐาน)', p4:'600×1200 (ครึ่งแผ่น)',
+    p5:'2000×4000 (แผ่นใหญ่)', p6:'3000×6000 (แผ่น XL)',
+    kerf:'Kerf / ช่องใบเลื่อย (mm)',
+    stlUnitLbl:'หน่วยของไฟล์ STL / OBJ',
+    unitMm:'มิลลิเมตร (mm)', unitCm:'เซนติเมตร (cm)', unitM:'เมตร (m)', unitIn:'นิ้ว (inch)',
+    pricePerSheet:'ราคาต่อแผ่น (บาท)',
+    laborLbl:'ค่าแรง CNC (บาท/m²)',
+    allowRot:'อนุญาตหมุนชิ้น 90°',
+    rotMode:'การหมุนชิ้นงาน', rotNone:'ไม่หมุน', rot90Opt:'หมุน 90°', rot45Opt:'หมุน 45° & 90°', rotFree:'อิสระ (ทุก 15°)',
+    dxfImportTitle:'📂 นำเข้า DXF หลายชิ้นงาน',
+    dxfImportNotice:'🔍 อัปโหลด <b>DXF 1 ไฟล์ที่มีหลายชิ้นงาน</b> — แอปจะ<b>อ่านเฉพาะกรอบนอกสุด</b>ของแต่ละชิ้น และ<b>ตัด inner object (รู, ช่องเปิด, detail ภายใน) ออกอัตโนมัติ</b> แสดง preview พร้อมขนาด/พื้นที่ แล้วเลือกเพิ่มเข้าลิสต์ได้เลย',
+    dxfDropHint:'คลิกหรือลากไฟล์ <b>.DXF</b> มาวาง',
+    dxfDropSub:'รองรับ LWPOLYLINE, POLYLINE, CIRCLE, ARC (AutoCAD / Rhino / SolidWorks)',
+    piecesTitle:'ชิ้นงาน', demoBtn:'📋 ตัวอย่าง', addBtn:'+ เพิ่มชิ้นงาน',
+    piecesNotice:'💡 <b>รองรับไฟล์ 3 ประเภท:</b> <b>STL / OBJ</b> — คำนวณพื้นที่ผิว 3D จาก triangles &nbsp;|&nbsp; <b>DXF</b> — อ่าน LWPOLYLINE 2D สำหรับ nesting &nbsp;|&nbsp; <b>กรอกขนาด</b> — ป้อน W×H โดยตรง',
+    emptyPieces:'กด "+ เพิ่มชิ้นงาน" หรือ "ตัวอย่าง" เพื่อเริ่มต้น',
+    resultTitle:'📊 ผลการคำนวณ',
+    layoutTitle:'✂️ การคำนวณแผ่น',
+    exportAllBtn:'⬇️ Export DXF รวมทุก Layout',
+    detailTitle:'รายละเอียด Layout',
+    exportBtn:'⬇️ Export DXF Layout นี้', closeBtn:'✕ ปิด',
+    pieceDetailTitle:'📋 รายละเอียดชิ้นงาน',
+    col_piece:'ชิ้นงาน', col_src:'แหล่งข้อมูล', col_qty:'จำนวน',
+    col_area1:'พื้นที่/ชิ้น (m²)', col_area2:'รวม (m²)', col_sheets:'แผ่นที่ใช้',
+    costTitle:'💰 ประมาณต้นทุน',
+    nestBtn:'✂️ จัดวาง CNC & คำนวณ',
+    resetBtn:'🗑️ รีเซ็ต',
+    resetConfirm:'ล้างชิ้นงานและผลการคำนวณทั้งหมด?',
+    // dynamic strings
+    stat_sheets:'แผ่นทั้งหมด', stat_layouts:'แบบแผ่น (layout)',
+    stat_area:'พื้นที่ชิ้นงาน (m²)', stat_eff:'ประสิทธิภาพ',
+    stat_pieces:'ชิ้นทั้งหมด', stat_sheetSz:'ขนาดแผ่น (m²)',
+    eff_good:'ดีมาก ✓', eff_mid:'ปานกลาง', eff_low:'ต่ำ (ชิ้นงานมีขนาดหลากหลายมาก)',
+    sheets_badge:'แผ่น',
+    src_manual:'กรอกขนาด',
+    srcManual:'📏 กรอกขนาด', srcSTL:'📦 STL (3D)', srcOBJ:'🔷 OBJ (3D)', srcDXF:'📄 DXF (2D)',
+    qty_lbl:'จำนวนชิ้น', w_lbl:'กว้าง (mm)', h_lbl:'สูง (mm)',
+    w_nest:'กว้าง nesting (mm)', h_nest:'สูง nesting (mm)',
+    dropFile:'📂 คลิกหรือลากไฟล์',
+    inspStep1:'① ตรวจสอบ DXF', inspStep2:'② ตั้งชื่อ & จำนวน',
+    inspInfo:'💡 แอปจัด classify อัตโนมัติแล้ว — ถ้าไม่ถูกต้อง กด badge ในตารางเพื่อสลับ <b>(กรอบนอก → รู/ช่อง → ข้าม)</b>',
+    inspReauto:'🔄 Auto-classify ใหม่', inspNext:'ต่อไป → ตั้งชื่อและจำนวน',
+    inspBack:'← กลับตรวจสอบ', inspAdd:'➕ เพิ่มชิ้นงานที่เลือกเข้าลิสต์',
+    inspSelAll:'เลือกทั้งหมด', inspDesel:'ยกเลิก', totalSel:'รวมที่เลือก',
+    hoverHighlight:'วางเมาส์เหนือแถวเพื่อ highlight ชิ้นทั้งกลุ่ม',
+    col_type:'ประเภท', col_layer:'Layer', col_cx:'Center X', col_cy:'Center Y',
+    col_w:'กว้าง (mm)', col_h:'สูง (mm)', col_aream2:'พื้นที่ (m²)', col_cls:'Classify',
+    col_found:'ตรวจพบ', col_name:'ชื่อ (แก้ได้)', col_holes:'🕳️ รู',
+    leg_outer:'กรอบนอก (คำนวน + nesting)', leg_hole:'รู/ช่อง (แสดง + export)', leg_skip:'ข้าม',
+    cost_mat:'ค่าวัสดุ', cost_labor:'ค่าแรง CNC', cost_total:'รวมทั้งหมด',
+    cost_unit_sheet:'แผ่น', cost_unit_labor:'บาท/m²',
+    autoLabel:'auto',
+    pieces_lbl:'ชิ้น',
+    perSheet:'ชิ้น/แผ่น',
+    layoutBadge:'แบบ',
+    exportDxfLbl:'แบบ',
+  },
+  en: {
+    settingsTitle:'⚙️ Sheet & Cut Settings',
+    sheetW:'Sheet Width (mm)', sheetH:'Sheet Height (mm)',
+    preset:'Sheet Preset', presetPh:'— Select preset —',
+    p1:'1200×2400 (Standard)', p4:'600×1200 (Half sheet)',
+    p5:'2000×4000 (Large)', p6:'3000×6000 (XL)',
+    kerf:'Kerf / Blade gap (mm)',
+    stlUnitLbl:'STL / OBJ file unit',
+    unitMm:'Millimeter (mm)', unitCm:'Centimeter (cm)', unitM:'Meter (m)', unitIn:'Inch',
+    pricePerSheet:'Price per sheet (THB)',
+    laborLbl:'CNC labor (THB/m²)',
+    allowRot:'Allow 90° rotation',
+    rotMode:'Piece Rotation', rotNone:'No rotation', rot90Opt:'Rotate 90°', rot45Opt:'Rotate 45° & 90°', rotFree:'Free (every 15°)',
+    dxfImportTitle:'📂 Import Multi-piece DXF',
+    dxfImportNotice:'🔍 Upload a <b>single DXF file with multiple pieces</b> — the app reads only <b>outer contours</b>, automatically <b>excludes inner objects (holes, openings)</b>, shows a preview with dimensions/area, then lets you add selected pieces to the list.',
+    dxfDropHint:'Click or drag a <b>.DXF</b> file here',
+    dxfDropSub:'Supports LWPOLYLINE, POLYLINE, CIRCLE, ARC (AutoCAD / Rhino / SolidWorks)',
+    piecesTitle:'Pieces', demoBtn:'📋 Demo', addBtn:'+ Add Piece',
+    piecesNotice:'💡 <b>Supports 3 file types:</b> <b>STL / OBJ</b> — calculate 3D surface area from triangles &nbsp;|&nbsp; <b>DXF</b> — read LWPOLYLINE 2D for nesting &nbsp;|&nbsp; <b>Manual</b> — enter W×H directly',
+    emptyPieces:'Click "+ Add Piece" or "Demo" to get started',
+    resultTitle:'📊 Results',
+    layoutTitle:'✂️ Sheet Layout',
+    exportAllBtn:'⬇️ Export DXF All Layouts (Combined)',
+    detailTitle:'Layout Detail',
+    exportBtn:'⬇️ Export DXF This Layout', closeBtn:'✕ Close',
+    pieceDetailTitle:'📋 Piece Detail',
+    col_piece:'Piece', col_src:'Source', col_qty:'Qty',
+    col_area1:'Area/pc (m²)', col_area2:'Total (m²)', col_sheets:'Sheets used',
+    costTitle:'💰 Cost Estimate',
+    nestBtn:'✂️ Run Nesting & Calculate',
+    resetBtn:'🗑️ Reset',
+    resetConfirm:'Clear all pieces and results?',
+    // dynamic
+    stat_sheets:'Total Sheets', stat_layouts:'Layouts',
+    stat_area:'Piece Area (m²)', stat_eff:'Efficiency',
+    stat_pieces:'Total Pieces', stat_sheetSz:'Sheet size (m²)',
+    eff_good:'Excellent ✓', eff_mid:'Moderate', eff_low:'Low (pieces vary widely in size)',
+    sheets_badge:'sheets',
+    src_manual:'Manual',
+    srcManual:'📏 Manual', srcSTL:'📦 STL (3D)', srcOBJ:'🔷 OBJ (3D)', srcDXF:'📄 DXF (2D)',
+    qty_lbl:'Quantity', w_lbl:'Width (mm)', h_lbl:'Height (mm)',
+    w_nest:'Nesting Width (mm)', h_nest:'Nesting Height (mm)',
+    dropFile:'📂 Click or drag file',
+    inspStep1:'① Inspect DXF', inspStep2:'② Name & Quantity',
+    inspInfo:'💡 Auto-classified — if incorrect, click a badge to cycle <b>(Outer → Hole → Skip)</b>',
+    inspReauto:'🔄 Re-classify', inspNext:'Next → Name & Quantity',
+    inspBack:'← Back to Inspect', inspAdd:'➕ Add Selected to List',
+    inspSelAll:'Select All', inspDesel:'Deselect', totalSel:'Total selected',
+    hoverHighlight:'Hover over a row to highlight the whole group',
+    col_type:'Type', col_layer:'Layer', col_cx:'Center X', col_cy:'Center Y',
+    col_w:'Width (mm)', col_h:'Height (mm)', col_aream2:'Area (m²)', col_cls:'Classify',
+    col_found:'Found', col_name:'Name (editable)', col_holes:'🕳️ Holes',
+    leg_outer:'Outer frame (nest + calculate)', leg_hole:'Hole/cutout (show + export)', leg_skip:'Skip',
+    cost_mat:'Material cost', cost_labor:'CNC labor', cost_total:'Total',
+    cost_unit_sheet:'sheets', cost_unit_labor:'THB/m²',
+    autoLabel:'auto',
+    pieces_lbl:'pcs',
+    perSheet:'pcs/sheet',
+    layoutBadge:'Layout',
+    exportDxfLbl:'Layout',
+  }
+};
+
+function t(key) { return TR[lang][key] || TR['th'][key] || key; }
+
+function applyPreset(val) {
+  if (!val) return;
+  const [w, h] = val.split(',').map(Number);
+  if (!w || !h) return;
+  document.getElementById('sw').value = w;
+  document.getElementById('sh').value = h;
+  saveSettings();
+}
+
+function saveSettings() {
+  // No-op persistence placeholder — settings live in the DOM
+  // Called on every input change so applyPreset can chain into it
+}
+
+function toggleLang() {
+  lang = lang === 'th' ? 'en' : 'th';
+  localStorage.setItem('sheetcnc_lang', lang);
+  applyLang();
+}
+
+function applyLang() {
+  // Update toggle button
+  const btn = document.getElementById('langBtn');
+  if (btn) btn.textContent = lang === 'th' ? '🌐 EN' : '🌐 ไทย';
+  // Update all data-i18n elements
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (TR[lang][key] !== undefined) el.innerHTML = TR[lang][key];
+  });
+  // Re-render dynamic sections
+  if (pieces.length) renderPieces();
+  if (nestResult) renderResults();
+}
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+const COLORS = [
+  '#4361ee','#f72585','#4cc9f0','#f4a261','#2dc653',
+  '#9b5de5','#ffd166','#ef476f','#06d6a0','#118ab2',
+  '#e63946','#8ecae6','#fb8500','#a8dadc','#457b9d'
+];
+let pieces = [];
+let nestResult = null;
+let activeSheet = 0;
+let _pid = 0;
+const uid = () => 'p' + (++_pid);
+function savePieces() { /* state lives in memory — no-op */ }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function unitFactor(){ const u=document.getElementById('stlUnit')?.value||'mm'; return u==='cm'?10:u==='m'?1000:(u==='in'||u==='inch')?25.4:1; }
+
+// ═══════════════════════════════════════════════════════
+//  STL PARSER  (binary + ASCII)
+// ═══════════════════════════════════════════════════════
+function parseSTL(buffer) {
+  // Heuristic: check if size matches binary format
+  const view = new DataView(buffer);
+  const n = view.getUint32(80, true);
+  if (buffer.byteLength === 84 + n * 50 && n > 0) {
+    return parseSTLBinary(buffer, n);
+  }
+  return parseSTLASCII(new TextDecoder().decode(buffer));
+}
+
+function parseSTLBinary(buffer, n) {
+  const view = new DataView(buffer);
+  let area = 0;
+  let mnX=1e18,mnY=1e18,mnZ=1e18,mxX=-1e18,mxY=-1e18,mxZ=-1e18;
+  for (let i = 0; i < n; i++) {
+    const o = 84 + i * 50;
+    const v = [];
+    for (let j = 0; j < 3; j++) {
+      const x=view.getFloat32(o+12+j*12,true);
+      const y=view.getFloat32(o+16+j*12,true);
+      const z=view.getFloat32(o+20+j*12,true);
+      v.push([x,y,z]);
+      if(x<mnX)mnX=x; if(x>mxX)mxX=x;
+      if(y<mnY)mnY=y; if(y>mxY)mxY=y;
+      if(z<mnZ)mnZ=z; if(z>mxZ)mxZ=z;
+    }
+    area += triArea(v[0],v[1],v[2]);
+  }
+  return { area, bbox:{ w:mxX-mnX, h:mxY-mnY, d:mxZ-mnZ } };
+}
+
+function parseSTLASCII(text) {
+  const ms=[...text.matchAll(/vertex\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)/g)];
+  const v=ms.map(m=>[+m[1],+m[2],+m[3]]);
+  let area=0,mnX=1e18,mnY=1e18,mxX=-1e18,mxY=-1e18;
+  for(let i=0;i+2<v.length;i+=3){
+    [v[i],v[i+1],v[i+2]].forEach(p=>{
+      if(p[0]<mnX)mnX=p[0]; if(p[0]>mxX)mxX=p[0];
+      if(p[1]<mnY)mnY=p[1]; if(p[1]>mxY)mxY=p[1];
+    });
+    area+=triArea(v[i],v[i+1],v[i+2]);
+  }
+  return { area, bbox:{ w:mxX-mnX, h:mxY-mnY, d:0 } };
+}
+
+function triArea(a,b,c){
+  const e1=[b[0]-a[0],b[1]-a[1],b[2]-a[2]];
+  const e2=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+  const cx=e1[1]*e2[2]-e1[2]*e2[1];
+  const cy=e1[2]*e2[0]-e1[0]*e2[2];
+  const cz=e1[0]*e2[1]-e1[1]*e2[0];
+  return 0.5*Math.sqrt(cx*cx+cy*cy+cz*cz);
+}
+
+// ═══════════════════════════════════════════════════════
+//  OBJ PARSER
+// ═══════════════════════════════════════════════════════
+function parseOBJ(text) {
+  const vs=[];
+  let area=0,mnX=1e18,mnY=1e18,mxX=-1e18,mxY=-1e18;
+  text.split('\n').forEach(ln=>{
+    const t=ln.trim();
+    if(t.startsWith('v ')){
+      const p=t.split(/\s+/);
+      vs.push([+p[1],+p[2],+p[3]||0]);
+    } else if(t.startsWith('f ')){
+      const idx=t.split(/\s+/).slice(1).map(s=>parseInt(s.split('/')[0])-1);
+      for(let i=1;i+1<idx.length;i++){
+        const v0=vs[idx[0]],v1=vs[idx[i]],v2=vs[idx[i+1]];
+        if(v0&&v1&&v2) area+=triArea(v0,v1,v2);
+      }
+    }
+  });
+  vs.forEach(p=>{
+    if(p[0]<mnX)mnX=p[0]; if(p[0]>mxX)mxX=p[0];
+    if(p[1]<mnY)mnY=p[1]; if(p[1]>mxY)mxY=p[1];
+  });
+  return { area, bbox:{ w:mxX-mnX, h:mxY-mnY, d:0 } };
+}
+
+// ═══════════════════════════════════════════════════════
+//  DXF PARSER  — full: LWPOLYLINE, POLYLINE+VERTEX, CIRCLE, ARC
+// ═══════════════════════════════════════════════════════
+
+/** Parse DXF text into code/value pairs */
+function dxfPairs(text) {
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  const pairs = [];
+  for (let i=0; i+1<lines.length; i+=2)
+    pairs.push([lines[i].trim(), lines[i+1].trim()]);
+  return pairs;
+}
+
+/** Shoelace area + bbox from vertex list */
+function polyStats(xs, ys) {
+  const n = xs.length;
+  let area = 0;
+  for (let j=0;j<n;j++) {
+    const k=(j+1)%n;
+    area += xs[j]*ys[k] - xs[k]*ys[j];
+  }
+  const mnX=Math.min(...xs), mxX=Math.max(...xs);
+  const mnY=Math.min(...ys), mxY=Math.max(...ys);
+  return {
+    vertices: xs.map((x,j)=>[x,ys[j]]),
+    area: Math.abs(area)/2,
+    w: mxX-mnX, h: mxY-mnY,
+    minX: mnX, minY: mnY,
+    cx: (mnX+mxX)/2, cy: (mnY+mxY)/2
+  };
+}
+
+
+/** Expand a DXF LWPOLYLINE arc segment (bulge) into polyline points.
+ *  bulge > 0 = CCW arc (in DXF Y-up), bulge < 0 = CW arc.
+ *  Returns intermediate points NOT including P0 but including P1.
+ *  Caller should push P0 first, then splice these in before pushing next vertex.
+ */
+function bulgePts(x0,y0,x1,y1,b,N=8){
+  if(Math.abs(b)<1e-10) return [[x1,y1]];
+  const dx=x1-x0, dy=y1-y0;
+  const d=Math.sqrt(dx*dx+dy*dy);
+  if(d<1e-10) return [[x1,y1]];
+  // r = d*(1+b²)/(4*|b|)
+  const b2=b*b;
+  const r=d*(1+b2)/(4*Math.abs(b));
+  // midpoint
+  const mx=(x0+x1)/2, my=(y0+y1)/2;
+  // unit direction P0→P1
+  const ux=dx/d, uy=dy/d;
+  // left-perp of P0→P1
+  const lx=-uy, ly=ux;
+  // distance midpoint→center: r*(1-b²)/(1+b²)
+  const dc=r*(1-b2)/(1+b2);
+  // center: for b>0 center is to LEFT; for b<0 to RIGHT
+  const sg=Math.sign(b);
+  const cx2=mx+sg*dc*lx, cy2=my+sg*dc*ly;
+  // start/end angles
+  const a0=Math.atan2(y0-cy2,x0-cx2);
+  const a1=Math.atan2(y1-cy2,x1-cx2);
+  // sweep: CCW if b>0, CW if b<0
+  let sw=a1-a0;
+  if(b>0){if(sw<0) sw+=2*Math.PI;}
+  else   {if(sw>0) sw-=2*Math.PI;}
+  const pts=[];
+  for(let k=1;k<=N;k++){
+    const a=a0+sw*k/N;
+    pts.push([cx2+r*Math.cos(a), cy2+r*Math.sin(a)]);
+  }
+  return pts;
+}
+
+/** Approximate circle/arc with polygon */
+function circleVerts(cx,cy,r,startDeg,endDeg,segs=36) {
+  const xs=[],ys=[];
+  const s=startDeg*(Math.PI/180), e=endDeg*(Math.PI/180);
+  const step=(e-s)/segs;
+  for(let i=0;i<=segs;i++){
+    const a=s+i*step;
+    xs.push(cx+r*Math.cos(a));
+    ys.push(cy+r*Math.sin(a));
+  }
+  return {xs,ys};
+}
+
+/** Full DXF parser — returns array of shape objects */
+function parseDXFFull(text) {
+  const pairs = dxfPairs(text);
+  const shapes = [];
+  let i = 0;
+
+  // Helper: read entity block starting after the entity-type pair
+  const readBlock = (startI) => {
+    const block = {};
+    let j = startI;
+    while (j < pairs.length) {
+      const [code, val] = pairs[j];
+      if (code === '0') break; // next entity or section
+      block[code] = block[code] === undefined ? val : block[code]; // first wins (except coords)
+      // For multi-value codes like 10/20, collect arrays
+      if (code==='10'||code==='20'||code==='11'||code==='21') {
+        if (!block['_arr_'+code]) block['_arr_'+code]=[];
+        block['_arr_'+code].push(+val);
+      }
+      j++;
+    }
+    return { block, nextI: j };
+  };
+
+  while (i < pairs.length) {
+    const [code, val] = pairs[i];
+
+    if (code === '0') {
+      // ── LWPOLYLINE ──────────────────────────────────
+      if (val === 'LWPOLYLINE') {
+        i++;
+        const rawV=[];  // [{x,y,b}]
+        let layer='0', closed=false, cur=null;
+        while (i < pairs.length) {
+          const [c,v] = pairs[i];
+          if (c==='0') break;
+          if (c==='8') layer=v;
+          if (c==='70') closed=(+v & 1)===1;
+          if (c==='10'){ if(cur) rawV.push(cur); cur={x:+v,y:0,b:0}; }
+          if (c==='20' && cur) cur.y=+v;
+          if (c==='42' && cur) cur.b=+v;
+          i++;
+        }
+        if(cur) rawV.push(cur);
+        if(rawV.length>=3){
+          // Expand bulge arcs into polyline vertices
+          const xs=[], ys=[];
+          rawV.forEach((v,k)=>{
+            xs.push(v.x); ys.push(v.y);
+            if(Math.abs(v.b)>1e-10){
+              const nxt=rawV[(k+1)%rawV.length];
+              const pts=bulgePts(v.x,v.y,nxt.x,nxt.y,v.b,24);
+              // push intermediate points (omit last = nxt, which is pushed next iteration)
+              for(let j=0;j<pts.length-1;j++){ xs.push(pts[j][0]); ys.push(pts[j][1]); }
+            }
+          });
+          // Remove closing duplicate if present
+          while(xs.length>3){
+            const dx=xs[xs.length-1]-xs[0], dy=ys[ys.length-1]-ys[0];
+            if(Math.sqrt(dx*dx+dy*dy)<0.5){xs.pop();ys.pop();}else break;
+          }
+          if(xs.length>=3){
+            shapes.push({ type:'polyline', layer, closed:true, rawV, ...polyStats(xs,ys) });
+          }
+        } else if(rawV.length===2){
+          const v0=rawV[0], v1=rawV[1];
+          const hasBulge=Math.abs(v0.b)>1e-10||Math.abs(v1.b)>1e-10;
+          if(closed && hasBulge){
+            // CLOSED 2-vertex polyline with bulge(s) = a lune / crescent moon (วงพระจันทร์):
+            // two arcs between the SAME two points — arc v0→v1 (bulge v0.b) and the
+            // closing arc v1→v0 (bulge v1.b). Build the full closed loop.
+            const xs=[v0.x], ys=[v0.y];
+            let seg=bulgePts(v0.x,v0.y,v1.x,v1.y,v0.b,28);   // ends at v1
+            for(let j=0;j<seg.length;j++){ xs.push(seg[j][0]); ys.push(seg[j][1]); }
+            seg=bulgePts(v1.x,v1.y,v0.x,v0.y,v1.b,28);        // ends at v0
+            for(let j=0;j<seg.length-1;j++){ xs.push(seg[j][0]); ys.push(seg[j][1]); } // omit final v0 (auto-closes)
+            if(xs.length>=3){
+              shapes.push({ type:'polyline', layer, closed:true, rawV, ...polyStats(xs,ys) });
+            }
+          } else if(hasBulge){
+            // OPEN 2-vertex arc (single curved segment)
+            const pts=[[v0.x,v0.y], ...bulgePts(v0.x,v0.y,v1.x,v1.y,v0.b,28)];
+            const xs2=pts.map(p=>p[0]), ys2=pts.map(p=>p[1]);
+            const mnX=Math.min(...xs2), mnY=Math.min(...ys2), mxX=Math.max(...xs2), mxY=Math.max(...ys2);
+            const arcArea=Math.max(Math.abs(shoelaceArea(pts)), 2);
+            shapes.push({ type:'arc', layer, open:true, closed:false,
+              vertices:pts, rawV:[{x:v0.x,y:v0.y,b:v0.b},{x:v1.x,y:v1.y,b:0}],
+              area:arcArea, w:mxX-mnX, h:mxY-mnY, minX:mnX, minY:mnY, cx:(mnX+mxX)/2, cy:(mnY+mxY)/2 });
+          } else {
+            const xs=rawV.map(v=>v.x), ys=rawV.map(v=>v.y);
+            shapes.push({ type:'line', layer, vertices:[[xs[0],ys[0]],[xs[1],ys[1]]],
+              area:0, w:Math.abs(xs[1]-xs[0]), h:Math.abs(ys[1]-ys[0]),
+              minX:Math.min(...xs), minY:Math.min(...ys), cx:0, cy:0 });
+          }
+        }
+        continue;
+      }
+
+      // ── POLYLINE (old-style, followed by VERTEX entities) ──
+      if (val === 'POLYLINE') {
+        i++;
+        let layer='0', closed=false;
+        while (i < pairs.length && pairs[i][0]!=='0') {
+          if (pairs[i][0]==='8') layer=pairs[i][1];
+          if (pairs[i][0]==='70') closed=(+pairs[i][1] & 1)===1;
+          i++;
+        }
+        const rawVp=[];
+        // Collect VERTEX entities — read bulge (code 42) for smooth export
+        while (i < pairs.length) {
+          if (pairs[i][0]==='0' && pairs[i][1]==='VERTEX') {
+            i++;
+            let vx=null, vy=null, vb=0;
+            while (i < pairs.length && pairs[i][0]!=='0') {
+              if (pairs[i][0]==='10') vx=+pairs[i][1];
+              if (pairs[i][0]==='20') vy=+pairs[i][1];
+              if (pairs[i][0]==='42') vb=+pairs[i][1];
+              i++;
+            }
+            if (vx!==null && vy!==null) rawVp.push({x:vx, y:vy, b:vb});
+          } else if (pairs[i][0]==='0' && pairs[i][1]==='SEQEND') {
+            i++; break;
+          } else { break; }
+        }
+        if (rawVp.length>=3) {
+          // Expand bulge arcs (same logic as LWPOLYLINE)
+          const xs=[], ys=[];
+          rawVp.forEach((v,k)=>{
+            xs.push(v.x); ys.push(v.y);
+            if(Math.abs(v.b)>1e-10){
+              const nxt=rawVp[(k+1)%rawVp.length];
+              const pts=bulgePts(v.x,v.y,nxt.x,nxt.y,v.b,24);
+              for(let j=0;j<pts.length-1;j++){ xs.push(pts[j][0]); ys.push(pts[j][1]); }
+            }
+          });
+          while(xs.length>3){
+            const dx=xs[xs.length-1]-xs[0], dy=ys[ys.length-1]-ys[0];
+            if(Math.sqrt(dx*dx+dy*dy)<0.5){xs.pop();ys.pop();}else break;
+          }
+          if(xs.length>=3){
+            shapes.push({ type:'polyline', layer, closed, rawV:rawVp, ...polyStats(xs,ys) });
+          }
+        }
+        continue;
+      }
+
+      // ── CIRCLE ──────────────────────────────────────
+      if (val === 'CIRCLE') {
+        i++;
+        let cx=0, cy=0, r=0, layer='0';
+        while (i < pairs.length && pairs[i][0]!=='0') {
+          const [c,v]=pairs[i];
+          if (c==='8') layer=v;
+          if (c==='10') cx=+v;
+          if (c==='20') cy=+v;
+          if (c==='40') r=+v;
+          i++;
+        }
+        if (r>0) {
+          const {xs,ys}=circleVerts(cx,cy,r,0,360,48);
+          xs.pop(); ys.pop(); // remove duplicate end point
+          const area=Math.PI*r*r;
+          // rawV: 4 quarter-arc bulge points (bulge = tan(90°/4)) = a TRUE circle on
+          // export (smooth arcs in CAD) instead of a faceted 48-gon polyline.
+          const Q=Math.tan(Math.PI/8);
+          const rawV=[{x:cx+r,y:cy,b:Q},{x:cx,y:cy+r,b:Q},{x:cx-r,y:cy,b:Q},{x:cx,y:cy-r,b:Q}];
+          shapes.push({ type:'circle', layer, r, vertices:xs.map((x,j)=>[x,ys[j]]), rawV,
+            area, w:r*2, h:r*2, minX:cx-r, minY:cy-r, cx, cy });
+        }
+        continue;
+      }
+
+      // ── ARC ─────────────────────────────────────────
+      if (val === 'ARC') {
+        i++;
+        let cx=0, cy=0, r=0, startA=0, endA=360, layer='0';
+        while (i < pairs.length && pairs[i][0]!=='0') {
+          const [c,v]=pairs[i];
+          if (c==='8') layer=v;
+          if (c==='10') cx=+v;
+          if (c==='20') cy=+v;
+          if (c==='40') r=+v;
+          if (c==='50') startA=+v;
+          if (c==='51') endA=+v;
+          i++;
+        }
+        // Open arc — keep parametric data so export stays smooth (bulge) rather
+        // than faceted. sweep CCW from startA→endA; bulge = tan(sweep/4).
+        let sweep=endA-startA; while(sweep<=0) sweep+=360; while(sweep>360) sweep-=360;
+        const aV=circleVerts(cx,cy,r,startA,startA+sweep,Math.max(8,Math.ceil(sweep/15)));
+        const arcVerts=aV.xs.map((x,j)=>[x,aV.ys[j]]);
+        const x0=cx+r*Math.cos(startA*Math.PI/180), y0=cy+r*Math.sin(startA*Math.PI/180);
+        const x1=cx+r*Math.cos((startA+sweep)*Math.PI/180), y1=cy+r*Math.sin((startA+sweep)*Math.PI/180);
+        const arcRawV=[{x:x0,y:y0,b:Math.tan(sweep*Math.PI/180/4)},{x:x1,y:y1,b:0}];
+        const mnX=Math.min(...aV.xs), mnY=Math.min(...aV.ys);
+        // Footprint area = the arc+chord "lune" (so the arc imports as a real piece
+        // and nests by the space it occupies). open:true → exported as an open arc
+        // (NO chord added) to keep the original artwork unchanged.
+        const arcArea=Math.max(Math.abs(shoelaceArea(arcVerts)), 2);
+        shapes.push({ type:'arc', layer, r, area:arcArea, open:true, vertices:arcVerts, rawV:arcRawV, closed:false,
+          w:Math.max(...aV.xs)-mnX, h:Math.max(...aV.ys)-mnY, minX:mnX, minY:mnY, cx, cy });
+        continue;
+      }
+
+      // ── SPLINE ──────────────────────────────────────
+      if (val === 'SPLINE') {
+        i++;
+        const xs=[], ys=[];
+        let layer='0';
+        while (i < pairs.length && pairs[i][0]!=='0') {
+          const [c,v]=pairs[i];
+          if (c==='8') layer=v;
+          if (c==='10') xs.push(+v); // control points
+          if (c==='20') ys.push(+v);
+          i++;
+        }
+        if (xs.length>=3) {
+          shapes.push({ type:'spline', layer, ...polyStats(xs,ys) });
+        }
+        continue;
+      }
+    }
+    i++;
+  }
+  return shapes;
+}
+
+// ═══════════════════════════════════════════════════════
+//  OUTER CONTOUR FILTER
+//  ตรวจว่า shape ใดอยู่ "ภายใน" shape อื่น → ตัดทิ้ง
+// ═══════════════════════════════════════════════════════
+
+/** Ray-casting point-in-polygon */
+function pointInPolygon(px, py, vertices) {
+  let inside = false;
+  const n = vertices.length;
+  for (let i = 0, j = n-1; i < n; j = i++) {
+    const [xi, yi] = vertices[i];
+    const [xj, yj] = vertices[j];
+    if (((yi > py) !== (yj > py)) &&
+        (px < (xj-xi)*(py-yi)/(yj-yi)+xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** ตรวจ bounding-box containment ก่อน (เร็วกว่า) — มี tolerance 0.5mm */
+function bboxContains(outer, inner, tol=0.5) {
+  return inner.minX >= outer.minX - tol &&
+         inner.minY >= outer.minY - tol &&
+         inner.minX+inner.w <= outer.minX+outer.w + tol &&
+         inner.minY+inner.h <= outer.minY+outer.h + tol;
+}
+
+/**
+ * สร้าง contour hierarchy — Even-Odd Rule
+ * depth 0,2,4… = outer solid  |  depth 1,3,5… = hole
+ * คืน array ของ outer shapes แต่ละตัวมี .holes[] สำหรับชิ้น/รูภายใน
+ */
+function buildContourTree(shapes) {
+  const valid = shapes.filter(s=>s.vertices&&s.vertices.length>=3&&s.area>=1);
+  // OPEN paths (arcs / open polylines) are standalone cut lines: they can never be
+  // a hole and can never contain holes. Keep them out of the even-odd hole logic
+  // entirely, then append them as their own outer pieces at the end.
+  const opens = valid.filter(s=>s.open);
+  const all = valid.filter(s=>!s.open);
+  all.sort((a,b)=>b.area-a.area);
+
+  // หา parent ที่เล็กที่สุดที่ครอบ shape นั้น
+  // ใช้ center point โดยตรง — ไม่ผ่าน bboxContains เพื่อป้องกัน false-negative
+  const parent = new Array(all.length).fill(-1);
+  for (let i=0;i<all.length;i++) {
+    const s = all[i];
+    // จุดกึ่งกลาง bbox (สำหรับ circle = cx,cy พอดี)
+    const cx = s.minX + s.w / 2;
+    const cy = s.minY + s.h / 2;
+    let bestJ=-1, bestArea=Infinity;
+    for (let j=0;j<all.length;j++) {
+      if (j===i || all[j].area <= s.area) continue;
+      if (all[j].vertices.length < 3) continue;
+      // ทดสอบ center point ของ s กับ polygon j โดยตรง
+      if (pointInPolygon(cx, cy, all[j].vertices)) {
+        if (all[j].area < bestArea){ bestArea=all[j].area; bestJ=j; }
+      }
+    }
+    parent[i]=bestJ;
+  }
+
+  // depth = จำนวนชั้นที่ซ้อนอยู่
+  const depthOf = i => {
+    let d=0,cur=i;
+    while(parent[cur]!==-1){d++;cur=parent[cur];}
+    return d;
+  };
+
+  // outer = depth คู่ (0,2,…)  hole = depth คี่ (1,3,…)
+  const result = [];
+  all.forEach((s,i)=>{
+    if(depthOf(i)%2===0){
+      // หา direct children ที่เป็น hole (depth คี่ และ parent===i)
+      const holes = all.filter((_,j)=>parent[j]===i && depthOf(j)%2===1);
+      result.push({...s, holes});
+    }
+  });
+  // Open cut paths (arcs) — always standalone outer pieces, no holes.
+  opens.forEach(s=>result.push({...s, holes:[]}));
+  return result;
+}
+
+/** backward-compat wrapper */
+function filterOuterContours(shapes) {
+  return buildContourTree(shapes);
+}
+
+/** Legacy single-piece DXF parser (used for per-piece import) */
+function parseDXF(text) {
+  const all = parseDXFFull(text).filter(s=>s.area>0 && s.vertices && s.vertices.length>=3);
+  const outer = filterOuterContours(all);
+  return outer.sort((a,b)=>b.area-a.area);
+}
+
+// ═══════════════════════════════════════════════════════
+//  MULTI-PIECE DXF IMPORT
+// ═══════════════════════════════════════════════════════
+let mdxfShapes = []; // parsed shapes from multi-piece DXF
+let mdxfGroups = []; // grouped by identical shape: [{shape, count, indices[]}]
+
+/** Normalize vertices to [0..1] space for shape comparison */
+function normalizeVerts(vertices, w, h) {
+  if (!vertices || !vertices.length) return [];
+  let mnX=Infinity, mnY=Infinity;
+  vertices.forEach(([x,y])=>{ mnX=Math.min(mnX,x); mnY=Math.min(mnY,y); });
+  const sc = Math.max(w, h) || 1;
+  return vertices.map(([x,y])=>[(x-mnX)/sc, (y-mnY)/sc]);
+}
+
+/** Compare two normalized vertex arrays with cyclic offset (handles different start point) */
+function vertsMatch(v1, v2, tol=0.008) {
+  if (v1.length !== v2.length) return false;
+  const n = v1.length;
+  // Try forward and reversed (handles CW/CCW difference)
+  for (const rev of [false, true]) {
+    const v2r = rev ? [...v2].reverse() : v2;
+    for (let off=0; off<n; off++) {
+      let ok=true;
+      for (let i=0;i<n;i++) {
+        const [ax,ay]=v1[i], [bx,by]=v2r[(i+off)%n];
+        if (Math.abs(ax-bx)>tol||Math.abs(ay-by)>tol){ok=false;break;}
+      }
+      if (ok) return true;
+    }
+  }
+  return false;
+}
+
+/** True if s1 and s2 are the same shape (size + contour pattern) */
+function shapeSimilar(s1, s2) {
+  if (s1.type !== s2.type) return false;
+  if (Math.abs(s1.w-s2.w)>1.5 || Math.abs(s1.h-s2.h)>1.5) return false;
+  if (!s1.vertices || !s2.vertices) return false;
+  if (Math.abs(s1.vertices.length-s2.vertices.length)>2) return false;
+  const n1 = normalizeVerts(s1.vertices, s1.w, s1.h);
+  const n2 = normalizeVerts(s2.vertices, s2.w, s2.h);
+  return vertsMatch(n1, n2);
+}
+
+/** Group mdxfShapes by identical contour — returns [{shape, count, indices}] */
+function buildShapeGroups(shapes) {
+  const groups = [];
+  shapes.forEach((s,i)=>{
+    const g = groups.find(g=>shapeSimilar(g.shape, s));
+    if (g) { g.count++; g.indices.push(i); }
+    else groups.push({shape:s, count:1, indices:[i]});
+  });
+  return groups;
+}
+
+// ═══════════════════════════════════════════════════════
+//  DXF INSPECTOR — ระบบตรวจสอบก่อนนำมาคำนวน
+// ═══════════════════════════════════════════════════════
+let inspRaw = [];    // all closed shapes from DXF (unfiltered)
+let inspCls = [];    // 'outer' | 'hole' | 'skip' per shape
+let inspFileName = '';
+
+const CLS_LABEL = { outer:'✅ กรอบนอก', hole:'🕳️ รู/ช่อง', skip:'⛔ ข้าม' };
+const CLS_NEXT  = { outer:'hole', hole:'skip', skip:'outer' };
+
+function handleMdxfDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) handleMdxfFile(f);
+}
+
+function handleMdxfFile(file) {
+  if (!file) return;
+  inspFileName = file.name;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      let all;
+      if (ext === 'dxf') {
+        all = parseDXFFull(ev.target.result);
+      } else if (ext === 'svg') {
+        all = parseSVGShapes(ev.target.result);
+      } else if (ext === 'eps' || ext === 'ai') {
+        all = parseEPSShapes(ev.target.result);
+      } else {
+        showInspErr(`ไม่รองรับไฟล์ .${ext} — รองรับเฉพาะ DXF, SVG, EPS, AI`);
+        return;
+      }
+      inspRaw = all.filter(s => s.vertices && s.vertices.length >= 3 && s.area >= 0.1)
+                   .sort((a,b) => b.area - a.area);
+      if (!inspRaw.length) {
+        showInspErr(lang==='en'
+          ? 'No closed contours found — make sure outlines are closed paths'
+          : 'ไม่พบ closed contour ในไฟล์ — ตรวจสอบว่า outline เป็น Closed Polyline / Path');
+        return;
+      }
+      autoClassify();
+      renderInspector();
+    } catch(err) {
+      showInspErr('อ่านไฟล์ไม่ได้: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ─── SVG Parser ────────────────────────────────────────────────────────────
+function parseSVGShapes(text) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'image/svg+xml');
+  const shapes = [];
+
+  // Get viewBox / width for unit conversion
+  const svgEl = doc.querySelector('svg');
+  let svgW = parseFloat(svgEl?.getAttribute('width')) || 0;
+  let svgH = parseFloat(svgEl?.getAttribute('height')) || 0;
+  const vb = svgEl?.getAttribute('viewBox')?.trim().split(/[\s,]+/).map(Number);
+  const vbW = vb?.[2] || svgW || 100;
+  const vbH = vb?.[3] || svgH || 100;
+  // Assume viewBox units = mm (common from AI/Illustrator export)
+  const scaleX = svgW > 0 ? svgW / vbW : 1;
+  const scaleY = svgH > 0 ? svgH / vbH : 1;
+
+  function applyTransform(pts, el) {
+    const t = el.getAttribute('transform');
+    if (!t) return pts;
+    const m = t.match(/matrix\(([^)]+)\)/);
+    if (m) {
+      const [a,b,c,d,e,f] = m[1].split(/[\s,]+/).map(Number);
+      return pts.map(([x,y]) => [a*x+c*y+e, b*x+d*y+f]);
+    }
+    const tr = t.match(/translate\(([^)]+)\)/);
+    if (tr) {
+      const [tx,ty=0] = tr[1].split(/[\s,]+/).map(Number);
+      return pts.map(([x,y]) => [x+tx, y+ty]);
+    }
+    return pts;
+  }
+
+  function addShape(pts, el) {
+    if (!pts || pts.length < 3) return;
+    pts = applyTransform(pts, el);
+    const xs = pts.map(v=>v[0]), ys = pts.map(v=>v[1]);
+    const x1=Math.min(...xs), y1=Math.min(...ys);
+    const w=Math.max(...xs)-x1, h=Math.max(...ys)-y1;
+    if (w < 0.5 || h < 0.5) return;
+    const norm = pts.map(([x,y]) => [(x-x1)*scaleX, (y-y1)*scaleY]);
+    const nw = w*scaleX, nh = h*scaleY;
+    const area = Math.abs(shoelaceArea(norm));
+    shapes.push({type:'polygon', vertices:norm, w:nw, h:nh, area, layer:'0', holes:[]});
+  }
+
+  doc.querySelectorAll('path,rect,circle,ellipse,polygon,polyline').forEach(el => {
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'rect') {
+      const x=+el.getAttribute('x')||0, y=+el.getAttribute('y')||0;
+      const w=+el.getAttribute('width')||0, h=+el.getAttribute('height')||0;
+      if (w>0 && h>0) addShape([[x,y],[x+w,y],[x+w,y+h],[x,y+h]], el);
+    } else if (tag === 'circle') {
+      const cx=+el.getAttribute('cx')||0, cy=+el.getAttribute('cy')||0, r=+el.getAttribute('r')||0;
+      if (r>0) addShape(circleToVerts(cx,cy,r,48), el);
+    } else if (tag === 'ellipse') {
+      const cx=+el.getAttribute('cx')||0, cy=+el.getAttribute('cy')||0;
+      const rx=+el.getAttribute('rx')||0, ry=+el.getAttribute('ry')||0;
+      if (rx>0 && ry>0) addShape(ellipseToVerts(cx,cy,rx,ry,48), el);
+    } else if (tag === 'polygon' || tag === 'polyline') {
+      const pts=(el.getAttribute('points')||'').trim().split(/\s+|,/).reduce((acc,v,i)=>{
+        if(i%2===0) acc.push([+v,0]); else acc[acc.length-1][1]=+v; return acc;
+      },[]);
+      addShape(pts, el);
+    } else if (tag === 'path') {
+      const subpaths = parseSVGPathD(el.getAttribute('d')||'');
+      subpaths.forEach(pts => addShape(pts, el));
+    }
+  });
+  return shapes;
+}
+
+function circleToVerts(cx,cy,r,n){
+  return Array.from({length:n},(_,i)=>{
+    const a=2*Math.PI*i/n;
+    return [cx+Math.cos(a)*r, cy+Math.sin(a)*r];
+  });
+}
+function ellipseToVerts(cx,cy,rx,ry,n){
+  return Array.from({length:n},(_,i)=>{
+    const a=2*Math.PI*i/n;
+    return [cx+Math.cos(a)*rx, cy+Math.sin(a)*ry];
+  });
+}
+function shoelaceArea(pts){
+  let s=0;
+  for(let i=0,n=pts.length;i<n;i++){
+    const [x0,y0]=pts[i],[x1,y1]=pts[(i+1)%n];
+    s+=(x0*y1-x1*y0);
+  }
+  return s/2;
+}
+
+function parseSVGPathD(d) {
+  // Tokenize SVG path data
+  const subpaths = [];
+  let cur = [], cx=0, cy=0, sx=0, sy=0;
+  const toks = d.replace(/([MmZzLlHhVvCcSsQqTtAa])/g,' $1 ').trim().split(/\s+|,/).filter(Boolean);
+  let i=0, cmd='M';
+  const N=()=>{ const v=+toks[i++]; return isNaN(v)?0:v; };
+
+  function closeAndSave(){
+    if(cur.length>=3){ subpaths.push([...cur]); }
+    cur=[];
+  }
+  function bezier(p0,p1,p2,p3,steps=12){
+    const pts=[];
+    for(let t=0;t<=1;t+=1/steps){
+      const u=1-t;
+      const x=u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0];
+      const y=u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1];
+      pts.push([x,y]);
+    }
+    return pts;
+  }
+
+  while(i<toks.length){
+    const tok=toks[i];
+    if(/^[MmZzLlHhVvCcSsQqTtAa]$/.test(tok)){ cmd=tok; i++; continue; }
+    switch(cmd){
+      case 'M': cx=N();cy=N(); sx=cx;sy=cy; cur=[[cx,cy]]; cmd='L'; break;
+      case 'm': cx+=N();cy+=N(); sx=cx;sy=cy; if(cur.length>=3)subpaths.push([...cur]); cur=[[cx,cy]]; cmd='l'; break;
+      case 'Z': case 'z': cur.push([sx,sy]); closeAndSave(); cx=sx;cy=sy; break;
+      case 'L': cx=N();cy=N(); cur.push([cx,cy]); break;
+      case 'l': cx+=N();cy+=N(); cur.push([cx,cy]); break;
+      case 'H': cx=N(); cur.push([cx,cy]); break;
+      case 'h': cx+=N(); cur.push([cx,cy]); break;
+      case 'V': cy=N(); cur.push([cx,cy]); break;
+      case 'v': cy+=N(); cur.push([cx,cy]); break;
+      case 'C': { const x1=N(),y1=N(),x2=N(),y2=N(),x=N(),y=N();
+        bezier([cx,cy],[x1,y1],[x2,y2],[x,y]).forEach(p=>cur.push(p)); cx=x;cy=y; break; }
+      case 'c': { const x1=cx+N(),y1=cy+N(),x2=cx+N(),y2=cy+N(),x=cx+N(),y=cy+N();
+        bezier([cx,cy],[x1,y1],[x2,y2],[x,y]).forEach(p=>cur.push(p)); cx=x;cy=y; break; }
+      case 'Q': { const x1=N(),y1=N(),x=N(),y=N();
+        bezier([cx,cy],[x1,y1],[x1,y1],[x,y],8).forEach(p=>cur.push(p)); cx=x;cy=y; break; }
+      case 'q': { const x1=cx+N(),y1=cy+N(),x=cx+N(),y=cy+N();
+        bezier([cx,cy],[x1,y1],[x1,y1],[x,y],8).forEach(p=>cur.push(p)); cx=x;cy=y; break; }
+      default: i++; // skip unknown
+    }
+  }
+  if(cur.length>=3) subpaths.push(cur);
+  return subpaths;
+}
+
+// ─── EPS / AI Parser ───────────────────────────────────────────────────────
+function parseEPSShapes(text) {
+  const shapes = [];
+  // Detect if it's PDF-based AI (modern AI) — can't parse
+  if(text.startsWith('%PDF') || text.includes('%%Creator: Adobe Illustrator') && text.includes('endstream')){
+    // Modern AI = PDF, try extracting embedded EPS or just warn
+    // Fall through to PostScript parser for embedded PS
+  }
+
+  const toks = text.split(/\s+/);
+  let i=0, cur=[], allPaths=[], ctmStack=[];
+  let cx=0, cy=0;
+  let a=1,b=0,c=0,d=1,e=0,f=0; // CTM
+
+  function apCTM(px,py){ return [a*px+c*py+e, b*px+d*py+f]; }
+  function flush(){ if(cur.length>=3){ allPaths.push([...cur]); } cur=[]; }
+
+  while(i<toks.length){
+    const tok=toks[i++];
+    if(tok==='moveto'||tok==='m'){
+      flush(); const py=+toks[i-3],px=+toks[i-4]; cx=px;cy=py;
+      cur=[apCTM(cx,cy)];
+    } else if(tok==='lineto'||tok==='l'||tok==='L'){
+      const py=+toks[i-3],px=+toks[i-4]; cx=px;cy=py;
+      cur.push(apCTM(cx,cy));
+    } else if(tok==='rlineto'||tok==='rl'){
+      const dy=+toks[i-3],dx=+toks[i-4]; cx+=dx;cy+=dy;
+      cur.push(apCTM(cx,cy));
+    } else if(tok==='closepath'||tok==='cp'||tok==='h'){
+      if(cur.length>0) cur.push(cur[0]);
+      flush();
+    } else if(tok==='curveto'||tok==='c'){
+      // 6 params before token: x1 y1 x2 y2 x3 y3
+      const y3=+toks[i-3],x3=+toks[i-4];
+      cx=x3;cy=y3; cur.push(apCTM(cx,cy));
+    } else if(tok==='concat'||tok==='setmatrix'){
+      // try reading matrix [ a b c d e f ]
+      const mat=text.slice(0,text.indexOf(tok)).match(/\[([^\]]+)\]\s*$/) ;
+    }
+  }
+  flush();
+
+  allPaths.forEach(pts=>{
+    if(pts.length<3) return;
+    const xs=pts.map(v=>v[0]),ys=pts.map(v=>v[1]);
+    const x1=Math.min(...xs),y1=Math.min(...ys);
+    const w=Math.max(...xs)-x1, h=Math.max(...ys)-y1;
+    if(w<0.5||h<0.5) return;
+    const norm=pts.map(([x,y])=>[x-x1,y-y1]);
+    const area=Math.abs(shoelaceArea(norm));
+    shapes.push({type:'polygon',vertices:norm,w,h,area,layer:'0',holes:[]});
+  });
+  return shapes;
+}
+
+function showInspErr(msg) {
+  const el = document.getElementById('mdxfResult');
+  el.style.display='';
+  el.innerHTML = `<div class="ferr">⚠️ ${msg}</div>`;
+}
+
+/** Auto-classify ด้วย buildContourTree */
+function autoClassify() {
+  inspCls = inspRaw.map(() => 'skip');
+  const tree = buildContourTree(inspRaw);
+  tree.forEach(outer => {
+    const oi = matchRaw(outer);
+    if (oi >= 0) inspCls[oi] = 'outer';
+    (outer.holes||[]).forEach(hole => {
+      const hi = matchRaw(hole);
+      if (hi >= 0) inspCls[hi] = 'hole';
+    });
+  });
+}
+
+function matchRaw(s) {
+  return inspRaw.findIndex(r =>
+    Math.abs(r.minX - s.minX) < 0.1 &&
+    Math.abs(r.minY - s.minY) < 0.1 &&
+    Math.abs(r.area  - s.area)  < 1
+  );
+}
+
+/** สลับ classification ของ shape i */
+function toggleCls(i) {
+  inspCls[i] = CLS_NEXT[inspCls[i]] || 'outer';
+  // update row style + button text
+  const row = document.getElementById('inspRow'+i);
+  const btn = document.getElementById('inspCls'+i);
+  if (!row||!btn) return;
+  row.className = `insp-row-${inspCls[i]}`;
+  btn.className = `cls-badge cls-${inspCls[i]}`;
+  btn.textContent = CLS_LABEL[inspCls[i]];
+  drawInspCanvas();
+}
+
+/** Render Inspector UI */
+function renderInspector() {
+  const el = document.getElementById('mdxfResult');
+  el.style.display = '';
+
+  const nOuter = inspCls.filter(c=>c==='outer').length;
+  const nHole  = inspCls.filter(c=>c==='hole').length;
+  const nSkip  = inspCls.filter(c=>c==='skip').length;
+  const layers = [...new Set(inspRaw.map(s=>s.layer||'0'))];
+
+  el.innerHTML = `
+    <!-- Step indicator -->
+    <div class="insp-steps">
+      <div class="insp-step active">${t('inspStep1')}</div>
+      <div class="insp-step" id="inspStep2">${t('inspStep2')}</div>
+    </div>
+
+    <!-- Summary badges -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <span style="font-size:.85rem;font-weight:700;">📄 ${inspFileName}</span>
+      <span class="cls-badge cls-outer">${CLS_LABEL.outer}: ${nOuter}</span>
+      <span class="cls-badge cls-hole">${CLS_LABEL.hole}: ${nHole}</span>
+      <span class="cls-badge cls-skip">${CLS_LABEL.skip}: ${nSkip}</span>
+      <span style="font-size:.74rem;color:var(--muted);">Layer: ${layers.join(', ')}</span>
+    </div>
+
+    <div class="info-box">${t('inspInfo')}</div>
+
+    <!-- Inspector map + legend -->
+    <div class="insp-map-wrap">
+      <div class="insp-canvas-box" style="position:relative;">
+        <canvas id="inspCanvas" style="display:block;width:100%;height:260px;"></canvas>
+        <div style="position:absolute;top:6px;left:8px;font-size:.7rem;color:#64748b;">
+          พิกัดจริงในไฟล์ DXF (mm)
+        </div>
+      </div>
+      <div>
+        <div class="insp-legend">
+          <div class="insp-leg"><div class="insp-leg-dot" style="background:#60a5fa;"></div>${t('leg_outer')}</div>
+          <div class="insp-leg"><div class="insp-leg-dot" style="background:#a78bfa;"></div>${t('leg_hole')}</div>
+          <div class="insp-leg"><div class="insp-leg-dot" style="background:#374151;"></div>${t('leg_skip')}</div>
+        </div>
+        <div style="font-size:.76rem;color:var(--muted);margin-bottom:6px;">
+          🖱️ วางเมาส์บนแถว = highlight บนแผนที่<br>
+          🔄 กด badge = เปลี่ยน classification
+        </div>
+        <!-- Group summary -->
+        <div style="font-size:.75rem;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <div style="background:var(--surface);padding:5px 10px;font-weight:700;color:var(--muted);">สรุปกลุ่มชิ้น</div>
+          ${groupInspSummary()}
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="insp-tbl-wrap">
+      <table class="insp-tbl">
+        <thead>
+          <tr>
+            <th>#</th><th>${t('col_type')}</th><th>${t('col_layer')}</th>
+            <th>${t('col_cx')}</th><th>${t('col_cy')}</th>
+            <th>${t('col_w')}</th><th>${t('col_h')}</th><th>${t('col_aream2')}</th>
+            <th>${t('col_cls')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${inspRaw.map((s,i)=>{
+            const cls=inspCls[i];
+            const cx=(s.minX+s.w/2).toFixed(1), cy=(s.minY+s.h/2).toFixed(1);
+            return `<tr id="inspRow${i}" class="insp-row-${cls}"
+              onmouseenter="inspHover(${i},true)" onmouseleave="inspHover(${i},false)">
+              <td style="color:var(--muted);">${i+1}</td>
+              <td><span class="shape-pill ${s.type==='circle'?'shape-free':'shape-rect'}">${s.type==='circle'?'⭕ Circle':'⬛ '+s.type}</span></td>
+              <td><span class="layer-tag">${s.layer||'0'}</span></td>
+              <td class="coord-tag">${cx}</td><td class="coord-tag">${cy}</td>
+              <td>${s.w.toFixed(1)}</td><td>${s.h.toFixed(1)}</td>
+              <td>${(s.area/1e6).toFixed(5)}</td>
+              <td><span id="inspCls${i}" class="cls-badge cls-${cls}" onclick="toggleCls(${i})">${CLS_LABEL[cls]}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
+      <button class="btn btn-ghost btn-sm" onclick="autoClassify();renderInspector()">${t('inspReauto')}</button>
+      <button class="btn btn-cnc" style="font-size:.85rem;padding:9px 18px;" onclick="showInspStep2()">${t('inspNext')}</button>
+    </div>
+  `;
+
+  setTimeout(drawInspCanvas, 60);
+}
+
+function groupInspSummary() {
+  const groups = {};
+  inspRaw.forEach((s,i)=>{
+    const cls=inspCls[i];
+    const key=`${cls}|${s.type}|${Math.round(s.w)}|${Math.round(s.h)}`;
+    if(!groups[key]) groups[key]={cls,type:s.type,w:s.w,h:s.h,count:0};
+    groups[key].count++;
+  });
+  return Object.values(groups).sort((a,b)=>b.count-a.count).map(g=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-bottom:1px solid #ffffff08;">
+      <span class="cls-badge cls-${g.cls}" style="min-width:70px;">${CLS_LABEL[g.cls]}</span>
+      <span style="font-weight:700;">${g.count}×</span>
+      <span style="color:var(--muted);">${g.w.toFixed(0)}×${g.h.toFixed(0)} mm</span>
+      <span class="shape-pill ${g.type==='circle'?'shape-free':'shape-rect'}">${g.type==='circle'?'⭕':'⬛'}</span>
+    </div>
+  `).join('');
+}
+
+/** Draw inspector canvas — แสดงพิกัดจริง */
+function drawInspCanvas(highlightIdx=-1) {
+  const canvas = document.getElementById('inspCanvas');
+  if (!canvas || !inspRaw.length) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 500;
+  const H = canvas.offsetHeight || 260;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0,0,W,H);
+
+  // Global bounds from ALL shapes (raw positions)
+  let mnX=1e18,mnY=1e18,mxX=-1e18,mxY=-1e18;
+  inspRaw.forEach(s=>{
+    s.vertices.forEach(([vx,vy])=>{
+      if(vx<mnX)mnX=vx; if(vx>mxX)mxX=vx;
+      if(vy<mnY)mnY=vy; if(vy>mxY)mxY=vy;
+    });
+  });
+  const PAD=18;
+  const rX=mxX-mnX||1, rY=mxY-mnY||1;
+  const sc=Math.min((W-PAD*2)/rX,(H-PAD*2)/rY);
+  const ox=PAD+(W-PAD*2-rX*sc)/2;
+  const oy=PAD+(H-PAD*2-rY*sc)/2;
+  const toC=(vx,vy)=>[ox+(vx-mnX)*sc, oy+(mxY-vy)*sc]; // Y-flip: DXF Y-up→canvas Y-down
+
+  // Grid lines (light)
+  ctx.strokeStyle='#ffffff08'; ctx.lineWidth=0.5;
+  for(let gx=Math.ceil(mnX/100)*100;gx<mxX;gx+=100){
+    const [px]=toC(gx,mnY); ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,H); ctx.stroke();
+  }
+
+  // Color by classification
+  const clsColor = { outer:'#3b82f6', hole:'#8b5cf6', skip:'#374151' };
+
+  inspRaw.forEach((s,i)=>{
+    if(!s.vertices.length) return;
+    const cls=inspCls[i];
+    const col=clsColor[cls]||'#666';
+    const isHl=(i===highlightIdx);
+
+    ctx.beginPath();
+    s.vertices.forEach(([vx,vy],j)=>{
+      const [px,py]=toC(vx,vy);
+      j===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    });
+    ctx.closePath();
+    ctx.fillStyle = cls==='skip' ? '#ffffff08' : (isHl ? col+'dd' : col+'44');
+    ctx.fill();
+    ctx.strokeStyle = isHl ? '#fff' : col;
+    ctx.lineWidth = isHl ? 2 : (cls==='outer'?1.5:0.8);
+    ctx.setLineDash(cls==='hole'?[3,2]:[]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Center label
+    if(cls!=='skip'||isHl){
+      const [lx,ly]=toC(s.minX+s.w/2, s.minY+s.h/2);
+      ctx.fillStyle=isHl?'#fff':'rgba(255,255,255,0.75)';
+      ctx.font=`${isHl?'bold ':''}${isHl?10:8}px Segoe UI,sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(i+1,lx,ly);
+    }
+  });
+
+  // Axis labels (min/max coords)
+  ctx.fillStyle='#64748b'; ctx.font='8px monospace';
+  ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText(`X:${mnX.toFixed(0)}`, 2, 2);
+  ctx.textAlign='right';
+  ctx.fillText(`X:${mxX.toFixed(0)}`, W-2, 2);
+  ctx.textAlign='left'; ctx.textBaseline='bottom';
+  ctx.fillText(`Y:${mnY.toFixed(0)}`, 2, H-2);
+}
+
+function inspHover(i,on) {
+  drawInspCanvas(on?i:-1);
+}
+
+/** Step 2: ตั้งชื่อและจำนวน */
+function showInspStep2() {
+  const outers = inspRaw.filter((_,i)=>inspCls[i]==='outer');
+  if(!outers.length){ alert(lang==='en'?'No "outer frame" pieces yet — click a badge to assign at least 1':'ยังไม่มีชิ้น "กรอบนอก" — กด badge เพื่อตั้งค่าอย่างน้อย 1 ชิ้น'); return; }
+
+  // Build holes map: for each outer, find holes
+  const outerWithHoles = outers.map(outer=>{
+    if(outer.open) return {...outer, holes:[]};   // open arcs never carry holes
+    const cx=outer.minX+outer.w/2, cy=outer.minY+outer.h/2;
+    const holes = inspRaw.filter((_,i)=>inspCls[i]==='hole').filter(h=>{
+      const hcx=h.minX+h.w/2, hcy=h.minY+h.h/2;
+      return pointInPolygon(hcx,hcy,outer.vertices);
+    });
+    return {...outer, holes};
+  });
+
+  mdxfShapes = outerWithHoles;
+  mdxfGroups = buildShapeGroups(outerWithHoles);
+
+  // Update step indicator
+  document.querySelectorAll('.insp-step').forEach((el,i)=>{
+    el.className='insp-step'+(i===0?' done':i===1?' active':'');
+  });
+
+  // Show step 2 panel after inspector
+  const el=document.getElementById('mdxfResult');
+  const step2=document.createElement('div');
+  step2.id='inspStep2Panel';
+  step2.style.marginTop='14px';
+  step2.innerHTML=renderStep2HTML(outerWithHoles);
+  // Remove old step2 if exists
+  document.getElementById('inspStep2Panel')?.remove();
+  el.appendChild(step2);
+  step2.scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(()=>drawMdxfPreviewGroup(-1),60);
+  updateMdxfTotal();
+}
+
+function renderStep2HTML(outers) {
+  const groups = mdxfGroups; // already computed in showInspStep2
+  const totalHoles = outers.reduce((s,o)=>s+(o.holes?.length||0),0);
+  const totalPieces = outers.length;
+  const totalGroups = groups.length;
+
+  return `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;">
+      <div class="mdxf-header">
+        <div>
+          <b style="color:var(--success);">✅ ${totalPieces} ${t('pieces_lbl')} → ${totalGroups} ${t('col_cls')}</b>
+          ${totalHoles ? `<span style="color:#a78bfa;font-size:.76rem;margin-left:8px;">
+            🕳️ ${t('leg_hole')}: ${totalHoles} ${t('pieces_lbl')} (layer CUT_HOLE)
+          </span>` : ''}
+          <div style="font-size:.72rem;color:var(--muted);margin-top:3px;">
+            💡 ${t('inspInfo')}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span id="mdxfTotalBox" style="background:#7209b7;color:#fff;border-radius:8px;
+            padding:5px 12px;font-size:.82rem;font-weight:800;white-space:nowrap;">${t('totalSel')}: 0</span>
+          <button class="btn btn-ghost btn-sm" onclick="mdxfSelectAll(true)">${t('inspSelAll')}</button>
+          <button class="btn btn-ghost btn-sm" onclick="mdxfSelectAll(false)">${t('inspDesel')}</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+        <canvas id="mdxfPreview" class="mdxf-canvas" style="flex:1;min-width:200px;max-width:380px;height:200px;"></canvas>
+        <div style="flex:1;min-width:180px;font-size:.76rem;color:var(--muted);">
+          🔍 ${t('hoverHighlight')}<br>
+          <div style="margin-top:6px;">
+            ${groups.map((g,gi)=>`
+              <div style="display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid var(--border)">
+                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS[gi%COLORS.length]};flex-shrink:0;display:inline-block;"></span>
+                <b style="color:var(--text);">${g.count}×</b>
+                <span>${g.shape.w.toFixed(0)}×${g.shape.h.toFixed(0)} mm</span>
+                <span class="shape-pill ${g.shape.type==='circle'?'shape-free':'shape-rect'}">${g.shape.type==='circle'?'⭕':'⬛'}</span>
+                ${g.shape.holes?.length?`<span style="color:#a78bfa;">🕳️${g.shape.holes.length}</span>`:''}
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="mdxf-table-wrap">
+        <table class="mdxf-table">
+          <thead><tr>
+            <th><input type="checkbox" class="mdxf-chk" id="mdxfChkAll" checked onchange="mdxfSelectAll(this.checked)"></th>
+            <th>#</th><th>${t('col_type')}</th>
+            <th>${t('col_w')}</th><th>${t('col_h')}</th><th>${t('col_aream2')}</th>
+            <th>${t('col_holes')}</th>
+            <th>${t('col_found')}</th>
+            <th>${t('col_name')}</th>
+            <th>${t('qty_lbl')}</th>
+          </tr></thead>
+          <tbody>
+            ${groups.map((g,gi)=>{
+              const s = g.shape;
+              const col = COLORS[gi%COLORS.length];
+              const autoQty = g.count;
+              return `<tr id="mdxfRow${gi}"
+                onmouseenter="mdxfGroupHighlight(${gi},true)"
+                onmouseleave="mdxfGroupHighlight(${gi},false)">
+                <td><input type="checkbox" class="mdxf-chk mdxf-item-chk" data-gidx="${gi}" checked onchange="updateMdxfTotal()"></td>
+                <td style="display:flex;align-items:center;gap:5px;">
+                  <span style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block;"></span>
+                  <span style="color:var(--muted);">${gi+1}</span>
+                </td>
+                <td><span class="shape-pill ${s.type==='circle'?'shape-free':'shape-rect'}">${s.type==='circle'?'⭕ Circle':'⬛ Poly'}</span></td>
+                <td>${s.w.toFixed(1)}</td>
+                <td>${s.h.toFixed(1)}</td>
+                <td>${(s.area/1e6).toFixed(5)}</td>
+                <td style="color:${s.holes?.length?'#a78bfa':'var(--muted)'};">
+                  ${s.holes?.length?`🕳️ ${s.holes.length}`:'—'}
+                </td>
+                <td>
+                  <span style="background:#1e3a5f;color:#60a5fa;border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700;">
+                    ${autoQty} ${t('pieces_lbl')}
+                  </span>
+                </td>
+                <td><input style="background:var(--surface);border:1px solid var(--border);border-radius:5px;
+                  color:var(--text);padding:3px 7px;font-size:.78rem;width:150px;"
+                  id="mdxfName${gi}" value="${s.w.toFixed(0)}×${s.h.toFixed(0)} mm${s.type==='circle'?' ⭕':''}"></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:4px;">
+                    <input type="number" min="1" value="${autoQty}"
+                      style="background:var(--surface);border:1px solid var(--border);border-radius:5px;
+                      color:var(--text);padding:3px 6px;font-size:.78rem;width:55px;"
+                      id="mdxfQty${gi}" oninput="updateMdxfTotal()">
+                    ${autoQty>1?`<span style="font-size:.68rem;color:var(--muted);">auto</span>`:''}
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn btn-ghost btn-sm" onclick="renderInspector()">${t('inspBack')}</button>
+        <button class="btn btn-cnc" style="font-size:.85rem;padding:9px 18px;" onclick="mdxfAddSelected()">
+          ${t('inspAdd')}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderMdxfResult(fileName, allShapes) {
+  const el = document.getElementById('mdxfResult');
+  el.style.display = '';
+
+  if (!mdxfShapes.length) {
+    el.innerHTML = `<div class="ferr">⚠️ ${lang==='en'?`No closed contours found in <b>${fileName}</b><br>Make sure outlines are Closed Polyline or Circle (not open Line/Arc)`:`ไม่พบชิ้นงานที่เป็น closed contour ในไฟล์ <b>${fileName}</b><br>ตรวจสอบว่า outline เป็น Closed Polyline หรือ Circle (ไม่ใช่ Line/Arc แบบเปิด)`}</div>`;
+    return;
+  }
+
+  // Count all entities in file
+  const totalEnt = allShapes.length;
+  const layers = [...new Set(allShapes.map(s=>s.layer))];
+
+  // Group identical shapes (same w,h within 0.1mm tolerance) for smart naming
+  const groups = groupSimilarShapes(mdxfShapes);
+
+  el.innerHTML = `
+    <div class="mdxf-header">
+      <div>
+        <b style="color:var(--success);">✅ ${lang==='en'?`Found ${mdxfShapes.length} pcs (outer frame)`:`พบ ${mdxfShapes.length} ชิ้น (กรอบนอก)`}</b>
+        <span style="color:var(--muted);font-size:.78rem;margin-left:8px;">
+          ${lang==='en'?'from':'จาก'} ${totalEnt} entities | Layer: ${layers.join(', ')}
+        </span>
+        ${mdxfShapes._innerCount > 0 ? `<span style="color:#a78bfa;font-size:.76rem;margin-left:6px;">
+          🕳️ ${lang==='en'?`Detected ${mdxfShapes._innerCount} holes/cutouts (not listed / exported as layer CUT_HOLE)`:`ตรวจพบ ${mdxfShapes._innerCount} รู/ช่องเปิดภายในกรอบ (ไม่แสดงในลิสต์ / export เป็น layer CUT_HOLE)`}</span>` : ''}
+        <span style="color:var(--muted);font-size:.74rem;margin-left:8px;">
+          [${lang==='en'?'Open DevTools → Console for detection details':'เปิด DevTools → Console เพื่อดูรายละเอียดการตรวจจับ'}]</span>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="mdxfSelectAll(true)">${t('inspSelAll')}</button>
+        <button class="btn btn-ghost btn-sm" onclick="mdxfSelectAll(false)">${t('inspDesel')}</button>
+        <button class="btn btn-primary btn-sm" onclick="mdxfAddSelected()">➕ ${t('inspAdd')}</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+      <canvas id="mdxfPreview" class="mdxf-canvas" style="flex:1;min-width:200px;max-width:400px;height:220px;"></canvas>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px;">🔍 ${t('hoverHighlight')}</div>
+        <div style="font-size:.78rem;color:var(--muted);">
+          ${groups.map(g=>`
+            <div style="padding:3px 0;border-bottom:1px solid var(--border);">
+              <span style="color:var(--text);font-weight:700;">${g.count} ${t('pieces_lbl')}</span> —
+              ${g.w.toFixed(0)}×${g.h.toFixed(0)} mm &nbsp;
+              <span class="shape-pill ${g.type==='circle'?'shape-free':'shape-rect'}">${g.type==='circle'?'⭕ Circle':'⬛ Poly'}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="mdxf-table-wrap">
+      <table class="mdxf-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" class="mdxf-chk" id="mdxfChkAll" checked onchange="mdxfSelectAll(this.checked)"></th>
+            <th>#</th>
+            <th>${t('col_type')}</th>
+            <th>${t('col_layer')}</th>
+            <th>${t('col_w')}</th>
+            <th>${t('col_h')}</th>
+            <th>${t('col_aream2')}</th>
+            <th>${lang==='en'?'Contour pts':'จุด Contour'}</th>
+            <th>${t('col_holes')}</th>
+            <th>${t('col_name')}</th>
+            <th>${t('qty_lbl')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${mdxfShapes.map((s,i)=>`
+            <tr id="mdxfRow${i}" onmouseenter="mdxfHighlight(${i})" onmouseleave="mdxfHighlight(-1)">
+              <td><input type="checkbox" class="mdxf-chk mdxf-item-chk" data-idx="${i}" checked></td>
+              <td style="color:var(--muted);">${i+1}</td>
+              <td><span class="shape-pill ${s.type==='circle'?'shape-free':'shape-rect'}">${s.type==='circle'?'⭕ Circle':'⬛ '+s.type}</span></td>
+              <td><span class="layer-tag">${s.layer||'0'}</span></td>
+              <td>${s.w.toFixed(1)}</td>
+              <td>${s.h.toFixed(1)}</td>
+              <td>${(s.area/1e6).toFixed(5)}</td>
+              <td style="color:var(--muted);">${s.vertices.length}</td>
+              <td style="color:${(s.holes&&s.holes.length)?'#a78bfa':'var(--muted)'};">
+                ${(s.holes&&s.holes.length) ? `<span title="${s.holes.map(h=>h.w.toFixed(0)+'×'+h.h.toFixed(0)+'mm').join(', ')}">🕳️ ${s.holes.length}</span>` : '—'}
+              </td>
+              <td><input style="background:var(--surface);border:1px solid var(--border);border-radius:5px;
+                color:var(--text);padding:3px 7px;font-size:.78rem;width:120px;"
+                id="mdxfName${i}" value="${lang==='en'?'Piece':'ชิ้น'} ${i+1} (${s.w.toFixed(0)}×${s.h.toFixed(0)})"></td>
+              <td><input type="number" min="1" value="1" style="background:var(--surface);border:1px solid var(--border);
+                border-radius:5px;color:var(--text);padding:3px 6px;font-size:.78rem;width:55px;"
+                id="mdxfQty${i}"></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;text-align:right;">
+      <button class="btn btn-cnc" style="font-size:.85rem;padding:9px 18px;" onclick="mdxfAddSelected()">
+        ${t('inspAdd')}
+      </button>
+    </div>
+  `;
+
+  // Draw preview
+  setTimeout(()=>{ drawMdxfPreview(-1); }, 50);
+}
+
+function groupSimilarShapes(shapes) {
+  const groups = [];
+  shapes.forEach(s=>{
+    const existing = groups.find(g=>
+      Math.abs(g.w-s.w)<0.5 && Math.abs(g.h-s.h)<0.5 && g.type===s.type
+    );
+    if (existing) existing.count++;
+    else groups.push({w:s.w, h:s.h, type:s.type, count:1});
+  });
+  return groups.sort((a,b)=>b.count-a.count);
+}
+
+function mdxfSelectAll(checked) {
+  document.querySelectorAll('.mdxf-item-chk').forEach(c=>c.checked=checked);
+  const allChk = document.getElementById('mdxfChkAll');
+  if (allChk) allChk.checked = checked;
+  updateMdxfTotal();
+}
+
+/** Sum the quantity of all CHECKED pieces and show it in the total badge. */
+function updateMdxfTotal() {
+  let total = 0;
+  document.querySelectorAll('.mdxf-item-chk').forEach(chk => {
+    if (!chk.checked) return;
+    const gi = chk.dataset.gidx ?? chk.dataset.idx;
+    const q = parseInt(document.getElementById('mdxfQty'+gi)?.value, 10);
+    total += (q > 0 ? q : 0);
+  });
+  const box = document.getElementById('mdxfTotalBox');
+  if (box) box.textContent = `${t('totalSel')}: ${total}`;
+}
+
+function mdxfHighlight(idx) {
+  drawMdxfPreview(idx);
+  document.querySelectorAll('.mdxf-table tbody tr').forEach((r,i)=>{
+    r.style.background = i===idx ? '#2d3580' : '';
+  });
+}
+
+function mdxfGroupHighlight(gi, on) {
+  // Highlight all shapes in this group on the preview canvas
+  drawMdxfPreviewGroup(on ? gi : -1);
+  document.querySelectorAll('.mdxf-table tbody tr').forEach((r,i)=>{
+    r.style.background = (on && i===gi) ? '#2d3580' : '';
+  });
+}
+
+function drawMdxfPreviewGroup(highlightGi) {
+  const canvas = document.getElementById('mdxfPreview');
+  if (!canvas || !mdxfShapes.length) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 380;
+  const H = canvas.offsetHeight || 200;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0,0,W,H);
+
+  let mnX=1e18,mnY=1e18,mxX=-1e18,mxY=-1e18;
+  mdxfShapes.forEach(s=>{
+    s.vertices.forEach(([vx,vy])=>{
+      if(vx<mnX)mnX=vx; if(vx>mxX)mxX=vx;
+      if(vy<mnY)mnY=vy; if(vy>mxY)mxY=vy;
+    });
+  });
+  const rangeX=mxX-mnX||1, rangeY=mxY-mnY||1;
+  const PAD=12, sc=Math.min((W-PAD*2)/rangeX,(H-PAD*2)/rangeY);
+  const ox=PAD+(W-PAD*2-rangeX*sc)/2;
+  const oy=PAD+(H-PAD*2-rangeY*sc)/2;
+  const toC=(vx,vy)=>([ox+(vx-mnX)*sc, oy+(mxY-vy)*sc]); // Y-flip
+
+  // Build set of highlighted shape indices
+  const hlSet = new Set(highlightGi>=0 ? (mdxfGroups[highlightGi]?.indices||[]) : []);
+
+  mdxfShapes.forEach((s, si)=>{
+    if (!s.vertices.length) return;
+    // Which group does this shape belong to?
+    const gi = mdxfGroups.findIndex(g=>g.indices.includes(si));
+    const col = COLORS[gi%COLORS.length];
+    const isHl = hlSet.has(si);
+
+    ctx.beginPath();
+    s.vertices.forEach(([vx,vy],j)=>{
+      const [px,py]=toC(vx,vy);
+      j===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    });
+    ctx.closePath();
+    if (s.holes && s.holes.length) {
+      s.holes.forEach(hole=>{
+        if(!hole.vertices||!hole.vertices.length) return;
+        ctx.moveTo(...toC(hole.vertices[0][0],hole.vertices[0][1]));
+        hole.vertices.forEach(([vx,vy],j)=>{ if(j>0) ctx.lineTo(...toC(vx,vy)); });
+        ctx.closePath();
+      });
+    }
+    ctx.fillStyle = isHl ? col+'cc' : col+'33';
+    ctx.fill('evenodd');
+    ctx.strokeStyle = isHl ? '#fff' : col;
+    ctx.lineWidth = isHl ? 2 : 0.8;
+    ctx.stroke();
+
+    // Label with group number
+    const [lx,ly]=toC(s.minX+s.w/2, s.minY+s.h/2);
+    ctx.fillStyle = isHl ? '#fff' : 'rgba(255,255,255,0.55)';
+    ctx.font=`${isHl?'bold ':''}${isHl?9:7}px Segoe UI,sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(gi+1, lx, ly);
+  });
+}
+
+function drawMdxfPreview(highlightIdx) {
+  const canvas = document.getElementById('mdxfPreview');
+  if (!canvas || !mdxfShapes.length) return;
+
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 380;
+  const H = canvas.offsetHeight || 220;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0,0,W,H);
+
+  // Find global bounds
+  let mnX=1e18,mnY=1e18,mxX=-1e18,mxY=-1e18;
+  mdxfShapes.forEach(s=>{
+    if(s.vertices.length){
+      s.vertices.forEach(([vx,vy])=>{
+        if(vx<mnX)mnX=vx; if(vx>mxX)mxX=vx;
+        if(vy<mnY)mnY=vy; if(vy>mxY)mxY=vy;
+      });
+    }
+  });
+  const rangeX=mxX-mnX||1, rangeY=mxY-mnY||1;
+  const PAD=12;
+  const scale=Math.min((W-PAD*2)/rangeX,(H-PAD*2)/rangeY);
+  const ox=PAD+(W-PAD*2-rangeX*scale)/2;
+  const oy=PAD+(H-PAD*2-rangeY*scale)/2;
+
+  const toC=(vx,vy)=>([ox+(vx-mnX)*scale, oy+(mxY-vy)*scale]); // Y-flip
+
+  mdxfShapes.forEach((s,i)=>{
+    if (!s.vertices.length) return;
+    const isHl = i===highlightIdx;
+    const col = COLORS[i%COLORS.length];
+
+    // Draw outer contour + holes using evenodd fill rule
+    ctx.beginPath();
+    s.vertices.forEach(([vx,vy],j)=>{
+      const [px,py]=toC(vx,vy);
+      j===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    });
+    ctx.closePath();
+    // Draw holes as sub-paths (evenodd will cut them out)
+    if (s.holes && s.holes.length) {
+      s.holes.forEach(hole=>{
+        if (!hole.vertices||!hole.vertices.length) return;
+        ctx.moveTo(...toC(hole.vertices[0][0], hole.vertices[0][1]));
+        hole.vertices.forEach(([vx,vy],j)=>{
+          if(j===0) return;
+          ctx.lineTo(...toC(vx,vy));
+        });
+        ctx.closePath();
+      });
+    }
+    ctx.fillStyle = isHl ? col+'cc' : col+'44';
+    ctx.fill('evenodd');
+    ctx.strokeStyle = isHl ? '#fff' : col;
+    ctx.lineWidth = isHl ? 2 : 1;
+    ctx.stroke();
+    // Draw hole outlines in purple
+    if (s.holes && s.holes.length) {
+      s.holes.forEach(hole=>{
+        if (!hole.vertices||!hole.vertices.length) return;
+        ctx.beginPath();
+        hole.vertices.forEach(([vx,vy],j)=>{
+          const [px,py]=toC(vx,vy);
+          j===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+        });
+        ctx.closePath();
+        ctx.strokeStyle = '#a78bfa';
+        ctx.lineWidth = isHl ? 1.5 : 0.8;
+        ctx.stroke();
+      });
+    }
+
+    // Index label
+    const [lx,ly]=toC(s.cx||(s.minX+s.w/2), s.cy||(s.minY+s.h/2));
+    ctx.fillStyle = isHl ? '#fff' : 'rgba(255,255,255,0.7)';
+    ctx.font=`${isHl?'bold ':''}${isHl?10:8}px Segoe UI,sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(i+1, lx, ly);
+  });
+}
+
+function mdxfAddSelected() {
+  const selected = [];
+  document.querySelectorAll('.mdxf-item-chk').forEach(chk=>{
+    if (chk.checked) {
+      const gi = +chk.dataset.gidx;
+      const g = mdxfGroups[gi];
+      if (!g) return;
+      const s = g.shape;
+      const name = document.getElementById('mdxfName'+gi)?.value || `${s.w.toFixed(0)}×${s.h.toFixed(0)} mm`;
+      const qty = +document.getElementById('mdxfQty'+gi)?.value || g.count;
+      selected.push({s, name, qty, gi});
+    }
+  });
+
+  if (!selected.length) { alert(lang==='en'?'Please select at least 1 piece':'กรุณาเลือกชิ้นงานอย่างน้อย 1 ชิ้น'); return; }
+
+  selected.forEach(({s, name, qty})=>{
+    const id = uid();
+    const color = COLORS[pieces.length % COLORS.length];
+    pieces.push({
+      id, name, qty,
+      source: 'dxf',
+      w: Math.max(1,Math.round(s.w)),
+      h: Math.max(1,Math.round(s.h)),
+      area: s.area,
+      open: s.open || false,
+      stlData: null,
+      dxfData: s,
+      color,
+      // Normalize to (0,0) and apply Y-flip for Y-up sources (DXF, EPS, AI).
+      // SVG is already Y-down so no flip needed.
+      // Both outer and holes use the outer shape's h as the flip reference.
+      // Y-flip also negates bulge (flipping Y reverses arc handedness).
+      vertices: s.vertices.map(([x,y])=>[x-s.minX, /\.(dxf|eps|ai)$/i.test(inspFileName) ? s.h-(y-s.minY) : y-s.minY]),
+      rawV: s.rawV && /\.(dxf)$/i.test(inspFileName) ? s.rawV.map(v=>({x:v.x-s.minX, y:s.h-(v.y-s.minY), b:-v.b})) : null,
+      holes: (s.holes||[]).map(h=>({
+        ...h,
+        vertices: h.vertices ? h.vertices.map(([x,y])=>[x-s.minX, /\.(dxf|eps|ai)$/i.test(inspFileName) ? s.h-(y-s.minY) : y-s.minY]) : [],
+        rawV: h.rawV && /\.(dxf)$/i.test(inspFileName) ? h.rawV.map(v=>({x:v.x-s.minX, y:s.h-(v.y-s.minY), b:-v.b})) : null
+      })),
+      fileName: 'multi-dxf'
+    });
+  });
+
+  renderPieces();
+  savePieces();
+
+  // Show success
+  const btn = document.querySelector('.mdxf-result .btn-cnc');
+  if (btn) {
+    const orig = btn.innerHTML;
+    btn.innerHTML = `✅ เพิ่มแล้ว ${selected.length} ชิ้น`;
+    btn.style.background = 'var(--success)';
+    setTimeout(()=>{ btn.innerHTML=orig; btn.style.background=''; }, 2000);
+  }
+
+  // Scroll to pieces
+  document.getElementById('pcList').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ═══════════════════════════════════════════════════════
+//  PIECE MANAGEMENT
+// ═══════════════════════════════════════════════════════
+function addPiece(data) {
+  const id = uid();
+  const c = COLORS[pieces.length % COLORS.length];
+  pieces.push(data || {
+    id, name:`ชิ้น ${pieces.length+1}`, qty:1, source:'manual',
+    w:400, h:300, area:null, stlData:null, dxfData:null,
+    color:c, vertices:null, fileName:''
+  });
+  renderPieces();
+  savePieces();
+}
+
+function addPieceDemo() {
+  [
+    {name:'แผ่นหน้า A', qty:4, source:'manual', w:800, h:600},
+    {name:'แผ่นข้าง B', qty:8, source:'manual', w:500, h:300},
+    {name:'แผ่น Freeform C', qty:2, source:'manual', w:350, h:500},
+  ].forEach((d,i)=>{
+    const id=uid();
+    pieces.push({id,color:COLORS[(pieces.length)%COLORS.length],
+      area:null,stlData:null,dxfData:null,vertices:null,fileName:'',...d});
+  });
+  renderPieces();
+  savePieces();
+}
+
+function deletePiece(id) {
+  pieces=pieces.filter(p=>p.id!==id);
+  renderPieces(); savePieces();
+}
+
+function updP(id,f,v) {
+  const p=pieces.find(p=>p.id===id);
+  if(!p) return;
+  if(['qty','w','h'].includes(f)) v=+v;
+  p[f]=v;
+  savePieces();
+}
+
+function setSource(id,src) {
+  const p=pieces.find(p=>p.id===id);
+  if(!p) return;
+  p.source=src;
+  // reset file data when switching source
+  if(src==='manual'){ p.stlData=null; p.dxfData=null; p.vertices=null; p.fileName=''; }
+  renderPieces(); savePieces();
+}
+
+// ─── Render ───────────────────────────────────────────
+function renderPieces() {
+  document.getElementById('pcCount').textContent=pieces.length;
+  const el=document.getElementById('pcList');
+  if(!pieces.length){
+    el.innerHTML=`<div class="empty"><div class="empty-ico">📐</div><p>${t('emptyPieces')}</p></div>`;
+    return;
+  }
+  el.innerHTML=pieces.map(p=>`
+    <div class="pc" id="pc_${p.id}">
+      <div class="pc-head">
+        <div class="dot" style="background:${p.color}"></div>
+        <input class="pc-name" value="${esc(p.name)}" onchange="updP('${p.id}','name',this.value)">
+        <button class="btn btn-danger btn-sm" onclick="deletePiece('${p.id}')">✕</button>
+      </div>
+      <div class="src-tabs">
+        <div class="src-tab ${p.source==='manual'?'active':''}" onclick="setSource('${p.id}','manual')">${t('srcManual')}</div>
+        <div class="src-tab ${p.source==='stl'?'active':''}" onclick="setSource('${p.id}','stl')">${t('srcSTL')}</div>
+        <div class="src-tab ${p.source==='obj'?'active':''}" onclick="setSource('${p.id}','obj')">${t('srcOBJ')}</div>
+        <div class="src-tab ${p.source==='dxf'?'active':''}" onclick="setSource('${p.id}','dxf')">${t('srcDXF')}</div>
+      </div>
+      ${p.source!=='manual' ? dropZone(p) : ''}
+      <div class="pf">
+        <div class="field"><label>${t('qty_lbl')}</label>
+          <input type="number" value="${p.qty}" min="1" onchange="updP('${p.id}','qty',this.value)">
+        </div>
+        ${p.source==='manual'?`
+        <div class="field"><label>${t('w_lbl')}</label>
+          <input type="number" value="${p.w}" min="1" onchange="updP('${p.id}','w',this.value)">
+        </div>
+        <div class="field"><label>${t('h_lbl')}</label>
+          <input type="number" value="${p.h}" min="1" onchange="updP('${p.id}','h',this.value)">
+        </div>`:
+        `<div class="field"><label>${t('w_nest')}</label>
+          <input type="number" value="${p.w}" min="1" onchange="updP('${p.id}','w',this.value)">
+        </div>
+        <div class="field"><label>${t('h_nest')}</label>
+          <input type="number" value="${p.h}" min="1" onchange="updP('${p.id}','h',this.value)">
+        </div>`}
+      </div>
+      ${fileResult(p)}
+    </div>
+  `).join('');
+}
+
+function dropZone(p) {
+  const ext = p.source==='dxf'?'.dxf':p.source==='obj'?'.obj':'.stl';
+  return `
+    <div class="drop" onclick="trigFi('${p.id}','${p.source}')"
+      ondragover="this.classList.add('dragover');event.preventDefault()"
+      ondragleave="this.classList.remove('dragover')"
+      ondrop="handleDrop(event,'${p.id}','${p.source}')">
+      📂 คลิกหรือลากไฟล์ <b>${ext.toUpperCase()}</b>
+      <input type="file" id="fi_${p.id}" accept="${ext}" style="display:none"
+        onchange="handleFiIn(this,'${p.id}','${p.source}')">
+    </div>`;
+}
+
+function fileResult(p) {
+  const d = p.stlData || p.dxfData;
+  if (!d) return '';
+  const f = unitFactor();
+  const isSTL = !!p.stlData;
+  const areaMM2 = isSTL ? d.area * f * f : d.area;
+  const aM2 = (areaMM2/1e6).toFixed(5);
+  const bw = isSTL ? (d.bbox.w*f).toFixed(1) : d.w.toFixed(1);
+  const bh = isSTL ? (d.bbox.h*f).toFixed(1) : d.h.toFixed(1);
+  const depth = isSTL && d.bbox.d ? ` | ความลึก ${(d.bbox.d*f).toFixed(1)} mm` : '';
+  const src = isSTL ? (p.source==='obj'?'OBJ':'STL') : 'DXF';
+  const vCount = p.vertices ? ` | ${p.vertices.length} จุด contour` : '';
+  return `<div class="fres">
+    ✅ <b>${src}</b>: ${p.fileName} &nbsp;
+    พื้นที่ผิว: <span class="av">${aM2} m²</span> &nbsp;
+    BBox: ${bw}×${bh} mm${depth}${vCount}
+  </div>`;
+}
+
+// ─── File Handling ───────────────────────────────────
+function trigFi(id,ext){ document.getElementById('fi_'+id)?.click(); }
+
+function handleDrop(e,id,ext){
+  e.preventDefault(); e.currentTarget.classList.remove('dragover');
+  const f=e.dataTransfer.files[0]; if(f) procFile(f,id,ext);
+}
+function handleFiIn(inp,id,ext){
+  const f=inp.files[0]; if(f) procFile(f,id,ext);
+}
+
+function procFile(file,id,ext) {
+  const p=pieces.find(p=>p.id===id); if(!p) return;
+  p.fileName=file.name;
+  const r=new FileReader();
+
+  if(ext==='stl'){
+    r.onload=e=>{
+      try {
+        const data=parseSTL(e.target.result);
+        const f=unitFactor();
+        p.stlData=data;
+        p.w=Math.max(1,Math.round(data.bbox.w*f));
+        p.h=Math.max(1,Math.round(data.bbox.h*f));
+        p.area=data.area*f*f;
+        renderPieces(); savePieces();
+      } catch(err){ showFileErr(id,'STL parse error: '+err.message); }
+    };
+    r.readAsArrayBuffer(file);
+  } else if(ext==='obj'){
+    r.onload=e=>{
+      try {
+        const data=parseOBJ(e.target.result);
+        const f=unitFactor();
+        p.stlData=data;
+        p.w=Math.max(1,Math.round(data.bbox.w*f));
+        p.h=Math.max(1,Math.round(data.bbox.h*f));
+        p.area=data.area*f*f;
+        renderPieces(); savePieces();
+      } catch(err){ showFileErr(id,'OBJ parse error: '+err.message); }
+    };
+    r.readAsText(file);
+  } else if(ext==='dxf'){
+    r.onload=e=>{
+      try {
+        const polys=parseDXF(e.target.result);
+        if(!polys.length){
+          showFileErr(id,'ไม่พบ LWPOLYLINE ในไฟล์ DXF\nลองเซฟจาก CAD แบบ R12/LT และตรวจว่า outline เป็น Closed Polyline');
+          return;
+        }
+        // pick largest area contour
+        const main=polys.sort((a,b)=>b.area-a.area)[0];
+        p.dxfData=main;
+        // Normalize to (0,0) + flip Y: DXF uses Y-up, canvas uses Y-down
+        // Y-flip also negates bulge (flipping Y reverses arc handedness)
+        p.vertices=main.vertices.map(([x,y])=>[x-main.minX, main.h-(y-main.minY)]);
+        p.rawV=main.rawV?main.rawV.map(v=>({x:v.x-main.minX, y:main.h-(v.y-main.minY), b:-v.b})):null;
+        // Import holes (inner contours detected by parseDXF/buildContourTree)
+        p.holes=(main.holes||[]).map(h=>({
+          ...h,
+          vertices:(h.vertices||[]).map(([x,y])=>[x-main.minX, main.h-(y-main.minY)]),
+          rawV:h.rawV?h.rawV.map(v=>({x:v.x-main.minX, y:main.h-(v.y-main.minY), b:-v.b})):null
+        }));
+        p.w=Math.max(1,Math.round(main.w));
+        p.h=Math.max(1,Math.round(main.h));
+        p.area=main.area;
+        if(polys.length>1) console.log(`DXF: พบ ${polys.length} contours, เลือก contour ใหญ่สุด`);
+        renderPieces(); savePieces();
+      } catch(err){ showFileErr(id,'DXF parse error: '+err.message); }
+    };
+    r.readAsText(file);
+  }
+}
+
+function showFileErr(id,msg){
+  const pc=document.getElementById('pc_'+id);
+  if(!pc) return;
+  let el=pc.querySelector('.ferr');
+  if(!el){ el=document.createElement('div'); el.className='ferr'; pc.appendChild(el); }
+  el.textContent='⚠️ '+msg;
+}
+
+// ═══════════════════════════════════════════════════════
+//  NESTING  — Shelf First Fit Decreasing + rotation
+// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+//  ROTATION HELPERS
+// ═══════════════════════════════════════════════════════
+function rotateVerts(verts, angleDeg, origW, origH){
+  if(!verts||!verts.length) return null;
+  const rad=angleDeg*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
+  const cx=origW/2, cy=origH/2;
+  const rv=verts.map(([x,y])=>{
+    const dx=x-cx, dy=y-cy;
+    return [cx+dx*cos-dy*sin, cy+dx*sin+dy*cos];
+  });
+  const mnX=Math.min(...rv.map(v=>v[0])), mnY=Math.min(...rv.map(v=>v[1]));
+  return rv.map(([x,y])=>[x-mnX, y-mnY]);
+}
+
+/**
+ * Rotate hole vertices using the SAME rotation + normalisation as the outer shape.
+ * rotateVerts() subtracts each shape's own mnX/mnY — for holes we must subtract
+ * the OUTER shape's mnX/mnY so their position stays correct relative to the piece.
+ */
+function computeRotatedHoles(holes, angle, origW, origH, outerVerts){
+  if(!holes||!holes.length||!angle) return holes;
+  const rad=angle*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
+  const cx=origW/2, cy=origH/2;
+  // Find mnX/mnY by rotating the outer reference (same as rotateVerts does)
+  const ref = outerVerts||[[0,0],[origW,0],[origW,origH],[0,origH]];
+  const rotRef = ref.map(([x,y])=>{const dx=x-cx,dy=y-cy;return [cx+dx*cos-dy*sin,cy+dx*sin+dy*cos];});
+  const mnX=Math.min(...rotRef.map(v=>v[0])), mnY=Math.min(...rotRef.map(v=>v[1]));
+  return holes.map(h=>({
+    ...h,
+    vertices: h.vertices?.map(([x,y])=>{
+      const dx=x-cx, dy=y-cy;
+      return [cx+dx*cos-dy*sin-mnX, cy+dx*sin+dy*cos-mnY];
+    })||[],
+    // Rotate the hole's raw arc data with the SAME outer-ref min so the exported
+    // hole curve stays aligned with the rotated outer contour (preserves bulges).
+    rawV: h.rawV ? h.rawV.map(v=>{
+      const dx=v.x-cx, dy=v.y-cy;
+      return {x:cx+dx*cos-dy*sin-mnX, y:cy+dx*sin+dy*cos-mnY, b:v.b};
+    }) : (h.rawV||null)
+  }));
+}
+
+
+/** Rotate rawV [{x,y,b}] with same transform as rotateVerts.
+ *  Rotation preserves bulge signs (rotation doesn't flip arc handedness).
+ *  origW/origH = pre-rotation dimensions.
+ *  refVerts = the EXPANDED outer vertices used by rotateVerts(); rawV MUST be
+ *  normalised against the SAME rotated min as the expanded outline, otherwise the
+ *  exported curve (rawV) and the nested position (expanded verts) drift apart and
+ *  arcs/holes appear broken in CAD. */
+function rotateRawV(rawV, angleDeg, origW, origH, refVerts){
+  if(!rawV||!rawV.length||!angleDeg) return rawV;
+  const rad=angleDeg*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
+  const cx=origW/2, cy=origH/2;
+  // Use the SAME normalisation basis as rotateVerts: min of the rotated reference
+  // (expanded outer) vertices — NOT rawV's own min (which omits arc bulge extent).
+  const ref = (refVerts&&refVerts.length) ? refVerts : [[0,0],[origW,0],[origW,origH],[0,origH]];
+  const rotRef = ref.map(([x,y])=>{const dx=x-cx,dy=y-cy;return [cx+dx*cos-dy*sin, cy+dx*sin+dy*cos];});
+  const mnX=Math.min(...rotRef.map(p=>p[0])), mnY=Math.min(...rotRef.map(p=>p[1]));
+  return rawV.map(v=>{const dx=v.x-cx,dy=v.y-cy;return{x:cx+dx*cos-dy*sin-mnX, y:cy+dx*sin+dy*cos-mnY, b:v.b};});
+}
+
+function bboxAfterRotation(verts, origW, origH, angleDeg){
+  if(!verts||!verts.length){
+    // rectangle corners
+    verts=[[0,0],[origW,0],[origW,origH],[0,origH]];
+  }
+  const rv=rotateVerts(verts, angleDeg, origW, origH);
+  const w=Math.max(...rv.map(v=>v[0]));
+  const h=Math.max(...rv.map(v=>v[1]));
+  return {w, h, rotatedVerts:rv};
+}
+
+function getOrientations(item, rotMode){
+  const {w, h, vertices} = item;
+  const orients=[];
+
+  function addOri(angleDeg){
+    if(angleDeg===0){
+      orients.push({w, h, angle:0, rotatedVerts:vertices||null});
+    } else if(angleDeg===90){
+      const rv=rotateVerts(vertices, 90, w, h);
+      orients.push({w:h, h:w, angle:90, rotatedVerts:rv});
+    } else {
+      const bb=bboxAfterRotation(vertices, w, h, angleDeg);
+      orients.push({w:bb.w, h:bb.h, angle:angleDeg, rotatedVerts:bb.rotatedVerts});
+    }
+  }
+
+  addOri(0);
+  if(rotMode==='rot90' && w!==h){ addOri(90); }
+  else if(rotMode==='rot45'){
+    if(w!==h) addOri(90);
+    addOri(45); addOri(135);
+  } else if(rotMode==='free'){
+    for(let a=15;a<180;a+=15) addOri(a);
+  }
+  return orients;
+}
+
+// ═══════════════════════════════════════════════════════
+//  NESTING
+// ═══════════════════════════════════════════════════════
+function runNesting() {
+  if(!pieces.length){ alert(lang==='en'?'Please add pieces first':'กรุณาเพิ่มชิ้นงานก่อน'); return; }
+
+  const sw=+document.getElementById('sw').value;
+  const sh=+document.getElementById('sh').value;
+  const kerf=+document.getElementById('kerf').value;
+  const rotMode=document.getElementById('rotMode').value;
+
+  // Validate pieces fit sheet
+  for(const p of pieces){
+    const pw=Math.round(p.w*10)/10, ph=Math.round(p.h*10)/10;
+    const orients=getOrientations({w:pw,h:ph,vertices:p.vertices||null}, rotMode);
+    const fits=orients.some(o=>o.w+kerf*2<=sw && o.h+kerf*2<=sh);
+    if(!fits){
+      const ans=confirm(lang==='en'?
+        `⚠️ "${p.name}" (${pw}×${ph}mm) cannot fit in sheet (${sw}×${sh}mm)\nContinue and skip this piece?`:
+        `⚠️ "${p.name}" (${pw}×${ph}mm) ใหญ่กว่าแผ่น (${sw}×${sh}mm)\nดำเนินการต่อและข้ามชิ้นนี้?`);
+      if(!ans) return;
+    }
+  }
+
+  // Expand all pieces by qty, sort largest first
+  const items=[];
+  pieces.forEach(p=>{
+    for(let i=0;i<p.qty;i++){
+      items.push({pieceId:p.id, name:p.name, color:p.color,
+        w:p.w, h:p.h, vertices:p.vertices||null, holes:p.holes||null, rawV:p.rawV||null, open:p.open||false});
+    }
+  });
+  items.sort((a,b)=>(b.w*b.h)-(a.w*a.h));
+
+  const sheets=[];
+  for(const item of items){
+    let placed=false;
+    for(const sheet of sheets){
+      if(place(item,sheet,sw,sh,kerf,rotMode)){ placed=true; break; }
+    }
+    if(!placed){
+      const ns={ items:[] };
+      sheets.push(ns);
+      if(!place(item,ns,sw,sh,kerf,rotMode)) sheets.pop(); // too large
+    }
+  }
+
+  const sheetGroups=deduplicateSheets(sheets);
+  const totalPieceArea=pieces.reduce((s,p)=>s+pieceArea(p)*p.qty,0);
+  const totalSheetArea=sheets.length*sw*sh;
+  const eff=totalSheetArea>0?totalPieceArea/totalSheetArea*100:0;
+
+  nestResult={sheets,sheetGroups,eff,totalPieceArea,sw,sh,kerf};
+  activeSheet=0;
+  renderResults();
+  document.getElementById('resSection').style.display='';
+  document.getElementById('resSection').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── BITMAP-GRID POLYGON NESTING ENGINE ──────────────────────────────────────
+// Each grid cell = GRID_MM mm. Pieces stamp their actual polygon outline
+// (expanded by kerf) onto the grid, enabling true shape-to-shape nesting.
+
+// 1mm grid → spacing is exact to the millimetre. Coarser only for very large sheets
+// to bound memory. (Resolution is independent of kerf; kerf is the gap, set via kc.)
+function _gridMM(kerf){ return 1; }
+
+function _gridInit(sw, sh, kerf){
+  const mm=Math.max(1, Math.ceil(Math.max(sw,sh)/3000)); // 1mm for normal sheets
+  const gw=Math.ceil(sw/mm)+4, gh=Math.ceil(sh/mm)+4;
+  const data=new Uint8Array(gw*gh);
+  // Halo = kerf rounded UP to whole cells → piece-to-piece & edge gap is never LESS
+  // than the specified kerf.
+  const kc=Math.max(0,Math.ceil(kerf/mm));
+  const ex=Math.floor(sw/mm), ey=Math.floor(sh/mm);
+  for(let gy=0;gy<gh;gy++) for(let gx=0;gx<gw;gx++){
+    if(gx<kc||gy<kc||gx>=ex-kc||gy>=ey-kc||gx>=gw||gy>=gh)
+      data[gy*gw+gx]=1;
+  }
+  return {gw,gh,data,mm,kc};
+}
+
+/** Precompute scanline spans for a polygon in local (0,0) grid coords */
+function _polySpans(verts, mm){
+  const n=verts.length;
+  const GX=verts.map(([x])=>x/mm), GY=verts.map(([,y])=>y/mm);
+  const y0=Math.floor(Math.min(...GY)), y1=Math.ceil(Math.max(...GY));
+  const spans=[];
+  for(let dgy=y0;dgy<=y1;dgy++){
+    const xs=[];
+    for(let i=0;i<n;i++){
+      const x1=GX[i],yy1=GY[i],x2=GX[(i+1)%n],yy2=GY[(i+1)%n];
+      if((yy1<=dgy&&yy2>dgy)||(yy2<=dgy&&yy1>dgy))
+        xs.push(x1+(dgy-yy1)/(yy2-yy1)*(x2-x1));
+    }
+    xs.sort((a,b)=>a-b);
+    for(let k=0;k+1<xs.length;k+=2) spans.push([dgy,xs[k],xs[k+1]]);
+  }
+  return spans;
+}
+
+/** Check if piece (with precomputed spans) can be placed at grid pos (gox,goy) */
+function _gridCheck(g, spans, gox, goy){
+  const {gw,gh,data}=g;
+  for(const [dgy,xa,xb] of spans){
+    const gy=goy+dgy;
+    if(gy<0||gy>=gh) return true; // out of bounds = collision
+    const gx0=Math.max(0,gox+Math.floor(xa));
+    const gx1=Math.min(gw-1,gox+Math.ceil(xb));
+    for(let gx=gx0;gx<=gx1;gx++) if(data[gy*gw+gx]) return true;
+  }
+  return false;
+}
+
+/** Stamp piece onto grid with kerf expansion */
+function _gridStamp(g, spans, gox, goy){
+  const {gw,gh,data,kc}=g;
+  for(const [dgy,xa,xb] of spans){
+    const r0=Math.max(0,goy+dgy-kc), r1=Math.min(gh-1,goy+dgy+kc);
+    for(let r=r0;r<=r1;r++){
+      const gx0=Math.max(0,gox+Math.floor(xa)-kc);
+      const gx1=Math.min(gw-1,gox+Math.ceil(xb)+kc);
+      for(let gx=gx0;gx<=gx1;gx++) data[r*gw+gx]=1;
+    }
+  }
+}
+
+function place(item, sheet, sw, sh, kerf, rotMode){
+  // Init grid for this sheet on first use
+  if(!sheet.grid) sheet.grid=_gridInit(sw,sh,kerf);
+  const g=sheet.grid;
+
+  for(const ori of getOrientations(item, rotMode)){
+    const {w,h,angle,rotatedVerts}=ori;
+    // Use actual polygon vertices (or rect corners for manual pieces)
+    const verts=rotatedVerts||[[0,0],[w,0],[w,h],[0,h]];
+    const spans=_polySpans(verts,g.mm);
+
+    // Bottom-left scan. Collision/spacing stay exact at 1mm; the scan steps in
+    // ~3mm increments so a fine grid stays fast (placement snaps to ~3mm).
+    const ST=Math.max(1, Math.round(3/g.mm));
+    const start=Math.ceil(kerf/g.mm);
+    for(let gy=start; gy*g.mm+h+kerf<=sh; gy+=ST){
+      for(let gx=start; gx*g.mm+w+kerf<=sw; gx+=ST){
+        if(!_gridCheck(g,spans,gx,gy)){
+          // Valid position found — stamp & record
+          _gridStamp(g,spans,gx,gy);
+          const x=gx*g.mm, y=gy*g.mm;
+          // Pre-rotate holes using the same transform as rotatedVerts so they
+          // stay in the correct relative position after rotation.
+          const placedHoles = angle
+            ? computeRotatedHoles(item.holes, angle, item.w, item.h, item.vertices)
+            : (item.holes||null);
+          // Preserve rawV (original arc data) for smooth DXF export
+          const placedRawV = angle ? rotateRawV(item.rawV, angle, item.w, item.h, item.vertices) : (item.rawV||null);
+          sheet.items.push({
+            pieceId:item.pieceId, name:item.name, color:item.color,
+            x, y, w, h, angle:angle||0,
+            rotatedVerts:(angle||item.vertices)?verts:null,
+            vertices:item.vertices||null,
+            holes:placedHoles,
+            rawV:placedRawV,
+            open:item.open||false
+          });
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function pieceArea(p){
+  if(p.area!=null) return p.area;
+  return p.w*p.h;
+}
+
+function deduplicateSheets(sheets) {
+  const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const key = sheet => {
+    const cnt = {};
+    sheet.items.forEach(it => { cnt[it.pieceId] = (cnt[it.pieceId]||0)+1; });
+    return Object.entries(cnt).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${k}:${v}`).join('|');
+  };
+  const groups = [];
+  sheets.forEach(sheet => {
+    const k = key(sheet);
+    const g = groups.find(g=>g.key===k);
+    if (g) g.count++;
+    else groups.push({key:k, sheet, count:1, label: ALPHA[groups.length%26]});
+  });
+  return groups;
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER RESULTS
+// ═══════════════════════════════════════════════════════
+function renderResults(){
+  if(!nestResult) return;
+  const {sheets,sheetGroups,eff,totalPieceArea,sw,sh}=nestResult;
+  const priceS=+document.getElementById('priceSheet').value;
+  const labor=+document.getElementById('laborRate').value;
+  const total=sheets.length;
+  const totalLayouts=sheetGroups.length;
+  const tM2=(totalPieceArea/1e6).toFixed(4);
+  const matC=total*priceS;
+  const labC=(totalPieceArea/1e6)*labor;
+
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat"><div class="sv lg" style="color:#f72585">${total}</div><div class="sl">${t('stat_sheets')}</div></div>
+    <div class="stat"><div class="sv" style="color:#a78bfa">${totalLayouts}</div><div class="sl">${t('stat_layouts')}</div></div>
+    <div class="stat"><div class="sv">${tM2}</div><div class="sl">${t('stat_area')}</div></div>
+    <div class="stat"><div class="sv">${eff.toFixed(1)}%</div><div class="sl">${t('stat_eff')}</div></div>
+    <div class="stat"><div class="sv">${pieces.reduce((s,p)=>s+p.qty,0)}</div><div class="sl">${t('stat_pieces')}</div></div>
+    <div class="stat"><div class="sv">${((sw/1000)*(sh/1000)).toFixed(3)}</div><div class="sl">${t('stat_sheetSz')}</div></div>
+  `;
+
+  const fillEl=document.getElementById('effFill');
+  fillEl.style.width=eff.toFixed(1)+'%';
+  fillEl.style.background=eff>75?'#10b981':eff>50?'#f59e0b':'#ef4444';
+  document.getElementById('effLabel').textContent=
+    `${t('stat_eff')} ${eff.toFixed(1)}% — ${eff>75?t('eff_good'):eff>50?t('eff_mid'):t('eff_low')}`;
+
+  renderLegend();
+  renderLayoutOverview();
+
+  // Piece table — show which layout group (A/B/C) and how many copies
+  const tb=document.querySelector('#resTable tbody');
+  tb.innerHTML=pieces.map(p=>{
+    const aM2=(pieceArea(p)/1e6).toFixed(5);
+    const totM2=((pieceArea(p)*p.qty)/1e6).toFixed(4);
+    const srcLabel=p.source==='manual'?t('src_manual'):p.source.toUpperCase();
+    // Find which layout groups contain this piece
+    const usedGroups=[];
+    sheetGroups.forEach((g,gi)=>{
+      const cnt=g.sheet.items.filter(it=>it.pieceId===p.id).length;
+      if(cnt>0) usedGroups.push(`${t('layoutBadge')} ${g.label}${g.count>1?' ×'+g.count:''}(${cnt*g.count}${t('pieces_lbl')})`);
+    });
+    return `<tr>
+      <td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${p.color};margin-right:6px;vertical-align:middle;"></span>${esc(p.name)}</td>
+      <td><span style="color:var(--muted);font-size:.75rem;">${srcLabel}</span></td>
+      <td>${p.qty}</td>
+      <td>${p.w}×${p.h}</td>
+      <td>${aM2}</td>
+      <td style="font-weight:700;">${totM2}</td>
+      <td style="color:var(--muted);font-size:.78rem;">${usedGroups.join(', ')}</td>
+    </tr>`;
+  }).join('');
+
+  // Cost
+  if(priceS>0||labor>0){
+    document.getElementById('costCard').style.display='';
+    document.getElementById('costBreak').innerHTML=`
+      <div class="cost-row"><span>${t('cost_mat')} (${total} ${t('cost_unit_sheet')} × ${priceS.toLocaleString()})</span><span class="cost-val">${matC.toLocaleString()}</span></div>
+      <div class="cost-row"><span>${t('cost_labor')} (${(totalPieceArea/1e6).toFixed(3)} m² × ${labor.toLocaleString()} ${t('cost_unit_labor')})</span><span class="cost-val">${labC.toLocaleString('th-TH',{maximumFractionDigits:0})}</span></div>
+      <div class="cost-row"><span>${t('cost_total')}</span><span class="cost-val cost-total">${(matC+labC).toLocaleString('th-TH',{maximumFractionDigits:0})}</span></div>
+    `;
+  } else {
+    document.getElementById('costCard').style.display='none';
+  }
+}
+
+/** Build mini-canvas overviews for each unique layout group */
+function renderLayoutOverview() {
+  const {sheetGroups, sw, sh} = nestResult;
+  const ov = document.getElementById('layoutOverview');
+  ov.innerHTML = '';
+
+  const THUMB_H = 200;
+  const aspect = sw / sh;
+  const THUMB_W = Math.round(THUMB_H * aspect);
+
+  sheetGroups.forEach((g, gi) => {
+    // Separator arrow between groups
+    if (gi > 0) {
+      const sep = document.createElement('div');
+      sep.className = 'layout-sep';
+      sep.textContent = '+';
+      ov.appendChild(sep);
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'layout-thumb' + (gi===activeSheet?' active':'');
+    wrap.title = `แบบ ${g.label} — คลิกเพื่อดูรายละเอียด & Export`;
+    wrap.onclick = () => selSheet(gi);
+
+    // Canvas thumbnail
+    const cv = document.createElement('canvas');
+    cv.width = THUMB_W; cv.height = THUMB_H;
+    cv.style.width = THUMB_W+'px'; cv.style.height = THUMB_H+'px';
+    drawSheetOnCanvas(cv, g.sheet, sw, sh);
+
+    // "= N แผ่น" badge
+    const badge = document.createElement('div');
+    badge.className = 'layout-count-badge';
+    badge.innerHTML = `= <b>${g.count}</b> ${t('sheets_badge')}`;
+
+    wrap.appendChild(cv);
+    wrap.appendChild(badge);
+    ov.appendChild(wrap);
+  });
+}
+
+function selSheet(i){
+  activeSheet=i;
+  // Update active state on thumbnails
+  document.querySelectorAll('.layout-thumb').forEach((t,idx)=>t.classList.toggle('active',idx===i));
+  // Show detail card
+  const detailCard = document.getElementById('sheetDetailCard');
+  const g = nestResult.sheetGroups[i];
+  detailCard.style.display = '';
+  document.getElementById('sheetDetailTitle').textContent =
+    `✂️ แบบ ${g.label}${g.count>1?' × '+g.count+' แผ่น':''} — ${g.sheet.items.length} ชิ้น/แผ่น`;
+  drawSheet(i);
+  detailCard.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+
+function renderLegend(){
+  document.getElementById('legend').innerHTML=pieces.map(p=>
+    `<div class="leg-item"><div class="leg-dot" style="background:${p.color}"></div>${esc(p.name)}</div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  CANVAS DRAWING
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Draw a sheet layout onto any canvas element.
+ * group = {sheet, count, label}   sw/sh = sheet dimensions in mm
+ * PAD, maxH = optional layout hints (thumbnail vs full)
+ */
+function drawSheetOnCanvas(canvas, sheet, sw, sh, {pad=4, maxW=null, maxH=null, showLabels=false, group=null}={}) {
+  const PAD=pad;
+  const W = canvas.width, H = canvas.height;
+  const scale = Math.min((W-PAD*2)/sw, (H-PAD*2)/sh);
+  const ox = PAD + (W-PAD*2-sw*scale)/2;
+  const oy = PAD + (H-PAD*2-sh*scale)/2;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  // Sheet bg
+  ctx.fillStyle='#1a1d30';
+  ctx.fillRect(ox,oy,sw*scale,sh*scale);
+  ctx.strokeStyle='#4361ee';
+  ctx.lineWidth = showLabels ? 2 : 1;
+  ctx.strokeRect(ox,oy,sw*scale,sh*scale);
+
+  sheet.items.forEach(item=>{
+    const px=ox+item.x*scale, py=oy+item.y*scale;
+    const pw=item.w*scale, ph=item.h*scale;
+
+    // Ensure valid color — fallback to a bright default
+    const baseColor = (item.color && /^#[0-9a-fA-F]{3,6}$/.test(item.color))
+      ? item.color : COLORS[(sheet.items.indexOf(item))%COLORS.length] || '#4cc9f0';
+
+    // Use rotatedVerts (normalized, origin at 0,0) if available
+    const drawVerts = item.rotatedVerts || item.vertices;
+    if(drawVerts && drawVerts.length>=3){
+      // Vertices are stored in canvas Y-down convention (vy=0 = top of piece).
+      // toCnv maps piece-local (vx,vy) directly to canvas pixels — no flip needed.
+      const toCnv=(vx,vy)=>[ox+item.x*scale+vx*scale, oy+item.y*scale+vy*scale];
+      ctx.beginPath();
+      drawVerts.forEach(([vx,vy],i)=>{
+        const [cx,cy]=toCnv(vx,vy);
+        i===0?ctx.moveTo(cx,cy):ctx.lineTo(cx,cy);
+      });
+      if(!item.open) ctx.closePath();   // open shapes (arcs) stay open — no chord
+      if(!item.open && item.holes?.length){
+        item.holes.forEach(hole=>{
+          if(!hole.vertices?.length) return;
+          hole.vertices.forEach(([vx,vy],i)=>{
+            const [cx,cy]=toCnv(vx,vy);
+            i===0?ctx.moveTo(cx,cy):ctx.lineTo(cx,cy);
+          });
+          ctx.closePath();
+        });
+      }
+      if(!item.open){ ctx.fillStyle=baseColor+'bb'; ctx.fill('evenodd'); }
+      ctx.strokeStyle=item.open?baseColor:'rgba(255,255,255,0.6)'; ctx.lineWidth=showLabels?1.5:1; ctx.stroke();
+      // Inner colored border
+      ctx.strokeStyle=baseColor; ctx.lineWidth=showLabels?1:0.5; ctx.stroke();
+      if(showLabels && item.holes?.length){
+        item.holes.forEach(hole=>{
+          if(!hole.vertices?.length) return;
+          ctx.beginPath();
+          hole.vertices.forEach(([vx,vy],i)=>{
+            const [cx,cy]=toCnv(vx,vy);
+            i===0?ctx.moveTo(cx,cy):ctx.lineTo(cx,cy);
+          });
+          ctx.closePath();
+          ctx.strokeStyle='#a78bfa'; ctx.lineWidth=1; ctx.setLineDash([3,2]); ctx.stroke(); ctx.setLineDash([]);
+        });
+      }
+    } else {
+      ctx.fillStyle=baseColor+'cc'; ctx.fillRect(px,py,pw,ph);
+      ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=showLabels?1.5:1; ctx.strokeRect(px,py,pw,ph);
+      if((item.angle||item.rotated) && showLabels){
+        ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='bold 9px sans-serif';
+        ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillText('↻',px+3,py+2);
+      }
+    }
+
+    if(showLabels && pw>24 && ph>14){
+      const fs=Math.min(11,ph*0.22,pw*0.12);
+      ctx.fillStyle='rgba(255,255,255,0.92)';
+      ctx.font=`bold ${fs}px Segoe UI,sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      const lbl=item.name.length>12?item.name.slice(0,12)+'…':item.name;
+      ctx.fillText(lbl,px+pw/2,py+ph/2);
+      if(pw>50&&ph>26){
+        ctx.font=`${Math.max(7,fs*0.78)}px Segoe UI,sans-serif`;
+        ctx.fillStyle='rgba(255,255,255,0.55)';
+        ctx.fillText(`${item.w}×${item.h}`,px+pw/2,py+ph/2+fs*0.85);
+      }
+    }
+  });
+
+  // Footer & badge (detail view only)
+  if(showLabels && group){
+    ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='9px Segoe UI,sans-serif';
+    ctx.textAlign='right'; ctx.textBaseline='bottom';
+    const used=(sheet.items.reduce((s,it)=>s+it.w*it.h,0)/(sw*sh)*100).toFixed(1);
+    ctx.fillText(`${t('layoutBadge')} ${group.label} | ${sheet.items.length} ${t('pieces_lbl')} | ${used}%`, ox+sw*scale-4, oy+sh*scale-4);
+    if(group.count>1){
+      const badge=`× ${group.count} ${t('sheets_badge')}`;
+      ctx.font='bold 13px Segoe UI,sans-serif';
+      const bw=ctx.measureText(badge).width+18, bh=24;
+      const bx=ox+sw*scale-bw-8, by=oy+8;
+      ctx.fillStyle='#a78bfa'; ctx.beginPath();
+      ctx.roundRect(bx,by,bw,bh,6); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(badge,bx+bw/2,by+bh/2);
+    }
+    ctx.fillStyle='#64748b'; ctx.font='10px Segoe UI,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(`${sw} mm`,ox+sw*scale/2,oy-2);
+    ctx.save(); ctx.translate(ox-4,oy+sh*scale/2); ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText(`${sh} mm`,0,0); ctx.restore();
+  }
+}
+
+function drawSheet(idx){
+  if(!nestResult) return;
+  const {sheetGroups,sw,sh}=nestResult;
+  const group=sheetGroups[idx]; if(!group) return;
+  const canvas=document.getElementById('nestCanvas');
+  const PAD=16;
+  const maxW=Math.max(200, canvas.parentElement.clientWidth-PAD*2);
+  const scale=Math.min(maxW/sw, 620/sh);
+  canvas.width=Math.round(sw*scale+PAD*2);
+  canvas.height=Math.round(sh*scale+PAD*2);
+  drawSheetOnCanvas(canvas, group.sheet, sw, sh, {pad:PAD, showLabels:true, group});
+}
+
+function projName(){
+  return document.getElementById('projName')?.value || 'SheetCNC';
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXCEL EXPORT
+// ═══════════════════════════════════════════════════════
+function resetAll(){
+  if(!confirm(t('resetConfirm'))) return;
+  // Clear all state
+  pieces=[]; nestResult=null; activeSheet=0; _pid=0;
+  mdxfShapes=[]; mdxfGroups=[]; inspRaw=[]; inspCls=[]; inspFileName='';
+  // Hide results section
+  const rs=document.getElementById('resSection'); if(rs) rs.style.display='none';
+  const sd=document.getElementById('sheetDetailCard'); if(sd) sd.style.display='none';
+  // Clear the DXF/SVG inspector panel
+  const mr=document.getElementById('mdxfResult'); if(mr){ mr.style.display='none'; mr.innerHTML=''; }
+  // Reset file pickers so the same file can be re-imported
+  const fi=document.getElementById('mdxfFi'); if(fi) fi.value='';
+  // Re-render the (now empty) piece list
+  renderPieces();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function exportExcel(){
+  if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
+  const {sheetGroups,sw,sh}=nestResult;
+  const wb=XLSX.utils.book_new();
+  const th=lang==='en';
+
+  const sumRows=[[th?'Layout':'แบบ', th?'Sheets':'แผ่น', th?'Pieces':'ชิ้น', th?'Efficiency %':'ประสิทธิภาพ %']];
+  sheetGroups.forEach(g=>{
+    const eff=(g.sheet.items.reduce((s,it)=>s+it.w*it.h,0)/(sw*sh)*100).toFixed(1);
+    sumRows.push([`Layout ${g.label}`, g.count, g.sheet.items.length, parseFloat(eff)]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sumRows), th?'Summary':'สรุป');
+
+  const pieceRows=[[th?'Piece':'ชิ้นงาน', th?'Source':'แหล่ง', th?'Qty':'จำนวน',
+    th?'Width mm':'กว้าง mm', th?'Height mm':'สูง mm',
+    th?'Area/pc m²':'พื้นที่/ชิ้น m²', th?'Total m²':'รวม m²']];
+  pieces.forEach(p=>{
+    pieceRows.push([p.name, p.src||'manual', p.qty, p.w, p.h,
+      parseFloat((pieceArea(p)/1e6).toFixed(5)),
+      parseFloat((pieceArea(p)*p.qty/1e6).toFixed(5))]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pieceRows), th?'Pieces':'ชิ้นงาน');
+
+  XLSX.writeFile(wb, `${projName()}_Report.xlsx`);
+}
+
+function dlText(content,filename,type='text/plain'){
+  const b=new Blob([content],{type});
+  const url=URL.createObjectURL(b);
+  const a=document.createElement('a'); a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════
+//  DXF EXPORT  (AC1009 / R12 — AutoCAD LT compatible)
+// ═══════════════════════════════════════════════════════
+// DXF R12 (AC1009) — universally compatible with AutoCAD LT, QCAD, etc.
+// Uses POLYLINE+VERTEX+SEQEND instead of LWPOLYLINE (no AC1015 subclass markers needed)
+function dxfPolyline(pts, layer, closed=true, bulges=null){
+  let s=`0\nPOLYLINE\n8\n${layer}\n66\n1\n10\n0.0\n20\n0.0\n70\n${closed?1:0}\n`;
+  pts.forEach(([x,y],i)=>{
+    s+=`0\nVERTEX\n8\n${layer}\n10\n${(+x).toFixed(4)}\n20\n${(+y).toFixed(4)}\n`;
+    const b=bulges?bulges[i]:0;
+    if(b&&Math.abs(b)>1e-10) s+=`42\n${(+b).toFixed(6)}\n`;
+  });
+  s+=`0\nSEQEND\n8\n${layer}\n`;
+  return s;
+}
+// Keep alias for callers
+function dxfLwpoly(pts, layer){ return dxfPolyline(pts, layer, true); }
+function dxfRectShape(x,y,w,h,layer){
+  return dxfPolyline([[x,y],[x+w,y],[x+w,y+h],[x,y+h]], layer, true);
+}
+/** R12 TEXT, horizontally centered at (cx,cy) */
+function dxfText(cx,cy,h,str,layer){
+  return `0\nTEXT\n8\n${layer}\n10\n${(+cx).toFixed(3)}\n20\n${(+cy).toFixed(3)}\n`
+    +`40\n${(+h).toFixed(3)}\n1\n${str}\n72\n1\n11\n${(+cx).toFixed(3)}\n21\n${(+cy).toFixed(3)}\n`;
+}
+function dxfHeader(layers){
+  const names=Object.keys(layers);
+  let s='';
+  // HEADER — AC1009 = R12, no subclass markers required
+  s+='0\nSECTION\n2\nHEADER\n';
+  s+='9\n$ACADVER\n1\nAC1009\n';
+  s+='9\n$INSUNITS\n70\n4\n';
+  s+='0\nENDSEC\n';
+  // TABLES — layer definitions
+  s+='0\nSECTION\n2\nTABLES\n';
+  s+=`0\nTABLE\n2\nLAYER\n70\n${names.length+1}\n`;
+  s+='0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nContinuous\n';
+  names.forEach(n=>{ s+=`0\nLAYER\n2\n${n}\n70\n0\n62\n${layers[n]}\n6\nContinuous\n`; });
+  s+='0\nENDTAB\n';
+  s+='0\nENDSEC\n';
+  return s;
+}
+function dxfItemPaths(item, offX, offY, sh){
+  let s='';
+  const ix=(offX||0)+item.x;
+  // Vertices are stored in canvas Y-down (vy=0=top).
+  // DXF is Y-up: dxf_y = sh - canvas_item_y - vy
+  // where canvas_item_y = item.y from top of sheet.
+  const iyTop = (sh||0) - ((offY||0)+item.y); // DXF Y of the piece's top edge
+
+  const verts = item.rotatedVerts || item.vertices;
+  const rawV = item.rawV || null;
+  const closedFlag = !item.open;        // open shapes (arcs) export WITHOUT a closing chord
+  if(verts && verts.length>=2){
+    // rawV ≥2 carries arc bulges (open arcs have exactly 2); use it when present.
+    if(rawV && rawV.length>=2){
+      // Export with original BULGE data → smooth curves in CAD
+      // Stored bulges are Y-down (negated at import); negate again → original DXF sign
+      const pts=rawV.map(v=>[ix+v.x, iyTop-v.y]);
+      const bulges=rawV.map(v=>-v.b);
+      s+=dxfPolyline(pts,'CUT',closedFlag,bulges);
+    } else {
+      const pts=verts.map(([vx,vy])=>[ix+vx, iyTop-vy]);
+      s+=dxfPolyline(pts,'CUT',closedFlag,null);
+    }
+    if(item.holes?.length){
+      item.holes.forEach(hole=>{
+        if(!hole.vertices?.length) return;
+        const hRawV=hole.rawV||null;
+        if(hRawV&&hRawV.length>=3){
+          const hpts=hRawV.map(v=>[ix+v.x, iyTop-v.y]);
+          const hbulges=hRawV.map(v=>-v.b);
+          s+=dxfPolyline(hpts,'CUT_HOLE',true,hbulges);
+        } else {
+          const hpts=hole.vertices.map(([vx,vy])=>[ix+vx, iyTop-vy]);
+          s+=dxfPolyline(hpts,'CUT_HOLE',true,null);
+        }
+      });
+    }
+  } else {
+    // Rectangle fallback: bottom-left in DXF Y-up = iyTop - item.h
+    s+=dxfRectShape(ix, iyTop-item.h, item.w, item.h, 'CUT');
+  }
+  return s;
+}
+function buildDXFSingle(groupIdx){
+  if(!nestResult) return null;
+  const {sheetGroups,sw,sh}=nestResult;
+  const g=sheetGroups[groupIdx]; if(!g) return null;
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6};
+  let entities='';
+  entities+=dxfRectShape(0,0,sw,sh,'SHEET');
+  // Label as TEXT entity (R12 format)
+  const lbl=`Layout ${g.label}${g.count>1?' x'+g.count:''}`;
+  entities+=`0\nTEXT\n8\nSHEET\n10\n${(sw/2).toFixed(3)}\n20\n${(-40).toFixed(3)}\n40\n25\n1\n${lbl}\n`;
+  g.sheet.items.forEach(item=>{ entities+=dxfItemPaths(item,0,0,sh); });
+  return dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
+}
+function buildDXF(){
+  if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return null; }
+  const {sheetGroups,sw,sh}=nestResult;
+  const GAP=150;
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6};
+  let entities='';
+  sheetGroups.forEach((g,li)=>{
+    const offX=li*(sw+GAP), offY=0;
+    entities+=dxfRectShape(offX,offY,sw,sh,'SHEET');
+    const lbl=`Layout ${g.label}${g.count>1?' x'+g.count:''}`;
+    entities+=`0\nTEXT\n8\nSHEET\n10\n${(offX+sw/2).toFixed(3)}\n20\n${(-40).toFixed(3)}\n40\n25\n1\n${lbl}\n`;
+    g.sheet.items.forEach(item=>{ entities+=dxfItemPaths(item,offX,offY,sh); });
+  });
+  return dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
+}
+function exportDXF(){
+  if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
+  const dxf=buildDXF(); if(!dxf) return;
+  dlText(dxf,(nestResult.sheetGroups.length===1?'layout_A':'all_layouts')+'.dxf');
+}
+function exportDXFCurrent(){
+  if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
+  const idx = (typeof activeSheet==='number') ? activeSheet : 0;
+  const dxf=buildDXFSingle(idx); if(!dxf) return;
+  const g=nestResult.sheetGroups[idx];
+  dlText(dxf,`layout_${g.label}.dxf`);
+}
+function exportDXFAll(){
+  if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
+  const {sheetGroups}=nestResult;
+  sheetGroups.forEach((g,i)=>{
+    const dxf=buildDXFSingle(i); if(!dxf) return;
+    dlText(dxf,`layout_${g.label}.dxf`);
+  });
+}
+function dlText(content,filename,type='text/plain'){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type}));
+  a.download=filename; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+}
+</script>
+</body>
+</html>

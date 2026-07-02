@@ -1,0 +1,3727 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNC Pattern Generator — Image to Tool Path</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #111; color: #e0e0e0;
+  height: 100vh; display: flex; flex-direction: column;
+  overflow: hidden; user-select: none;
+}
+header {
+  background: #1c1c1e; padding: 10px 18px;
+  display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid #2a2a2a; flex-shrink: 0;
+}
+.logo {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, #0a7aff, #00d1a0);
+  border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+.header-title { font-size: 15px; font-weight: 700; color: #fff; }
+.header-sub   { font-size: 11px; color: #666; margin-left: auto; }
+.app-body { flex: 1; display: flex; overflow: hidden; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 278px; background: #1a1a1c;
+  border-right: 1px solid #2a2a2a;
+  overflow-y: auto; flex-shrink: 0; padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+.panel {
+  background: #222; border-radius: 10px;
+  padding: 11px 12px; border: 1px solid #2a2a2a;
+}
+.panel-title {
+  font-size: 10px; font-weight: 700; color: #555;
+  text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px;
+}
+
+/* Upload */
+.upload-area {
+  border: 2px dashed #333; border-radius: 8px; padding: 18px 10px;
+  text-align: center; cursor: pointer; transition: all 0.2s;
+  min-height: 80px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px;
+}
+.upload-area:hover, .upload-area.drag-over { border-color: #0a7aff; background: rgba(10,122,255,0.06); }
+.upload-icon { font-size: 22px; }
+.upload-text { font-size: 11px; color: #777; }
+.upload-hint { font-size: 10px; color: #444; }
+.img-thumb-wrap { position: relative; display: none; margin-top: 6px; cursor: pointer; border-radius: 6px; overflow: hidden; }
+.img-thumb { width: 100%; height: 80px; object-fit: cover; border-radius: 6px; display: block; transition: opacity 0.18s; }
+.img-thumb-wrap:hover .img-thumb { opacity: 0.45; }
+.img-thumb-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; opacity: 0; transition: opacity 0.18s; pointer-events: none; }
+.img-thumb-wrap:hover .img-thumb-overlay { opacity: 1; }
+.img-thumb-overlay span:first-child { font-size: 18px; }
+.img-thumb-overlay span:last-child  { font-size: 10px; color: #ccc; font-weight: 600; letter-spacing: 0.3px; }
+
+/* Pattern grid */
+.pattern-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
+.pat-btn {
+  background: #2a2a2a; border: 2px solid transparent;
+  border-radius: 7px; padding: 7px 2px; cursor: pointer;
+  text-align: center; font-size: 9px; color: #aaa;
+  font-family: inherit; transition: all 0.15s;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.pat-btn svg { width: 22px; height: 22px; }
+.pat-btn:hover { background: #333; color: #fff; }
+.pat-btn.active { border-color: #0a7aff; background: rgba(10,122,255,0.15); color: #fff; }
+
+/* Sliders */
+.ctrl { margin-bottom: 10px; }
+.ctrl:last-child { margin-bottom: 0; }
+.ctrl-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; color: #ccc; margin-bottom: 5px; gap: 6px;
+}
+.ctrl-lbl { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctrl-num { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.inline-num {
+  width: 52px; background: #1c2a3a; border: 1px solid #0a7aff55;
+  border-radius: 5px; padding: 2px 5px;
+  color: #0a7aff; font-size: 11px; font-weight: 700;
+  font-family: inherit; text-align: right; outline: none;
+  -moz-appearance: textfield;
+}
+.inline-num:hover { border-color: #0a7aff99; }
+.inline-num:focus { border-color: #0a7aff; background: #1a2a40; }
+.inline-num::-webkit-inner-spin-button,
+.inline-num::-webkit-outer-spin-button { -webkit-appearance: none; }
+.unit-lbl { font-size: 10px; color: #555; min-width: 14px; }
+input[type="range"] { --pct: 0%; }
+input[type="range"] {
+  width: 100%; height: 3px; -webkit-appearance: none;
+  background: #333; border-radius: 2px; outline: none; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px;
+  background: #0a7aff; border-radius: 50%; cursor: pointer;
+  box-shadow: 0 0 0 2px rgba(10,122,255,0.25);
+}
+
+/* Toggles */
+.tog-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.tog-row:last-child { margin-bottom: 0; }
+.tog-label { font-size: 11px; color: #ccc; }
+.toggle { width: 36px; height: 20px; background: #333; border-radius: 10px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+.toggle.on { background: #0a7aff; }
+.toggle::after { content:''; position: absolute; width: 16px; height: 16px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.2s; }
+.toggle.on::after { transform: translateX(16px); }
+
+/* Inputs */
+.num-in {
+  width: 100%; background: #2a2a2a; border: 1px solid #333;
+  border-radius: 6px; padding: 5px 8px;
+  color: #fff; font-size: 11px; outline: none; font-family: inherit;
+}
+.num-in:focus { border-color: #0a7aff; }
+.in-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.in-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.in-grp label { font-size: 10px; color: #666; display: block; margin-bottom: 3px; }
+select {
+  width: 100%; background: #2a2a2a; border: 1px solid #333;
+  border-radius: 6px; color: #fff; padding: 5px 8px;
+  font-size: 11px; outline: none; font-family: inherit;
+}
+select:focus { border-color: #0a7aff; }
+.color-row { display: flex; gap: 8px; align-items: center; }
+.color-row label { font-size: 11px; color: #ccc; flex: 1; }
+input[type="color"] { width: 36px; height: 24px; border: none; border-radius: 5px; cursor: pointer; padding: 1px; background: #2a2a2a; }
+
+/* Work size row with aspect lock */
+.worksize-row {
+  display: flex; gap: 6px; align-items: flex-end; margin-bottom: 7px;
+}
+.worksize-row .in-grp { flex: 1; }
+.aspect-btn {
+  width: 28px; height: 28px; flex-shrink: 0; background: #2a2a2a;
+  border: 1px solid #333; border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; transition: all 0.15s; margin-bottom: 0;
+}
+.aspect-btn.locked { background: rgba(10,122,255,0.2); border-color: #0a7aff; }
+.aspect-btn:hover { border-color: #555; }
+
+/* ── Profiling & Area Clearance panels ── */
+.sect-hd {
+  font-size: 9px; font-weight: 700; color: #0a7aff;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  padding-top: 7px; margin: 4px 0 7px;
+  border-top: 1px solid #2a2a2a;
+}
+.sect-hd:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+.chk-row { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.chk-lbl { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #ccc; flex: 1; cursor: pointer; }
+.chk-lbl input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: #0a7aff; flex-shrink: 0; }
+.tool-box {
+  display: flex; align-items: center; gap: 8px;
+  background: #1a1a1c; border: 1px solid #2a2a2a;
+  border-radius: 7px; padding: 7px 9px; margin-bottom: 8px;
+}
+.tool-icon { font-size: 20px; flex-shrink: 0; }
+.tool-info { flex: 1; min-width: 0; }
+.collap-panel .panel-title {
+  cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  user-select: none; margin-bottom: 0;
+}
+.collap-panel .collap-body { padding-top: 10px; }
+.collap-panel.closed .collap-body { display: none; }
+.collap-panel.closed .panel-title { margin-bottom: 0; }
+.collap-arrow { font-size: 12px; color: #0a7aff; transition: transform 0.2s; }
+.collap-panel.closed .collap-arrow { transform: rotate(-90deg); }
+.ac-tool-list {
+  background: #1a1a1c; border: 1px solid #2a2a2a; border-radius: 6px;
+  min-height: 52px; max-height: 90px; overflow-y: auto; margin-bottom: 6px;
+}
+.ac-tool-item {
+  padding: 4px 8px; font-size: 10px; color: #ccc;
+  border-bottom: 1px solid #2a2a2a; cursor: pointer;
+}
+.ac-tool-item.selected { background: rgba(10,122,255,0.15); color: #0a7aff; }
+.calc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.btn-outline {
+  padding: 6px; font-size: 11px; background: #2a2a2a;
+  border: 1px solid #444; border-radius: 6px; cursor: pointer;
+  color: #aaa; font-family: inherit; transition: all 0.15s;
+}
+.btn-outline:hover { border-color: #666; color: #fff; }
+
+/* Tool type selector */
+.tool-type-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; margin-bottom: 8px; }
+.tool-type-btn {
+  background: #2a2a2a; border: 2px solid transparent; border-radius: 7px;
+  padding: 6px 2px; cursor: pointer; font-size: 9px; color: #888;
+  font-family: inherit; text-align: center; line-height: 1.4;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  transition: all 0.15s;
+}
+.tool-type-btn svg { width: 22px; height: 22px; }
+.tool-type-btn:hover { background: #333; color: #ccc; }
+.tool-type-btn.active { border-color: #0a7aff; background: rgba(10,122,255,0.15); color: #fff; }
+.tool-param-box { background: #1a1a1c; border: 1px solid #2a2a2a; border-radius: 7px; padding: 8px; margin-bottom: 8px; }
+/* ── Main area ── */
+.main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #0a0a0a; }
+.main-tabs {
+  background: #1a1a1c; border-bottom: 1px solid #2a2a2a;
+  display: flex; flex-shrink: 0; padding: 0 12px;
+}
+.tab-btn {
+  padding: 9px 16px; background: none; border: none;
+  color: #555; font-size: 11px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+}
+.tab-btn:hover { color: #ccc; }
+.tab-btn.active { color: #0a7aff; border-bottom-color: #0a7aff; }
+.tab-panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.tab-panel.active { display: flex; }
+.canvas-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; position: relative;
+}
+/* Zoom viewport */
+#zoomViewport {
+  flex: 1; overflow: hidden; position: relative;
+}
+/* View canvas fills the entire viewport — vectors re-drawn at zoom level */
+#viewCanvas {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  cursor: grab; display: block;
+  image-rendering: crisp-edges;
+}
+#viewCanvas.dragging { cursor: grabbing; }
+/* pCanvas is the export canvas — kept hidden */
+#previewCanvas { display: none; }
+
+/* Zoom toolbar */
+.zoom-toolbar {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  display: none; gap: 4px; background: rgba(20,20,22,0.92);
+  border: 1px solid #333; border-radius: 20px; padding: 5px 10px;
+  backdrop-filter: blur(10px); z-index: 20; align-items: center;
+}
+.zoom-toolbar.visible { display: flex; }
+.zt-btn {
+  background: none; border: none; color: #aaa; font-size: 16px;
+  cursor: pointer; padding: 2px 7px; border-radius: 12px; line-height: 1.6;
+  transition: background 0.15s, color 0.15s;
+}
+.zt-btn:hover { background: #333; color: #fff; }
+.zt-label {
+  font-size: 11px; color: #666; min-width: 46px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.no-img {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  text-align: center; color: #2a2a2a; pointer-events: none;
+}
+.no-img .icon { font-size: 60px; margin-bottom: 10px; }
+.no-img p { font-size: 14px; }
+.stats-ov {
+  position: absolute; top: 14px; right: 14px;
+  background: rgba(10,10,10,0.85); border: 1px solid #2a2a2a;
+  border-radius: 8px; padding: 8px 12px;
+  font-size: 10px; color: #666;
+  backdrop-filter: blur(8px); display: none; min-width: 160px;
+}
+.st-row { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 2px; }
+.st-row:last-child { margin-bottom: 0; }
+.st-val { color: #00d1a0; font-weight: 700; }
+.processing-ov {
+  position: absolute; inset: 0; display: none;
+  align-items: center; justify-content: center; background: rgba(0,0,0,0.5);
+}
+.processing-ov.show { display: flex; }
+.spinner { width: 36px; height: 36px; border: 3px solid #333; border-top-color: #0a7aff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Simulation ── */
+.sim-wrap { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background: #0a0a0a; }
+#simCanvas { display: block; }
+.sim-controls {
+  background: #1a1a1c; border-top: 1px solid #2a2a2a;
+  padding: 8px 14px; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.sim-legend { display: flex; gap: 12px; margin-left: auto; font-size: 10px; color: #666; }
+.sim-legend span { display: flex; align-items: center; gap: 4px; }
+.leg-line { display: inline-block; width: 16px; height: 2px; border-radius: 1px; }
+
+/* ── Sheet layout ── */
+.sheet-wrap { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #0a0a0a; position: relative; }
+#sheetCanvas { display: block; }
+.sheet-info-ov {
+  position: absolute; top: 14px; right: 14px;
+  background: rgba(10,10,10,0.85); border: 1px solid #2a2a2a;
+  border-radius: 8px; padding: 8px 12px; font-size: 10px; color: #666;
+  backdrop-filter: blur(8px); min-width: 150px;
+}
+
+/* ── Bottom bar ── */
+.bottom-bar {
+  background: #1a1a1c; border-top: 1px solid #2a2a2a;
+  padding: 9px 14px; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.btn { padding: 7px 14px; border-radius: 7px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+.btn-blue   { background: #0a7aff; color: #fff; }
+.btn-blue:hover   { background: #006ee0; }
+.btn-green  { background: #00c875; color: #fff; }
+.btn-green:hover  { background: #00aa60; }
+.btn-orange { background: #ff9500; color: #fff; }
+.btn-orange:hover { background: #e08300; }
+.btn-gray   { background: #2a2a2a; color: #ccc; }
+.btn-gray:hover   { background: #333; }
+.btn-red    { background: #ff3b30; color: #fff; }
+.btn-red:hover    { background: #e03020; }
+.status { margin-left: auto; font-size: 11px; color: #555; }
+
+/* ── G-code modal ── */
+.gcode-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: none; align-items: center; justify-content: center; z-index: 100;
+}
+.gcode-modal.show { display: flex; }
+.gcode-box {
+  background: #1a1a1c; border: 1px solid #333;
+  border-radius: 12px; width: 680px; max-height: 85vh; display: flex; flex-direction: column;
+}
+.gcode-header { padding: 14px 16px; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; gap: 10px; }
+.gcode-header h2 { font-size: 14px; flex: 1; }
+.gcode-close { background: none; border: none; color: #666; font-size: 20px; cursor: pointer; line-height: 1; }
+.gcode-close:hover { color: #fff; }
+pre.gcode-content {
+  flex: 1; overflow: auto; padding: 14px 16px;
+  font-size: 11px; font-family: 'Courier New', monospace;
+  color: #0f0; background: #0d1a0d; line-height: 1.6; margin: 0;
+  white-space: pre-wrap; word-break: break-all;
+}
+.gcode-footer { padding: 10px 16px; border-top: 1px solid #2a2a2a; display: flex; gap: 8px; align-items: center; }
+
+/* ── Export modal ── */
+.export-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: none; align-items: center; justify-content: center; z-index: 100;
+}
+.export-modal.show { display: flex; }
+.export-box {
+  background: #1a1a1c; border: 1px solid #333;
+  border-radius: 12px; width: 520px; max-height: 85vh; display: flex; flex-direction: column;
+}
+.export-header { padding: 14px 16px; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; }
+.export-header h2 { font-size: 14px; flex: 1; }
+.export-section { padding: 12px 16px; border-bottom: 1px solid #1e1e1e; }
+.export-section-title { font-size: 10px; color: #555; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.export-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.exp-btn {
+  background: #2a2a2a; border: 1px solid #333; border-radius: 8px;
+  padding: 10px 6px; cursor: pointer; text-align: center;
+  font-family: inherit; color: #ccc; transition: all 0.15s;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.exp-btn:hover { background: #333; border-color: #0a7aff55; color: #fff; }
+.exp-btn:active { transform: scale(0.97); }
+.exp-icon { font-size: 20px; }
+.exp-name { font-size: 11px; font-weight: 700; }
+.exp-desc { font-size: 9px; color: #555; }
+.exp-btn:hover .exp-desc { color: #888; }
+.export-footer { padding: 10px 16px; display: flex; gap: 8px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚙</div>
+  <div>
+    <div class="header-title">CNC Pattern Generator</div>
+  </div>
+  <div class="header-sub">Image → Halftone Pattern → Tool Path</div>
+</header>
+
+<div class="app-body">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <div class="sidebar">
+
+    <!-- Image Upload -->
+    <div class="panel">
+      <div class="panel-title">📁 รูปภาพ (Image Source)</div>
+      <div class="upload-area" id="uploadArea">
+        <div class="upload-icon">🖼</div>
+        <div class="upload-text">วางรูปหรือคลิกเลือกไฟล์</div>
+        <div class="upload-hint">PNG · JPG · BMP · GIF · WebP</div>
+      </div>
+      <div id="imgThumbWrap" class="img-thumb-wrap">
+        <img id="imgThumb" class="img-thumb" alt="preview"/>
+        <div class="img-thumb-overlay">
+          <span>🔄</span>
+          <span>เปลี่ยนรูป</span>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none">
+      <div id="imgSizeInfo" style="font-size:10px;color:#555;margin-top:6px;display:none"></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:7px">
+        <span style="font-size:10px;color:#666;white-space:nowrap">ความละเอียด DPI:</span>
+        <select id="dpiPreset" style="flex:1;font-size:10px;padding:3px 6px">
+          <option value="96">Screen 96 dpi</option>
+          <option value="150">Medium 150 dpi</option>
+          <option value="300" selected>Print 300 dpi</option>
+          <option value="600">High 600 dpi</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <input type="number" id="dpiCustom" class="num-in" value="300" min="1" max="2400"
+          style="width:56px;display:none;font-size:10px;padding:3px 6px">
+      </div>
+    </div>
+
+    <!-- Pattern Type -->
+    <div class="panel">
+      <div class="panel-title">🔷 รูปแบบ Pattern</div>
+      <div class="pattern-grid" id="patternGrid">
+        <button class="pat-btn active" data-pat="circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" opacity=".4"/></svg>วงกลม
+        </button>
+        <button class="pat-btn" data-pat="square">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/></svg>สี่เหลี่ยม
+        </button>
+        <button class="pat-btn" data-pat="diamond">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 22,12 12,22 2,12"/></svg>ข้าวหลาม
+        </button>
+        <button class="pat-btn" data-pat="cross">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/></svg>กากบาท
+        </button>
+        <button class="pat-btn" data-pat="hline">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="2" y1="7" x2="22" y2="7"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="17" x2="22" y2="17"/></svg>เส้นนอน
+        </button>
+        <button class="pat-btn" data-pat="triangle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,3 22,20 2,20"/></svg>สามเหลี่ยม
+        </button>
+        <button class="pat-btn" data-pat="hexagon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7"/></svg>หกเหลี่ยม
+        </button>
+        <button class="pat-btn" data-pat="star">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9"/></svg>ดาว
+        </button>
+        <button class="pat-btn" data-pat="dot">
+          <svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="3" fill="currentColor"/><circle cx="17" cy="7" r="2" fill="currentColor" opacity=".5"/><circle cx="7" cy="17" r="2" fill="currentColor" opacity=".5"/><circle cx="17" cy="17" r="1.5" fill="currentColor" opacity=".3"/></svg>ดอท Stipple
+        </button>
+      </div>
+    </div>
+
+    <!-- Pattern Settings -->
+    <div class="panel">
+      <div class="panel-title">⚙ ตั้งค่า Pattern</div>
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <span class="ctrl-lbl">Spacing (ระยะห่าง)</span>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nSpacing" value="5.0" min="0.5" max="30" step="0.1"><span class="unit-lbl">mm</span></div>
+        </div>
+        <input type="range" id="rSpacing" min="0.5" max="30" value="5.0" step="0.1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <span class="ctrl-lbl">Min Radius (รัศมีต่ำสุด)</span>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nMinR" value="0.0" min="0" max="999" step="0.05"><span class="unit-lbl">mm</span></div>
+        </div>
+        <input type="range" id="rMinR" min="0" max="50" value="0.0" step="0.05">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <span class="ctrl-lbl">Max Radius (รัศมีสูงสุด)</span>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nMaxR" value="2.0" min="0.05" max="999" step="0.05"><span class="unit-lbl">mm</span></div>
+        </div>
+        <input type="range" id="rMaxR" min="0.05" max="50" value="2.0" step="0.05">
+      </div>
+
+      <!-- Quantize sizes -->
+      <div class="in-grp" style="margin:8px 0 4px">
+        <label style="color:#aaa;font-size:11px">📐 เส้นผ่าศูนย์กลาง (mm, คั่นด้วย ,) — ว่าง = ปิด</label>
+        <input type="text" id="quantSizes" placeholder="เช่น 2, 6, 10 (เส้นผ่า mm)"
+               style="width:100%;background:#1a1a1c;border:1px solid #333;border-radius:6px;
+                      color:#e0e0e0;padding:5px 8px;font-size:11px;box-sizing:border-box;margin-top:4px">
+      </div>
+      <div class="tog-row" style="margin-bottom:10px">
+        <span class="tog-label">🎲 สุ่มขนาด (Random Size)</span>
+        <div class="toggle" id="togQuantRandom"></div>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <span class="ctrl-lbl">Angle (มุมหมุน Grid)</span>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nAngle" value="0" min="0" max="89" step="1"><span class="unit-lbl">°</span></div>
+        </div>
+        <input type="range" id="rAngle" min="0" max="89" value="0" step="1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <span class="ctrl-lbl">Contrast (ความคมชัด)</span>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nContrast" value="1.0" min="0.5" max="4.0" step="0.1"><span class="unit-lbl">×</span></div>
+        </div>
+        <input type="range" id="rContrast" min="0.5" max="4.0" value="1.0" step="0.1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <span class="ctrl-lbl">Gamma (โทนสี)</span>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nGamma" value="1.0" min="0.3" max="3.0" step="0.05"><span class="unit-lbl"></span></div>
+        </div>
+        <input type="range" id="rGamma" min="0.3" max="3.0" value="1.0" step="0.05">
+      </div>
+      <div class="tog-row" style="margin-top:10px">
+        <span class="tog-label">🔄 Invert (กลับสี)</span>
+        <div class="toggle" id="togInvert"></div>
+      </div>
+      <div class="tog-row">
+        <span class="tog-label">🖌 Fill (เติมสีทึบ)</span>
+        <div class="toggle on" id="togFill"></div>
+      </div>
+      <div class="tog-row">
+        <span class="tog-label">🌓 Dark Background</span>
+        <div class="toggle" id="togDarkBg"></div>
+      </div>
+    </div>
+
+    <!-- CNC Parameters -->
+    <div class="panel">
+      <div class="panel-title">🔩 ตั้งค่า CNC</div>
+      <div class="ctrl" style="margin-bottom:8px">
+        <div class="in-grp">
+          <label>หน่วย (Units)</label>
+          <select id="units">
+            <option value="mm">มิลลิเมตร (mm)</option>
+            <option value="inch">นิ้ว (inch)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Work size with aspect lock -->
+      <div class="worksize-row">
+        <div class="in-grp"><label>ขนาดงาน W</label>
+          <input type="number" class="num-in" id="workW" value="100" min="1" max="3000" step="0.1">
+        </div>
+        <button class="aspect-btn locked" id="aspectLock" title="Lock aspect ratio">🔒</button>
+        <div class="in-grp"><label>ขนาดงาน H</label>
+          <input type="number" class="num-in" id="workH" value="100" min="1" max="3000" step="0.1">
+        </div>
+      </div>
+
+      <!-- hidden CNC defaults (used by pattern G-code engine) -->
+      <input type="hidden" id="toolDia"    value="3">
+      <input type="hidden" id="cutDepth"   value="-1.5">
+      <input type="hidden" id="feedRate"   value="800">
+      <input type="hidden" id="plungeRate" value="200">
+      <input type="hidden" id="safeZ"      value="5">
+      <input type="hidden" id="rpm"        value="12000">
+      <div class="in-grp" style="margin-bottom:0">
+        <label>Machine Format (G-code)</label>
+        <select id="machineFormat">
+          <option value="grbl">GRBL v1.1 (Hobby CNC, Laser)</option>
+          <option value="mach2">Mach2</option>
+          <option value="mach3">Mach3 / Mach4</option>
+          <option value="fanuc">Fanuc 0i / 16 / 18 / 21</option>
+          <option value="linuxcnc">LinuxCNC (EMC2)</option>
+          <option value="smoothie">Smoothieboard</option>
+          <option value="siemens">Siemens Sinumerik 840D</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ══ Procedural Pattern Generator ══ -->
+    <div class="panel collap-panel closed" id="panProcGen">
+      <div class="panel-title" onclick="togglePanel('panProcGen')">
+        🎨 สร้างลาย (Procedural) <span class="collap-arrow">▾</span>
+      </div>
+      <div class="collap-body">
+
+        <!-- 8 pattern type buttons -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px" id="procTypeGrid">
+          <button class="tool-type-btn active" onclick="setProcType(this,'wave')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M2 12 Q6 4 12 12 Q18 20 22 12"/></svg>
+            คลื่น
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'rings')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="10"/></svg>
+            วงแหวน
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'spiral')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><path d="M12 12 Q16 8 16 12 Q16 17 10 17 Q4 17 4 10 Q4 3 12 3 Q20 3 20 12"/></svg>
+            สไปรัล
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'radial')">
+            <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="currentColor" opacity="0.4"/><circle cx="12" cy="12" r="11" fill="currentColor" opacity="0.15"/></svg>
+            Radial
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'checker')">
+            <svg viewBox="0 0 24 24" width="22" height="22"><rect x="2" y="2" width="9" height="9" fill="currentColor"/><rect x="13" y="13" width="9" height="9" fill="currentColor"/><rect x="13" y="2" width="9" height="9" fill="currentColor" opacity="0.15"/><rect x="2" y="13" width="9" height="9" fill="currentColor" opacity="0.15"/></svg>
+            หมากรุก
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'diamond')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><path d="M12 2L22 12L12 22L2 12Z"/><path d="M12 6L18 12L12 18L6 12Z"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>
+            ไดมอนด์
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'noise')">
+            <svg viewBox="0 0 24 24" width="22" height="22">
+              <rect x="2"  y="2"  width="4" height="4" fill="currentColor" opacity="0.9"/>
+              <rect x="8"  y="2"  width="4" height="4" fill="currentColor" opacity="0.3"/>
+              <rect x="14" y="2"  width="4" height="4" fill="currentColor" opacity="0.7"/>
+              <rect x="2"  y="8"  width="4" height="4" fill="currentColor" opacity="0.4"/>
+              <rect x="8"  y="8"  width="4" height="4" fill="currentColor" opacity="0.85"/>
+              <rect x="14" y="8"  width="4" height="4" fill="currentColor" opacity="0.2"/>
+              <rect x="2"  y="14" width="4" height="4" fill="currentColor" opacity="0.6"/>
+              <rect x="8"  y="14" width="4" height="4" fill="currentColor" opacity="0.1"/>
+              <rect x="14" y="14" width="4" height="4" fill="currentColor" opacity="0.75"/>
+            </svg>
+            Noise
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'stripe')">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+              <rect x="2"  y="2" width="5" height="20" opacity="0.9"/>
+              <rect x="9"  y="2" width="3" height="20" opacity="0.5"/>
+              <rect x="14" y="2" width="5" height="20" opacity="0.2"/>
+              <rect x="20" y="2" width="2" height="20" opacity="0.7"/>
+            </svg>
+            แถบ
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'gradient')">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+              <rect x="1"  y="2" width="4" height="20" opacity="0.95"/>
+              <rect x="6"  y="2" width="3" height="20" opacity="0.72"/>
+              <rect x="10" y="2" width="3" height="20" opacity="0.48"/>
+              <rect x="14" y="2" width="3" height="20" opacity="0.26"/>
+              <rect x="18" y="2" width="3" height="20" opacity="0.10"/>
+              <rect x="22" y="2" width="2" height="20" opacity="0.03"/>
+            </svg>
+            ไล่สี
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'cross')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+              <line x1="6"  y1="2" x2="6"  y2="22"/><line x1="12" y1="2" x2="12" y2="22"/><line x1="18" y1="2" x2="18" y2="22"/>
+              <line x1="2"  y1="6" x2="22" y2="6"/><line x1="2"  y1="12" x2="22" y2="12"/><line x1="2"  y1="18" x2="22" y2="18"/>
+            </svg>
+            ตาราง
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'star')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+              <line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/>
+              <line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/><line x1="19.1" y1="4.9" x2="4.9" y2="19.1"/>
+              <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+            </svg>
+            ดาว
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'hex')">
+            <svg viewBox="0 0 28 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22">
+              <path d="M9 2L15 2L18 7L15 12L9 12L6 7Z"/>
+              <path d="M15 12L21 12L24 17L21 22L15 22L12 17Z"/>
+              <path d="M3 12L9 12L12 17L9 22L3 22L0 17Z"/>
+            </svg>
+            รังผึ้ง
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'zigzag')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22">
+              <path d="M2 7L8 3L14 7L20 3L22 4.5"/>
+              <path d="M2 13L8 9L14 13L20 9L22 10.5"/>
+              <path d="M2 19L8 15L14 19L20 15L22 16.5"/>
+            </svg>
+            ซิกแซก
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'dotgrid')">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+              <circle cx="5"  cy="5"  r="2.5"/><circle cx="12" cy="5"  r="2.5"/><circle cx="19" cy="5"  r="2.5"/>
+              <circle cx="5"  cy="12" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="19" cy="12" r="2.5"/>
+              <circle cx="5"  cy="19" r="2.5"/><circle cx="12" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/>
+            </svg>
+            จุดกริด
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'triangle')">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+              <path d="M2 22L8 4L14 22Z" opacity="0.9"/>
+              <path d="M12 22L18 4L24 22Z" opacity="0.5"/>
+            </svg>
+            สามเหลี่ยม
+          </button>
+        </div>
+
+        <!-- Live mini-preview -->
+        <canvas id="procPv" width="220" height="110"
+          style="width:100%;border-radius:7px;border:1px solid #2a2a2a;margin-bottom:10px;display:block;image-rendering:pixelated;background:#111"></canvas>
+
+        <!-- Dynamic parameter sliders -->
+        <div id="procSliders"></div>
+
+        <!-- Center XY (shown only for rings / radial / spiral) -->
+        <div id="procCenterRow" style="display:none;margin-bottom:6px">
+          <div class="in-row">
+            <div class="in-grp">
+              <label style="display:flex;justify-content:space-between;align-items:center">
+                <span>Center X (%)</span><span id="procCXv" style="color:#0a7aff;font-size:10px;font-weight:700">50</span>
+              </label>
+              <input type="range" min="0" max="100" value="50" id="procCX" oninput="$('procCXv').textContent=this.value;procPreview()">
+            </div>
+            <div class="in-grp">
+              <label style="display:flex;justify-content:space-between;align-items:center">
+                <span>Center Y (%)</span><span id="procCYv" style="color:#0a7aff;font-size:10px;font-weight:700">50</span>
+              </label>
+              <input type="range" min="0" max="100" value="50" id="procCY" oninput="$('procCYv').textContent=this.value;procPreview()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Invert toggle -->
+        <div class="tog-row" style="margin-bottom:10px">
+          <span class="tog-label">พลิกลาย (Invert)</span>
+          <div class="toggle" id="togProcInv"></div>
+        </div>
+
+        <button class="btn btn-blue" style="width:100%;font-size:12px;padding:9px;border-radius:8px"
+          onclick="applyProcPattern()">▶ ใช้ลายนี้ &amp; Generate</button>
+
+      </div>
+    </div>
+
+    <!-- ══ Vector Tracing Panel ══ -->
+    <div class="panel collap-panel closed" id="panVec">
+      <div class="panel-title" onclick="togglePanel('panVec')">
+        🔍 Vector Tracing
+      </div>
+      <div class="panel-body" style="padding:8px 10px 10px">
+
+        <!-- Preset -->
+        <div style="margin-bottom:8px">
+          <label style="font-size:10px;color:#aaa;display:block;margin-bottom:3px">Preset</label>
+          <select id="vecPreset" onchange="applyVecPreset(this.value)"
+            style="width:100%;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;padding:3px 6px;font-size:11px">
+            <option value="">— เลือก Preset —</option>
+            <option value="line_art">Line Art (เส้นลาย)</option>
+            <option value="technical">Technical Drawing</option>
+            <option value="sketch">Sketch / ดินสอ</option>
+            <option value="dark_bg">เส้นขาวบนพื้นดำ</option>
+          </select>
+        </div>
+
+        <!-- Mode tabs -->
+        <div style="display:flex;gap:4px;margin-bottom:8px">
+          <button id="vecMode_centerlineBtn" class="tool-type-btn active"
+            onclick="setVecMode('centerline')" style="flex:1;font-size:10px;padding:4px 2px">
+            ✏️ Centerline
+          </button>
+          <button id="vecMode_outlineBtn" class="tool-type-btn"
+            onclick="setVecMode('outline')" style="flex:1;font-size:10px;padding:4px 2px">
+            ⬜ Outline
+          </button>
+          <button id="vecMode_patternBtn" class="tool-type-btn"
+            onclick="setVecMode('pattern')" style="flex:1;font-size:10px;padding:4px 2px">
+            ▦ Pattern
+          </button>
+        </div>
+
+        <!-- Shared settings (centerline + outline) -->
+        <div id="vecSettings_shared">
+
+          <!-- Threshold -->
+          <div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+              <span>Threshold</span>
+              <span id="vecThresh2V" style="color:#0a7aff;font-size:10px;font-weight:600">128</span>
+            </div>
+            <input type="range" id="vecThresh2" min="10" max="245" value="128"
+              oninput="$('vecThresh2V').textContent=this.value"
+              style="width:100%;accent-color:#0a7aff">
+            <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+              <input type="checkbox" id="vecInvert" style="accent-color:#0a7aff">
+              <label for="vecInvert" style="font-size:10px;color:#aaa">Invert (เส้นขาวบนดำ)</label>
+            </div>
+          </div>
+
+          <!-- Blur -->
+          <div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+              <span>Blur (ลด noise)</span>
+              <span id="vecBlur2V" style="color:#0a7aff;font-size:10px;font-weight:600">1.0</span>
+            </div>
+            <input type="range" id="vecBlur2" min="0" max="30" value="10"
+              oninput="$('vecBlur2V').textContent=(this.value/10).toFixed(1)"
+              style="width:100%;accent-color:#0a7aff">
+          </div>
+
+          <!-- Close gaps -->
+          <div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+              <span>ต่อเส้นขาด (Close)</span>
+              <span id="vecCloseV" style="color:#0a7aff;font-size:10px;font-weight:600">1</span>
+            </div>
+            <input type="range" id="vecClose" min="0" max="8" value="1"
+              oninput="$('vecCloseV').textContent=this.value"
+              style="width:100%;accent-color:#0a7aff">
+          </div>
+
+          <!-- Smooth -->
+          <div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+              <span>Smooth (เส้นโค้ง)</span>
+              <span id="vecSmooth2V" style="color:#0a7aff;font-size:10px;font-weight:600">5</span>
+            </div>
+            <input type="range" id="vecSmooth2" min="1" max="10" value="5"
+              oninput="$('vecSmooth2V').textContent=this.value"
+              style="width:100%;accent-color:#0a7aff">
+          </div>
+
+          <!-- Min line length -->
+          <div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+              <span>ตัดเส้นสั้น (Min px)</span>
+              <span id="vecMinLen2V" style="color:#0a7aff;font-size:10px;font-weight:600">15</span>
+            </div>
+            <input type="range" id="vecMinLen2" min="3" max="200" value="15"
+              oninput="$('vecMinLen2V').textContent=this.value"
+              style="width:100%;accent-color:#0a7aff">
+          </div>
+
+          <!-- Simplify -->
+          <div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+              <span>ลดจุด / Simplify</span>
+              <span id="vecEps2V" style="color:#0a7aff;font-size:10px;font-weight:600">0.8</span>
+            </div>
+            <input type="range" id="vecEps2" min="1" max="60" value="8"
+              oninput="$('vecEps2V').textContent=(this.value/10).toFixed(1)"
+              style="width:100%;accent-color:#0a7aff">
+          </div>
+
+        </div><!-- /vecSettings_shared -->
+
+        <!-- Pattern-only settings -->
+        <div id="vecSettings_pattern" style="display:none">
+          <div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+              <span>Threshold</span>
+              <span id="vecPThresh2V" style="color:#0a7aff;font-size:10px;font-weight:600">128</span>
+            </div>
+            <input type="range" id="vecPThresh2" min="10" max="245" value="128"
+              oninput="$('vecPThresh2V').textContent=this.value"
+              style="width:100%;accent-color:#0a7aff">
+            <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+              <input type="checkbox" id="vecInvert2" style="accent-color:#0a7aff">
+              <label for="vecInvert2" style="font-size:10px;color:#aaa">Invert</label>
+            </div>
+          </div>
+          <div id="vecTileInfo" style="font-size:10px;color:#888;line-height:1.5;margin-bottom:6px">
+            ตรวจจับ tile ซ้ำในภาพโดยอัตโนมัติ<br>แล้ว export เฉพาะ tile เดียว
+          </div>
+        </div><!-- /vecSettings_pattern -->
+
+        <!-- Preview canvas -->
+        <canvas id="vecPreviewCanvas"
+          style="width:100%;border:1px solid #333;border-radius:4px;display:block;margin-bottom:6px;background:#111;max-height:160px;object-fit:contain">
+        </canvas>
+
+        <!-- Info bar -->
+        <div id="vecInfo" style="font-size:10px;color:#888;margin-bottom:8px;min-height:14px">
+          กดปุ่มด้านล่างเพื่อเริ่มตรวจจับเส้น
+        </div>
+
+        <!-- Trace button -->
+        <button style="width:100%;margin-bottom:6px;background:#1a3a1a;color:#5dff5d;border:1px solid #2a5a2a;border-radius:5px;padding:6px;font-size:11px;font-weight:600;cursor:pointer"
+          onclick="runVectorTrace()">🔍 ตรวจจับ &amp; Trace เส้น</button>
+
+        <!-- Export buttons -->
+        <div style="display:flex;gap:6px">
+          <button style="flex:1;background:#1a2a3a;color:#7ab3e0;border:1px solid #1e3a5a;border-radius:5px;padding:5px;font-size:10px;cursor:pointer"
+            onclick="exportVectorSVG()" id="vecExportSVG">💾 Export SVG</button>
+          <button style="flex:1;background:#1a2a3a;color:#7ab3e0;border:1px solid #1e3a5a;border-radius:5px;padding:5px;font-size:10px;cursor:pointer"
+            onclick="exportVectorDXF()" id="vecExportDXF">💾 Export DXF</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ Profiling Panel ══ -->
+    <div class="panel collap-panel closed" id="panProfiling">
+      <div class="panel-title" onclick="togglePanel('panProfiling')">
+        ✂️ Profiling (กินใน / กินนอก) <span class="collap-arrow">▾</span>
+      </div>
+      <div class="collap-body">
+
+        <div class="sect-hd">Profile Type &amp; Vector Association</div>
+        <div class="in-row" style="margin-bottom:7px">
+          <div class="in-grp">
+            <label>Profile</label>
+            <select id="profProfile">
+              <option value="outside">Outside (กินนอก)</option>
+              <option value="inside">Inside (กินใน)</option>
+              <option value="on">On (บนเส้น)</option>
+            </select>
+          </div>
+          <div class="in-grp">
+            <label>Allowance (mm)</label>
+            <input type="number" class="num-in" id="profAllowance" value="0" min="-10" max="10" step="0.1">
+          </div>
+        </div>
+        <div class="chk-row">
+          <label class="chk-lbl"><input type="checkbox" id="profFPThk"><span>Final Pass Thickness</span></label>
+          <input type="number" class="num-in" id="profFPThkVal" value="0.5" min="0" max="5" step="0.1" style="width:52px">
+          <span class="unit-lbl">mm</span>
+        </div>
+        <div class="chk-row" style="margin-bottom:4px">
+          <label class="chk-lbl"><input type="checkbox" id="profFPAlw"><span>Final Pass Allowance</span></label>
+          <input type="number" class="num-in" id="profFPAlwVal" value="0" min="0" max="5" step="0.1" style="width:52px">
+          <span class="unit-lbl">mm</span>
+        </div>
+
+        <div class="sect-hd">Cutting Depths</div>
+        <div class="in-row" style="margin-bottom:6px">
+          <div class="in-grp"><label>Start Depth (mm)</label>
+            <input type="number" class="num-in" id="profStartZ" value="0" min="-200" max="200" step="0.1">
+          </div>
+          <div class="in-grp"><label>Finish Depth (mm)</label>
+            <input type="number" class="num-in" id="profFinishZ" value="-5" min="-200" max="0" step="0.1">
+          </div>
+        </div>
+        <div class="in-grp" style="margin-bottom:4px">
+          <label>Tolerance (mm)</label>
+          <input type="number" class="num-in" id="profTolerance" value="0.025" min="0.001" max="1" step="0.001">
+        </div>
+
+        <div class="sect-hd">Profiling Tool</div>
+        <!-- Tool type selector -->
+        <div class="tool-type-row" id="profToolTypeRow">
+          <button class="tool-type-btn active" onclick="setProfToolType(this,'endmill')" title="Endmill (Flat)">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="12" rx="1"/><rect x="6" y="14" width="12" height="4" rx="0.5"/></svg>
+            Endmill
+          </button>
+          <button class="tool-type-btn" onclick="setProfToolType(this,'vbit')" title="V-bit">
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="9,2 15,2 12,19"/></svg>
+            V-bit
+          </button>
+          <button class="tool-type-btn" onclick="setProfToolType(this,'ballr')" title="Corner R (ดอก R)">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="10" rx="1"/><path d="M9 12 Q9 20 12 20 Q15 20 15 12 Z"/></svg>
+            Radius R
+          </button>
+          <button class="tool-type-btn" onclick="setProfToolType(this,'ball')" title="Ball Nose">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="8" rx="1"/><circle cx="12" cy="14" r="5"/></svg>
+            Ball
+          </button>
+        </div>
+        <!-- Common: diameter + tool number -->
+        <div class="in-row" style="margin-bottom:6px">
+          <div class="in-grp"><label>Tool Ø (mm)</label>
+            <input type="number" class="num-in" id="profDia" value="3" min="0.1" max="50" step="0.1">
+          </div>
+          <div class="in-grp"><label>Tool Number</label>
+            <input type="number" class="num-in" id="profToolNum" value="1" min="1" max="99">
+          </div>
+        </div>
+        <!-- V-bit: angle -->
+        <div id="profVbitP" style="display:none;margin-bottom:6px">
+          <div class="in-grp"><label>V-bit Angle (°)</label>
+            <select id="profVAngle" class="num-in" style="color:#e0e0e0">
+              <option value="30">30°</option>
+              <option value="45">45°</option>
+              <option value="60" selected>60°</option>
+              <option value="90">90°</option>
+              <option value="120">120°</option>
+            </select>
+          </div>
+        </div>
+        <!-- Radius R: corner radius -->
+        <div id="profBallRP" style="display:none;margin-bottom:6px">
+          <div class="in-grp"><label>Corner Radius R (mm)</label>
+            <input type="number" class="num-in" id="profCornerR" value="0.5" min="0.01" max="25" step="0.1">
+          </div>
+        </div>
+        <!-- Feed / speed -->
+        <div class="in-row" style="margin-bottom:6px">
+          <div class="in-grp"><label>Stepover (mm)</label>
+            <input type="number" class="num-in" id="profStepover" value="1.2" min="0.01" max="100" step="0.1">
+          </div>
+          <div class="in-grp"><label>Stepdown (mm)</label>
+            <input type="number" class="num-in" id="profStepdown" value="5" min="0.1" max="100" step="0.1">
+          </div>
+        </div>
+        <div class="in-row" style="margin-bottom:6px">
+          <div class="in-grp"><label>Feed Rate (mm/min)</label>
+            <input type="number" class="num-in" id="profFeed" value="1500" min="1" max="30000">
+          </div>
+          <div class="in-grp"><label>Plunge Rate (mm/min)</label>
+            <input type="number" class="num-in" id="profPlunge" value="1200" min="1" max="10000">
+          </div>
+        </div>
+        <div class="in-grp" style="margin-bottom:7px">
+          <label>Spindle (RPM)</label>
+          <input type="number" class="num-in" id="profRPM" value="24000" min="100" max="60000" step="100">
+        </div>
+        <div class="in-grp" style="margin-bottom:8px">
+          <label>Cutting Direction</label>
+          <select id="profCutDir">
+            <option value="conventional">Conventional (ทวนเข็ม)</option>
+            <option value="climb">Climb (ตามเข็ม)</option>
+          </select>
+        </div>
+        <div class="chk-row">
+          <label class="chk-lbl"><input type="checkbox" id="profLeadInOut"><span>Add Lead In / Out Moves</span></label>
+        </div>
+        <div class="chk-row" style="margin-bottom:4px">
+          <label class="chk-lbl"><input type="checkbox" id="profRamping"><span>Add Ramping Moves</span></label>
+        </div>
+
+        <div class="sect-hd">Toolpath</div>
+        <div class="in-grp" style="margin-bottom:8px">
+          <label>Name</label>
+          <input type="text" class="num-in" id="profName" placeholder="Profile_1" style="color:#ccc">
+        </div>
+        <div class="calc-row">
+          <button class="btn-outline" onclick="calcProfileGcode(false)">💾 Calculate Later</button>
+          <button class="btn btn-blue" style="font-size:11px;padding:6px" onclick="calcProfileGcode(true)">▶ Calculate Now</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 2D Area Clearance Panel ══ -->
+    <div class="panel collap-panel closed" id="panAreaClear">
+      <div class="panel-title" onclick="togglePanel('panAreaClear')">
+        🗂️ 2D Area Clearance (เซาะงาน) <span class="collap-arrow">▾</span>
+      </div>
+      <div class="collap-body">
+
+        <div class="sect-hd">Vector Association</div>
+        <div class="in-grp" style="margin-bottom:8px">
+          <label>Vector Selection</label>
+          <select id="acVecAssoc">
+            <option value="selected">Selected Vectors</option>
+            <option value="all">All Vectors</option>
+          </select>
+        </div>
+
+        <div class="in-row" style="margin-bottom:6px">
+          <div class="in-grp"><label>Start Depth (mm)</label>
+            <input type="number" class="num-in" id="acStartZ" value="0" min="-200" max="200" step="0.1">
+          </div>
+          <div class="in-grp"><label>Finish Depth (mm)</label>
+            <input type="number" class="num-in" id="acFinishZ" value="-5" min="-200" max="0" step="0.1">
+          </div>
+        </div>
+        <div class="in-row" style="margin-bottom:6px">
+          <div class="in-grp"><label>Allowance (mm)</label>
+            <input type="number" class="num-in" id="acAllowance" value="0" min="-10" max="10" step="0.1">
+          </div>
+          <div class="in-grp"><label>Final Tool Allowance</label>
+            <input type="number" class="num-in" id="acFinalAlw" value="0" min="-10" max="10" step="0.1">
+          </div>
+        </div>
+        <div class="in-grp" style="margin-bottom:4px">
+          <label>Tolerance (mm)</label>
+          <input type="number" class="num-in" id="acTolerance" value="0.025" min="0.001" max="1" step="0.001">
+        </div>
+
+        <div class="in-row" style="margin-bottom:8px;margin-top:8px">
+          <div class="in-grp"><label>Machine Safe Z (mm)</label>
+            <input type="number" class="num-in" id="acSafeZ" value="10" min="0" max="500" step="1">
+          </div>
+          <div class="in-grp"><label>Home Position</label>
+            <input type="text" class="num-in" id="acHomePos" value="X:0 Y:0 Z:10" style="color:#aaa;font-size:10px">
+          </div>
+        </div>
+
+        <div class="sect-hd">Tools List</div>
+        <!-- Tool entry form -->
+        <div class="tool-param-box" id="acToolForm">
+          <div style="font-size:9px;font-weight:700;color:#0a7aff;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px">เพิ่มดอกมีด</div>
+          <div class="tool-type-row" id="acToolTypeRow">
+            <button class="tool-type-btn active" onclick="setAcToolType(this,'endmill')" title="Endmill (Flat)">
+              <svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="12" rx="1"/><rect x="6" y="14" width="12" height="4" rx="0.5"/></svg>
+              Endmill
+            </button>
+            <button class="tool-type-btn" onclick="setAcToolType(this,'vbit')" title="V-bit">
+              <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="9,2 15,2 12,19"/></svg>
+              V-bit
+            </button>
+            <button class="tool-type-btn" onclick="setAcToolType(this,'ballr')" title="Corner R (ดอก R)">
+              <svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="10" rx="1"/><path d="M9 12 Q9 20 12 20 Q15 20 15 12 Z"/></svg>
+              Radius R
+            </button>
+            <button class="tool-type-btn" onclick="setAcToolType(this,'ball')" title="Ball Nose">
+              <svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="8" rx="1"/><circle cx="12" cy="14" r="5"/></svg>
+              Ball
+            </button>
+          </div>
+          <div class="in-row" style="margin-bottom:5px">
+            <div class="in-grp"><label>Tool Ø (mm)</label>
+              <input type="number" class="num-in" id="acToolDia" value="3" min="0.1" max="50" step="0.1">
+            </div>
+            <div class="in-grp"><label>T Number</label>
+              <input type="number" class="num-in" id="acToolNum" value="1" min="1" max="99">
+            </div>
+          </div>
+          <div id="acVbitP" style="display:none;margin-bottom:5px">
+            <div class="in-grp"><label>V-bit Angle (°)</label>
+              <select id="acVAngle" class="num-in" style="color:#e0e0e0">
+                <option value="30">30°</option>
+                <option value="45">45°</option>
+                <option value="60" selected>60°</option>
+                <option value="90">90°</option>
+                <option value="120">120°</option>
+              </select>
+            </div>
+          </div>
+          <div id="acBallRP" style="display:none;margin-bottom:5px">
+            <div class="in-grp"><label>Corner Radius R (mm)</label>
+              <input type="number" class="num-in" id="acCornerR" value="0.5" min="0.01" max="25" step="0.1">
+            </div>
+          </div>
+          <div class="in-row" style="margin-bottom:5px">
+            <div class="in-grp"><label>Feed (mm/min)</label>
+              <input type="number" class="num-in" id="acToolFeed" value="800" min="1" max="30000">
+            </div>
+            <div class="in-grp"><label>Plunge (mm/min)</label>
+              <input type="number" class="num-in" id="acToolPlunge" value="200" min="1" max="10000">
+            </div>
+          </div>
+          <div class="in-grp" style="margin-bottom:6px">
+            <label>Spindle (RPM)</label>
+            <input type="number" class="num-in" id="acToolRPM" value="12000" min="100" max="60000" step="100">
+          </div>
+          <div class="calc-row">
+            <button class="btn-outline" onclick="acAddTool()">➕ Add to List</button>
+            <button class="btn-outline" onclick="acSyncTool()">↩ Sync Params</button>
+          </div>
+        </div>
+        <div class="ac-tool-list" id="acToolsList"></div>
+        <div style="text-align:right;margin-bottom:8px">
+          <button class="btn-outline" style="font-size:10px;padding:3px 9px" onclick="acRemoveTool()">➖ Remove Selected</button>
+        </div>
+        <div class="chk-row" style="margin-bottom:4px">
+          <label class="chk-lbl"><input type="checkbox" id="acRamping"><span>Add Ramping Moves</span></label>
+        </div>
+
+        <div class="sect-hd">Material</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span id="acMaterialLbl" style="font-size:11px;color:#e55;font-weight:600">Undefined</span>
+          <button class="btn-outline" style="font-size:10px;padding:3px 9px" onclick="acSetupMaterial()">⚙️ Setup…</button>
+        </div>
+
+        <div class="sect-hd">Toolpath</div>
+        <div class="in-grp" style="margin-bottom:8px">
+          <label>Name</label>
+          <input type="text" class="num-in" id="acName" placeholder="Area_Clear_1" style="color:#ccc">
+        </div>
+        <div class="calc-row">
+          <button class="btn-outline" onclick="calcAreaGcode(false)">💾 Calculate Later</button>
+          <button class="btn btn-blue" style="font-size:11px;padding:6px" onclick="calcAreaGcode(true)">▶ Calculate Now</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sheet / Nesting -->
+    <div class="panel">
+      <div class="panel-title">📋 แผ่นงาน (Sheet / Nesting)</div>
+      <div class="in-row" style="margin-bottom:7px">
+        <div class="in-grp"><label>แผ่น W (mm)</label>
+          <input type="number" class="num-in" id="sheetW" value="600" min="1" max="5000">
+        </div>
+        <div class="in-grp"><label>แผ่น H (mm)</label>
+          <input type="number" class="num-in" id="sheetH" value="400" min="1" max="5000">
+        </div>
+      </div>
+      <div class="in-row" style="margin-bottom:7px">
+        <div class="in-grp"><label>Margin ขอบ (mm)</label>
+          <input type="number" class="num-in" id="sheetMargin" value="10" min="0" max="200" step="1">
+        </div>
+        <div class="in-grp"><label>Spacing ชิ้น (mm)</label>
+          <input type="number" class="num-in" id="partSpacing" value="5" min="0" max="200" step="1">
+        </div>
+      </div>
+      <div class="in-grp" style="margin-bottom:7px">
+        <label>จำนวนชิ้นที่ต้องการ <span style="color:#555;font-weight:400">(0 = เต็มแผ่น)</span></label>
+        <input type="number" class="num-in" id="desiredCount" value="0" min="0" max="9999" step="1">
+      </div>
+      <div id="nestInfo" style="font-size:10px;color:#00d1a0;margin-bottom:7px;font-weight:700">— ชิ้น / แผ่น</div>
+      <button class="btn btn-blue" id="btnViewSheet" style="width:100%;font-size:11px;padding:6px 10px">📋 ดูแผ่นงาน (Sheet Layout)</button>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- ═══ MAIN AREA ═══ -->
+  <div class="main-area">
+    <div class="main-tabs">
+      <button class="tab-btn active" data-tab="pattern">🎨 Pattern Preview</button>
+      <button class="tab-btn" data-tab="simulation">▶ Toolpath Sim</button>
+      <button class="tab-btn" data-tab="sheet">📋 Sheet Layout</button>
+    </div>
+
+    <!-- Pattern tab -->
+    <div class="tab-panel active" id="tabPattern">
+      <div class="canvas-wrap" id="canvasWrap" style="flex-direction:column">
+        <!-- zoom viewport: viewCanvas draws vectors at zoom level; pCanvas hidden for exports -->
+        <div id="zoomViewport" style="flex:1;width:100%">
+          <canvas id="viewCanvas"></canvas>
+          <canvas id="previewCanvas"></canvas>
+        </div>
+        <!-- overlays (absolute to canvasWrap) -->
+        <div class="no-img" id="noImg">
+          <div class="icon">🖼</div>
+          <p>เลือกรูปภาพเพื่อเริ่มสร้าง Pattern</p>
+        </div>
+        <div class="stats-ov" id="statsOv">
+          <div class="st-row"><span>Shapes</span><span class="st-val" id="stShapes">—</span></div>
+          <div class="st-row"><span>Pattern</span><span class="st-val" id="stPat">—</span></div>
+          <div class="st-row"><span>Grid</span><span class="st-val" id="stGrid">—</span></div>
+          <div class="st-row"><span>Real size</span><span class="st-val" id="stSize">—</span></div>
+          <div class="st-row"><span>Est. time</span><span class="st-val" id="stTime">—</span></div>
+        </div>
+        <div class="processing-ov" id="procOv"><div class="spinner"></div></div>
+        <!-- zoom toolbar -->
+        <div class="zoom-toolbar" id="zoomToolbar">
+          <button class="zt-btn" id="ztOut" title="Zoom Out">−</button>
+          <span class="zt-label" id="ztLabel">100%</span>
+          <button class="zt-btn" id="ztIn" title="Zoom In">+</button>
+          <button class="zt-btn" id="ztFit" title="Fit to screen" style="font-size:13px">⊞ Fit</button>
+          <button class="zt-btn" id="zt100" title="Actual size" style="font-size:11px">1:1</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulation tab -->
+    <div class="tab-panel" id="tabSimulation">
+      <div class="sim-wrap" id="simWrap">
+        <canvas id="simCanvas"></canvas>
+        <div class="no-img" id="noImgSim">
+          <div class="icon">▶</div>
+          <p>สร้าง Pattern แล้วกด Play เพื่อ Simulate</p>
+        </div>
+      </div>
+      <div class="sim-controls">
+        <button class="btn btn-green" id="btnSimPlay" style="padding:5px 12px;font-size:11px">▶ Play</button>
+        <button class="btn btn-gray" id="btnSimReset" style="padding:5px 12px;font-size:11px">⏹ Reset</button>
+        <span style="font-size:11px;color:#666">Speed:</span>
+        <input type="range" id="simSpeed" min="1" max="30" value="8" style="width:70px">
+        <span style="font-size:11px;color:#0a7aff;min-width:24px" id="simSpeedVal">8×</span>
+        <span style="font-size:11px;color:#555" id="simStatus">—</span>
+        <div class="sim-legend">
+          <span><span class="leg-line" style="background:#ff9500"></span>Rapid G0</span>
+          <span><span class="leg-line" style="background:#00d1a0"></span>Cut G1</span>
+          <span><span class="leg-line" style="background:#0a7aff"></span>Arc G2</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sheet Layout tab -->
+    <div class="tab-panel" id="tabSheet">
+      <div class="sheet-wrap" id="sheetWrap">
+        <canvas id="sheetCanvas"></canvas>
+        <div class="no-img" id="noImgSheet">
+          <div class="icon">📋</div>
+          <p>คลิก "ดูแผ่นงาน" เพื่อแสดง Sheet Layout</p>
+        </div>
+        <div class="sheet-info-ov" id="sheetInfoOv" style="display:none">
+          <div class="st-row"><span>Sheet</span><span class="st-val" id="siSheet">—</span></div>
+          <div class="st-row"><span>Part</span><span class="st-val" id="siPart">—</span></div>
+          <div class="st-row"><span>Cols × Rows</span><span class="st-val" id="siGrid">—</span></div>
+          <div class="st-row"><span>Total parts</span><span class="st-val" id="siCount">—</span></div>
+          <div class="st-row"><span>Margin</span><span class="st-val" id="siMargin">—</span></div>
+          <div class="st-row"><span>Spacing</span><span class="st-val" id="siSpacing">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <button class="btn btn-gray" id="btnRegen">🔄 Regenerate</button>
+      <button class="btn btn-blue" id="btnExport">📤 Export…</button>
+      <button class="btn btn-green" id="btnGcode">💾 G-code</button>
+      <button class="btn btn-gray" id="btnPreview">👁 Preview G-code</button>
+      <span class="status" id="statusTxt">พร้อมใช้งาน</span>
+    </div>
+  </div>
+</div><!-- /app-body -->
+
+<!-- ── G-code Preview Modal ── -->
+<div class="gcode-modal" id="gcodeModal">
+  <div class="gcode-box">
+    <div class="gcode-header">
+      <h2>G-code Preview</h2>
+      <span style="font-size:10px;color:#555;margin-right:8px" id="gcodeFormatLabel"></span>
+      <button class="gcode-close" id="gcodeClose">✕</button>
+    </div>
+    <pre class="gcode-content" id="gcodeContent"></pre>
+    <div class="gcode-footer">
+      <button class="btn btn-green" id="btnGcodeDown">💾 Download</button>
+      <span style="font-size:10px;color:#555;flex:1" id="gcodeStats"></span>
+      <button class="btn btn-gray" id="gcodeClose2">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Export Modal ── -->
+<div class="export-modal" id="exportModal">
+  <div class="export-box">
+    <div class="export-header">
+      <h2>📤 Export ไฟล์</h2>
+      <button class="gcode-close" id="exportClose">✕</button>
+    </div>
+
+    <div class="export-section">
+      <div class="export-section-title">🖼 Raster Image</div>
+      <div class="export-grid">
+        <button class="exp-btn" id="expPNG">
+          <span class="exp-icon">🖼</span>
+          <span class="exp-name">.PNG</span>
+          <span class="exp-desc">High quality raster</span>
+        </button>
+        <button class="exp-btn" id="expJPG">
+          <span class="exp-icon">📷</span>
+          <span class="exp-name">.JPG</span>
+          <span class="exp-desc">Compressed raster</span>
+        </button>
+        <button class="exp-btn" id="expPDF">
+          <span class="exp-icon">📄</span>
+          <span class="exp-name">.PDF</span>
+          <span class="exp-desc">Print-ready PDF</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="export-section">
+      <div class="export-section-title">📐 Vector / CAD</div>
+      <div class="export-grid">
+        <button class="exp-btn" id="expSVG">
+          <span class="exp-icon">✏</span>
+          <span class="exp-name">.SVG</span>
+          <span class="exp-desc">Web / Inkscape</span>
+        </button>
+        <button class="exp-btn" id="expAI">
+          <span class="exp-icon">🎨</span>
+          <span class="exp-name">.AI / .SVG</span>
+          <span class="exp-desc">Illustrator-ready</span>
+        </button>
+        <button class="exp-btn" id="expDXF">
+          <span class="exp-icon">📏</span>
+          <span class="exp-name">.DXF</span>
+          <span class="exp-desc">AutoCAD / CAM</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="export-section">
+      <div class="export-section-title">🔩 CNC / Machine</div>
+      <div class="export-grid">
+        <button class="exp-btn" id="expGCODE">
+          <span class="exp-icon">⚙</span>
+          <span class="exp-name">.NC / .TAP</span>
+          <span class="exp-desc">G-code toolpath</span>
+        </button>
+        <button class="exp-btn" id="expCSV">
+          <span class="exp-icon">📊</span>
+          <span class="exp-name">.CSV</span>
+          <span class="exp-desc">Point data table</span>
+        </button>
+        <button class="exp-btn" id="expSheetGcode">
+          <span class="exp-icon">📋</span>
+          <span class="exp-name">Sheet G-code</span>
+          <span class="exp-desc">All parts nested</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="export-footer">
+      <button class="btn btn-gray" id="exportClose2">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden processing canvas -->
+<canvas id="imgCanvas" style="display:none"></canvas>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  CNC Pattern Generator v2
+//  Inspired by Vectoraster (lostminds.com/vectoraster)
+// ══════════════════════════════════════════════════════════
+
+const S = {
+  image: null, pattern: 'circle',
+  spacingMm: 5.0, minRmm: 0.0, maxRmm: 2.0,
+  angle: 0, contrast: 1.0, gamma: 1.0,
+  invert: false, fill: true, darkBg: false, quantRandom: false,
+  shapes: [], lastGcode: '',
+  machineFormat: 'grbl',
+  aspectLocked: true, imgAspect: 1,
+  // simulation
+  simMoves: [], simIdx: 0, simAnimId: null, simRunning: false
+};
+
+const $ = id => document.getElementById(id);
+const pCanvas = $('previewCanvas');   // export canvas (hidden)
+const vCanvas = $('viewCanvas');      // display canvas (zoom-aware, vector-crisp)
+const iCanvas = $('imgCanvas');
+const pCtx    = pCanvas.getContext('2d');
+const vCtx    = vCanvas.getContext('2d');
+const iCtx    = iCanvas.getContext('2d', { willReadFrequently: true });
+
+// ── Tab switching ─────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const panel = $('tab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1));
+    if (panel) panel.classList.add('active');
+    if (btn.dataset.tab === 'sheet') renderSheet();
+    if (btn.dataset.tab === 'simulation') { simReset(); initSimCanvas(); }
+  });
+});
+
+// ── DPI handling ──────────────────────────────────────────
+$('dpiPreset').addEventListener('change', () => {
+  $('dpiCustom').style.display = $('dpiPreset').value === 'custom' ? 'block' : 'none';
+  if (S.image) autoSetWorkSize();
+});
+$('dpiCustom').addEventListener('input', () => { if (S.image) autoSetWorkSize(); });
+
+function getDpi() {
+  const v = $('dpiPreset').value;
+  if (v === 'custom') return parseFloat($('dpiCustom').value) || 96;
+  return parseFloat(v);
+}
+
+function autoSetWorkSize() {
+  if (!S.image) return;
+  const dpi = getDpi();
+  const wMm = S.image.width  / dpi * 25.4;
+  const hMm = S.image.height / dpi * 25.4;
+  $('workW').value = wMm.toFixed(1);
+  $('workH').value = hMm.toFixed(1);
+  S.imgAspect = wMm / hMm;
+  $('imgSizeInfo').textContent =
+    `รูป: ${S.image.width}×${S.image.height}px → ${wMm.toFixed(1)}×${hMm.toFixed(1)} mm @ ${dpi} dpi`;
+  $('imgSizeInfo').style.display = 'block';
+  scheduleRender();
+}
+
+// ── Aspect lock ───────────────────────────────────────────
+$('aspectLock').addEventListener('click', () => {
+  S.aspectLocked = !S.aspectLocked;
+  $('aspectLock').classList.toggle('locked', S.aspectLocked);
+  $('aspectLock').textContent = S.aspectLocked ? '🔒' : '🔓';
+});
+$('workW').addEventListener('input', () => {
+  if (S.aspectLocked && S.imgAspect) {
+    const w = parseFloat($('workW').value) || 1;
+    $('workH').value = (w / S.imgAspect).toFixed(1);
+  }
+  scheduleRender();
+});
+$('workH').addEventListener('input', () => {
+  if (S.aspectLocked && S.imgAspect) {
+    const h = parseFloat($('workH').value) || 1;
+    $('workW').value = (h * S.imgAspect).toFixed(1);
+  }
+  scheduleRender();
+});
+
+// ── Image loading ─────────────────────────────────────────
+$('uploadArea').addEventListener('click', () => $('fileInput').click());
+$('imgThumbWrap').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', e => e.target.files[0] && loadImg(e.target.files[0]));
+
+['dragover','dragleave','drop'].forEach(ev => {
+  $('uploadArea').addEventListener(ev, e => {
+    e.preventDefault();
+    if (ev === 'dragover')  $('uploadArea').classList.add('drag-over');
+    if (ev === 'dragleave') $('uploadArea').classList.remove('drag-over');
+    if (ev === 'drop') {
+      $('uploadArea').classList.remove('drag-over');
+      const f = e.dataTransfer.files[0];
+      if (f && f.type.startsWith('image/')) loadImg(f);
+    }
+  });
+});
+
+function loadImg(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      S.image = img;
+      S.imageFromProc = false;   // uploaded image — Regenerate reruns halftone only
+      $('imgThumb').src = e.target.result;
+      $('imgThumbWrap').style.display = 'block';
+      $('uploadArea').style.display = 'none';
+      $('noImg').style.display = 'none';
+      $('statsOv').style.display = 'block';
+      S.imgAspect = img.width / img.height;
+      autoSetWorkSize();   // auto-set workW/workH from DPI
+      fitCanvases();
+      zoom.show();
+      scheduleRender();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function fitCanvases() {
+  const vp = $('zoomViewport');
+  // Size viewCanvas to fill viewport (pixel-exact for sharpness)
+  vCanvas.width  = vp.clientWidth;
+  vCanvas.height = vp.clientHeight;
+
+  // Size pCanvas (export canvas) to the work area aspect ratio
+  const mxW = vp.clientWidth - 32, mxH = vp.clientHeight - 32;
+  const ratio = S.image.width / S.image.height;
+  let cw, ch;
+  if (mxW / mxH > ratio) { ch = mxH; cw = ch * ratio; }
+  else { cw = mxW; ch = cw / ratio; }
+  pCanvas.width  = Math.round(cw);
+  pCanvas.height = Math.round(ch);
+  iCanvas.width  = pCanvas.width;
+  iCanvas.height = pCanvas.height;
+  iCtx.drawImage(S.image, 0, 0, iCanvas.width, iCanvas.height);
+  zoom.fitToViewport(); // reset zoom/pan to fit when resized or re-loaded
+}
+
+// ── Zoom / Pan engine (vector-crisp redraw) ───────────────
+// Shape at pCanvas coord (px,py) → vCanvas coord (px*sc + tx, py*sc + ty)
+const zoom = (() => {
+  const tb  = $('zoomToolbar');
+  const lbl = $('ztLabel');
+  let sc = 1, tx = 0, ty = 0;
+  let dragging = false, sx0 = 0, sy0 = 0, tx0 = 0, ty0 = 0;
+
+  function getTransform() { return { sc, tx, ty }; }
+
+  function clamp() {
+    const vW = vCanvas.width, vH = vCanvas.height;
+    const cW = pCanvas.width * sc, cH = pCanvas.height * sc;
+    tx = Math.max(Math.min(vW * 0.9, tx), vW * 0.1 - cW);
+    ty = Math.max(Math.min(vH * 0.9, ty), vH * 0.1 - cH);
+  }
+
+  let _rafId = null;
+  function redraw() {
+    lbl.textContent = Math.round(sc * 100) + '%';
+    if (_rafId) return;          // already a frame queued — skip
+    _rafId = requestAnimationFrame(() => { _rafId = null; updateViewCanvas(); });
+  }
+
+  function zoomAt(factor, cx, cy) {
+    const newSc = Math.max(0.05, Math.min(40, sc * factor));
+    tx = cx + (tx - cx) * (newSc / sc);
+    ty = cy + (ty - cy) * (newSc / sc);
+    sc = newSc;
+    clamp();
+    redraw();
+  }
+
+  function fitToViewport() {
+    const vW = vCanvas.width, vH = vCanvas.height;
+    const cW = pCanvas.width,  cH = pCanvas.height;
+    if (!cW || !cH) return;
+    sc = Math.min(vW / cW, vH / cH);
+    tx = (vW - cW * sc) / 2;
+    ty = (vH - cH * sc) / 2;
+    redraw();
+  }
+
+  function actualSize() {
+    const vW = vCanvas.width, vH = vCanvas.height;
+    sc = 1;
+    tx = (vW - pCanvas.width)  / 2;
+    ty = (vH - pCanvas.height) / 2;
+    clamp();
+    redraw();
+  }
+
+  // Mouse wheel — zoom toward cursor
+  vCanvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = vCanvas.getBoundingClientRect();
+    zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15,
+           e.clientX - rect.left, e.clientY - rect.top);
+  }, { passive: false });
+
+  // Drag-to-pan
+  vCanvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    dragging = true; sx0 = e.clientX; sy0 = e.clientY; tx0 = tx; ty0 = ty;
+    vCanvas.classList.add('dragging');
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    tx = tx0 + (e.clientX - sx0);
+    ty = ty0 + (e.clientY - sy0);
+    clamp(); redraw();
+  });
+  window.addEventListener('mouseup', () => {
+    dragging = false; vCanvas.classList.remove('dragging');
+  });
+
+  // Touch pinch-zoom + pan
+  let touches0 = null, sc0 = 1, tx0t = 0, ty0t = 0;
+  vCanvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      touches0 = [...e.touches]; sc0 = sc; tx0t = tx; ty0t = ty;
+    } else if (e.touches.length === 1) {
+      sx0 = e.touches[0].clientX; sy0 = e.touches[0].clientY; tx0 = tx; ty0 = ty;
+    }
+  }, { passive: true });
+  vCanvas.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && touches0) {
+      const d0 = Math.hypot(touches0[1].clientX - touches0[0].clientX, touches0[1].clientY - touches0[0].clientY);
+      const d1 = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+      const rect = vCanvas.getBoundingClientRect();
+      const mx = ((touches0[0].clientX + touches0[1].clientX) / 2) - rect.left;
+      const my = ((touches0[0].clientY + touches0[1].clientY) / 2) - rect.top;
+      const newSc = Math.max(0.05, Math.min(40, sc0 * (d1 / d0)));
+      tx = mx + (tx0t - mx) * (newSc / sc0);
+      ty = my + (ty0t - my) * (newSc / sc0);
+      sc = newSc;
+      clamp(); redraw();
+    } else if (e.touches.length === 1 && !touches0) {
+      tx = tx0 + (e.touches[0].clientX - sx0);
+      ty = ty0 + (e.touches[0].clientY - sy0);
+      clamp(); redraw();
+    }
+  }, { passive: true });
+  vCanvas.addEventListener('touchend', () => { touches0 = null; });
+
+  // Toolbar buttons
+  $('ztIn').addEventListener('click',  () => zoomAt(1.5, vCanvas.width/2, vCanvas.height/2));
+  $('ztOut').addEventListener('click', () => zoomAt(1/1.5, vCanvas.width/2, vCanvas.height/2));
+  $('ztFit').addEventListener('click', fitToViewport);
+  $('zt100').addEventListener('click', actualSize);
+
+  // Double-click resets to fit
+  vCanvas.addEventListener('dblclick', fitToViewport);
+
+  // Keyboard shortcuts (outside input fields)
+  window.addEventListener('keydown', e => {
+    if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+    if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomAt(1.3, vCanvas.width/2, vCanvas.height/2); }
+    if (e.key === '-')                  { e.preventDefault(); zoomAt(1/1.3, vCanvas.width/2, vCanvas.height/2); }
+    if (e.key === '0')                  { e.preventDefault(); fitToViewport(); }
+    if (e.key === '1')                  { e.preventDefault(); actualSize(); }
+  });
+
+  function show() { tb.classList.add('visible'); }
+
+  return { fitToViewport, actualSize, show, getTransform };
+})();
+
+// ── View canvas renderer (vector-crisp at any zoom) ───────
+function updateViewCanvas() {
+  const { sc, tx, ty } = zoom.getTransform();
+  const vW = vCanvas.width, vH = vCanvas.height;
+  const cW = pCanvas.width, cH = pCanvas.height;
+
+  vCtx.clearRect(0, 0, vW, vH);
+
+  // ── Vector trace main display ──────────────────────────────
+  if (VEC.showMain && VEC.svgPaths && VEC.svgPaths.length > 0) {
+    vCtx.fillStyle = S.darkBg ? '#111111' : '#ffffff';
+    vCtx.fillRect(tx, ty, cW * sc, cH * sc);
+    vCtx.save();
+    vCtx.setTransform(sc, 0, 0, sc, tx, ty);
+    // Faded original image underneath
+    vCtx.globalAlpha = 0.18;
+    vCtx.drawImage(iCanvas, 0, 0, cW, cH);
+    vCtx.globalAlpha = 1;
+    // Scale VEC paths from image-pixel space → pCanvas space
+    const scX = cW / VEC.imgW, scY = cH / VEC.imgH;
+    vCtx.scale(scX, scY);
+    vCtx.strokeStyle = S.darkBg ? '#00e5ff' : '#0055dd';
+    vCtx.lineWidth = 1 / Math.min(scX, scY);
+    vCtx.lineCap = 'round'; vCtx.lineJoin = 'round';
+    VEC.svgPaths.forEach(d => { try { vCtx.stroke(new Path2D(d)); } catch(e) {} });
+    // Pattern tile grid overlay
+    if (VEC.mode === 'pattern' && VEC.tileW > 0 && VEC.tileH > 0) {
+      vCtx.strokeStyle = '#ff6b35';
+      vCtx.lineWidth = 2 / Math.min(scX, scY);
+      vCtx.setLineDash([6, 3]);
+      for (let x = 0; x <= VEC.imgW; x += VEC.tileW) {
+        vCtx.beginPath(); vCtx.moveTo(x, 0); vCtx.lineTo(x, VEC.imgH); vCtx.stroke();
+      }
+      for (let y = 0; y <= VEC.imgH; y += VEC.tileH) {
+        vCtx.beginPath(); vCtx.moveTo(0, y); vCtx.lineTo(VEC.imgW, y); vCtx.stroke();
+      }
+      vCtx.setLineDash([]);
+    }
+    vCtx.restore();
+    return;
+  }
+
+  if (!S.shapes.length) return;
+
+  // Work-area background
+  vCtx.fillStyle = S.darkBg ? '#111111' : '#f5f5f5';
+  vCtx.fillRect(tx, ty, cW * sc, cH * sc);
+
+  // Re-draw shapes as vectors using the zoom transform — stays crisp at any scale
+  vCtx.save();
+  vCtx.setTransform(sc, 0, 0, sc, tx, ty);
+
+  const fg = S.darkBg ? '#ffffff' : '#000000';
+  vCtx.fillStyle = fg;
+  vCtx.strokeStyle = fg;
+  vCtx.lineWidth = 0.7;   // in pCanvas coordinate space (scales naturally)
+
+  vCtx.beginPath();
+  for (const s of S.shapes) shapePath(vCtx, s.x, s.y, s.r, S.pattern);
+  if (S.fill) vCtx.fill(); else vCtx.stroke();
+
+  vCtx.restore();
+}
+
+// ── Controls wiring ───────────────────────────────────────
+function bindCtrl(rangeId, numId, stateKey, decimals, onChange) {
+  const rng = $(rangeId), num = $(numId);
+  const upd = (v, src) => {
+    const mn = parseFloat(rng.min), mx = parseFloat(rng.max);
+    v = Math.max(mn, Math.min(mx, parseFloat(v) || mn));
+    v = parseFloat(v.toFixed(decimals));
+    S[stateKey] = v;
+    if (src !== 'range') rng.value = v;
+    if (src !== 'num')   num.value = v.toFixed(decimals);
+    updateRangeTrack(rng);
+    onChange && onChange(v);
+    scheduleRender();
+  };
+  rng.addEventListener('input', () => upd(rng.value, 'range'));
+  num.addEventListener('input', () => upd(num.value, 'num'));
+  num.addEventListener('blur',  () => { num.value = S[stateKey].toFixed(decimals); });
+  num.addEventListener('keydown', e => {
+    const step = parseFloat(rng.step) || 1;
+    if (e.key === 'ArrowUp')   { e.preventDefault(); upd(S[stateKey] + step, 'num'); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); upd(S[stateKey] - step, 'num'); }
+  });
+  updateRangeTrack(rng);
+}
+function updateRangeTrack(rng) {
+  const mn = parseFloat(rng.min), mx = parseFloat(rng.max), v = parseFloat(rng.value);
+  const pct = ((v - mn) / (mx - mn) * 100).toFixed(1);
+  rng.style.background = `linear-gradient(to right, #0a7aff ${pct}%, #333 ${pct}%)`;
+}
+let _prevSpacingMm = S.spacingMm; // tracks previous value for proportional scaling
+function onSpacingChange(newV) {
+  _prevSpacingMm = newV;
+}
+function bindCtrl_set(rId, nId, key, v, dec) {
+  v = parseFloat(v.toFixed(dec));
+  S[key] = v; $(rId).value = v; $(nId).value = v.toFixed(dec);
+  updateRangeTrack($(rId));
+}
+bindCtrl('rSpacing','nSpacing','spacingMm',1,onSpacingChange);
+bindCtrl('rMinR','nMinR','minRmm',2);
+bindCtrl('rMaxR','nMaxR','maxRmm',2);
+bindCtrl('rAngle','nAngle','angle',0);
+bindCtrl('rContrast','nContrast','contrast',1);
+bindCtrl('rGamma','nGamma','gamma',2);
+['rSpacing','rMinR','rMaxR','rAngle','rContrast','rGamma'].forEach(id => updateRangeTrack($(id)));
+
+function tog(id, key) {
+  $(id).addEventListener('click', function() {
+    S[key] = !S[key]; this.classList.toggle('on', S[key]);
+    if (key === 'darkBg') $('canvasWrap').style.background = S.darkBg ? '#111' : '#0a0a0a';
+    scheduleRender();
+  });
+}
+tog('togInvert','invert'); tog('togFill','fill'); tog('togDarkBg','darkBg');
+tog('togQuantRandom','quantRandom');
+
+$('quantSizes').addEventListener('input', () => {
+  // Auto-enable/disable random when sizes are typed
+  const hasVal = $('quantSizes').value.trim().length > 0;
+  if (hasVal !== S.quantRandom) {
+    S.quantRandom = hasVal;
+    $('togQuantRandom').classList.toggle('on', hasVal);
+  }
+  scheduleRender();
+});
+
+$('patternGrid').addEventListener('click', e => {
+  const btn = e.target.closest('[data-pat]');
+  if (!btn) return;
+  document.querySelectorAll('.pat-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  S.pattern = btn.dataset.pat;
+  scheduleRender();
+});
+
+['units'].forEach(id => {
+  $(id).addEventListener('input', updateStats);
+});
+$('machineFormat').addEventListener('change', () => { S.machineFormat = $('machineFormat').value; });
+['sheetW','sheetH','sheetMargin','partSpacing','desiredCount'].forEach(id => $(id).addEventListener('input', updateNestInfo));
+
+$('btnRegen').addEventListener('click', () => {
+  _generating = false;        // force-unlock mutex so Regenerate always runs
+  clearTimeout(renderTimer);
+  if (S.imageFromProc) {
+    applyProcPattern(true);   // re-render procedural image, keep work size
+  } else {
+    generatePattern();        // uploaded image — re-run halftone only
+  }
+});
+$('btnViewSheet').addEventListener('click', () => {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('[data-tab="sheet"]').classList.add('active');
+  $('tabSheet').classList.add('active');
+  renderSheet();
+});
+
+// ── Render scheduling ─────────────────────────────────────
+let renderTimer = null;
+function scheduleRender(ms = 200) {       // 200 ms debounce — prevents rapid-fire renders
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(generatePattern, ms);
+}
+
+// ── Core generation ───────────────────────────────────────
+let _generating = false;                  // mutex — only one render at a time
+function generatePattern() {
+  if (!S.image) {
+    $('statusTxt').textContent = '⚠️ โหลดรูปภาพก่อน หรือกด "ใช้ลายนี้ & Generate" จาก Procedural';
+    return;
+  }
+  if (_generating) {
+    // Already rendering — re-schedule so this request fires after current render finishes
+    scheduleRender(250);
+    return;
+  }
+  _generating = true;
+  $('procOv').classList.add('show');
+  $('statusTxt').textContent = '⏳ กำลังสร้าง...';
+  requestAnimationFrame(() => {
+    try {
+      _generate();
+    } catch (e) {
+      console.error('Pattern generation error:', e);
+      $('procOv').classList.remove('show');
+      $('statusTxt').textContent = '❌ เกิดข้อผิดพลาด: ' + e.message;
+      _generating = false;
+    }
+  });
+}
+
+function _generate() {
+  VEC.showMain = false;   // switch main view back to pattern mode
+  const W = pCanvas.width, H = pCanvas.height;
+  const bg = S.darkBg ? '#111111' : '#ffffff';
+  pCtx.fillStyle = bg; pCtx.fillRect(0, 0, W, H);
+
+  const workW_mm = parseFloat($('workW').value) || 100;
+  const mmToPx   = W / workW_mm;
+  let spacingPx = S.spacingMm * mmToPx;
+  const minRpx    = S.minRmm    * mmToPx;
+  const maxRpx    = S.maxRmm    * mmToPx;
+  const angleRad  = S.angle * Math.PI / 180;
+  if (spacingPx < 1) { _generating = false; $('procOv').classList.remove('show'); return; }
+
+  const imgData = iCtx.getImageData(0, 0, W, H);
+  const px = imgData.data;
+
+  function bright(x, y) {
+    const xi = Math.max(0, Math.min(W-1, Math.round(x)));
+    const yi = Math.max(0, Math.min(H-1, Math.round(y)));
+    const i  = (yi * W + xi) * 4;
+    let lum = (0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]) / 255;
+    lum = Math.pow(Math.max(0, lum), S.gamma);
+    lum = 0.5 + (lum - 0.5) * S.contrast;
+    return Math.max(0, Math.min(1, lum));
+  }
+
+  // Parse quantize sizes — values are DIAMETERS (mm); internally use radius = diameter/2
+  const _qStr = $('quantSizes').value.trim();
+  const _qMm = _qStr                              // user-specified diameters (mm)
+    ? _qStr.split(',')
+           .map(v => parseFloat(v.trim()))
+           .filter(v => !isNaN(v) && v > 0)
+           .sort((a, b) => a - b)
+    : [];
+  const _qRaw = _qMm.map(v => (v/2) * mmToPx);  // radius = diameter/2, then to canvas pixels
+
+  // Quantize sizes are always exact — spacing does NOT shrink them
+  const _qPx = _qRaw.slice();
+  const useQuant = _qPx.length > 0;
+  const jitter = 0; // No positional jitter — keeps dots on exact grid centres
+
+  const cx = W/2, cy = H/2;
+  const diag  = Math.sqrt(W*W + H*H);
+  const steps = Math.ceil(diag / spacingPx) + 2;
+  const shapes = [];
+
+  // Safety cap: if grid is extremely dense, auto-increase spacing to stay responsive
+  const MAX_SHAPES = 60000;
+  const estIterations = (2 * steps + 1) * (2 * steps + 1);
+  if (estIterations > MAX_SHAPES * 8) {
+    // Too dense — scale spacing up so estIterations ≈ MAX_SHAPES * 4
+    const safeSide = Math.sqrt(MAX_SHAPES * 4);
+    spacingPx = Math.ceil(diag / ((safeSide - 1) / 2));
+  }
+  const stepsAdj = Math.ceil(diag / spacingPx) + 2;
+
+  let limitHit = false;
+  outer: for (let row = -stepsAdj; row <= stepsAdj; row++) {
+    for (let col = -stepsAdj; col <= stepsAdj; col++) {
+      const gx = col * spacingPx, gy = row * spacingPx;
+      // Add position jitter when random mode is on — randomises spacing
+      const jx = jitter ? (Math.random() - 0.5) * 2 * jitter : 0;
+      const jy = jitter ? (Math.random() - 0.5) * 2 * jitter : 0;
+      const rx = gx * Math.cos(angleRad) - gy * Math.sin(angleRad) + cx + jx;
+      const ry = gx * Math.sin(angleRad) + gy * Math.cos(angleRad) + cy + jy;
+      const guard = (useQuant ? _qPx[_qPx.length - 1] : maxRpx) + 1;
+      if (rx < -guard || rx > W+guard || ry < -guard || ry > H+guard) continue;
+      let b = bright(rx, ry);
+      if (S.invert) b = 1 - b;
+      const t = 1 - b;
+      let r, rMm = null;
+      if (useQuant && S.quantRandom) {
+        // Stochastic halftone: brightness controls DENSITY (dark=dense, bright=sparse)
+        if (t < 0.04) continue;                          // very bright → no dot at all
+        if (Math.random() > t) continue;                 // probabilistic placement
+        const qi = Math.floor(Math.random() * _qPx.length);
+        r = _qPx[qi]; rMm = _qMm[qi] / 2;           // store radius = diameter/2
+      } else {
+        if (useQuant) {
+          // Quantize mode: map brightness to size — dark → large, bright → small
+          // All grid positions get a dot (no brightness skip); size is determined by brightness
+          const qi = Math.min(Math.round(t * (_qPx.length - 1)), _qPx.length - 1);
+          r = _qPx[qi]; rMm = _qMm[qi] / 2;             // store radius = diameter/2
+        } else {
+          r = minRpx + t * (maxRpx - minRpx);
+          if (r < 0.25) continue;                        // non-quantize: skip near-invisible dots
+        }
+      }
+      // Hard cap for non-quantize mode only — quantize sizes are always exact
+      if (!useQuant) r = Math.min(r, spacingPx * 0.40);
+      if (r < 0.25) continue;
+      shapes.push({ x: rx, y: ry, r, rMm, frac: t });
+      if (shapes.length >= MAX_SHAPES) { limitHit = true; break outer; }
+    }
+  }
+
+  const fg = S.darkBg ? '#ffffff' : '#000000';
+  pCtx.fillStyle = fg; pCtx.strokeStyle = fg; pCtx.lineWidth = 0.7;
+  pCtx.beginPath();
+  for (const s of shapes) shapePath(pCtx, s.x, s.y, s.r, S.pattern);
+  if (S.fill) pCtx.fill(); else pCtx.stroke();
+
+  S.shapes = shapes;
+  updateViewCanvas();   // re-render display at current zoom level (crisp vectors)
+  updateStats();
+  updateNestInfo();
+  $('procOv').classList.remove('show');
+  _generating = false;  // release mutex
+  if (limitHit) {
+    $('statusTxt').textContent = `⚠️ ${shapes.length.toLocaleString()} shapes (ถึงขีดจำกัด — เพิ่มระยะห่างเพื่อลดจำนวน)`;
+  } else {
+    $('statusTxt').textContent = `✅ สร้างแล้ว ${shapes.length.toLocaleString()} shapes`;
+  }
+}
+
+// ── Shape path builders ───────────────────────────────────
+function shapePath(ctx, x, y, r, pat) {
+  switch (pat) {
+    case 'circle': case 'dot':
+      ctx.moveTo(x+r, y); ctx.arc(x, y, r, 0, Math.PI*2); break;
+    case 'square':
+      ctx.rect(x-r, y-r, r*2, r*2); break;
+    case 'diamond':
+      ctx.moveTo(x, y-r); ctx.lineTo(x+r, y); ctx.lineTo(x, y+r); ctx.lineTo(x-r, y); ctx.closePath(); break;
+    case 'cross': {
+      const t = r * 0.38;
+      ctx.rect(x-t, y-r, t*2, r*2); ctx.rect(x-r, y-t, r*2, t*2); break;
+    }
+    case 'hline': {
+      const h = Math.max(0.4, r * 0.55);
+      ctx.rect(x-r, y-h, r*2, h*2); break;
+    }
+    case 'triangle':
+      ctx.moveTo(x, y-r); ctx.lineTo(x+r*0.866, y+r*0.5); ctx.lineTo(x-r*0.866, y+r*0.5); ctx.closePath(); break;
+    case 'hexagon': {
+      for (let i = 0; i < 6; i++) {
+        const a = (i * Math.PI)/3 - Math.PI/6;
+        const px = x + r*Math.cos(a), py = y + r*Math.sin(a);
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath(); break;
+    }
+    case 'star': {
+      const ir = r * 0.4;
+      for (let i = 0; i < 10; i++) {
+        const a = (i * Math.PI)/5 - Math.PI/2;
+        const rr = i%2===0 ? r : ir;
+        const px = x + rr*Math.cos(a), py = y + rr*Math.sin(a);
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath(); break;
+    }
+  }
+}
+
+// ── Stats update ──────────────────────────────────────────
+function updateStats() {
+  if (!S.shapes.length) return;
+  const W = pCanvas.width, H = pCanvas.height;
+  const wW = parseFloat($('workW').value) || 100;
+  const wH = parseFloat($('workH').value) || 100;
+  const feed = parseFloat($('feedRate').value) || 800;
+  const units = $('units').value;
+  const avgR_mm = (S.minRmm + S.maxRmm) / 2;
+  const pathLen = S.shapes.length * 2 * Math.PI * avgR_mm;
+  const timeSec = pathLen / feed * 60;
+  const mmToPx = W / wW;
+  const spacePx = S.spacingMm * mmToPx;
+  $('stShapes').textContent = S.shapes.length.toLocaleString();
+  $('stPat').textContent    = patName(S.pattern);
+  $('stGrid').textContent   = `${Math.ceil(W/Math.max(1,spacePx))}×${Math.ceil(H/Math.max(1,spacePx))}`;
+  $('stSize').textContent   = `${wW}×${wH} ${units}`;
+  $('stTime').textContent   = timeSec < 60 ? `~${Math.ceil(timeSec)} วิ` : `~${(timeSec/60).toFixed(1)} นาที`;
+}
+function patName(p) {
+  return {circle:'Circle',square:'Square',diamond:'Diamond',cross:'Cross',
+          hline:'H-Line',triangle:'Triangle',hexagon:'Hexagon',star:'Star',dot:'Dot'}[p]||p;
+}
+
+// ── Sheet Nesting ─────────────────────────────────────────
+function updateNestInfo() {
+  const sW = parseFloat($('sheetW').value)||600;
+  const sH = parseFloat($('sheetH').value)||400;
+  const mg = parseFloat($('sheetMargin').value)||10;
+  const sp = parseFloat($('partSpacing').value)||5;
+  const pW = parseFloat($('workW').value)||100;
+  const pH = parseFloat($('workH').value)||100;
+  const areaW = sW - mg*2;
+  const areaH = sH - mg*2;
+  const cols = Math.max(0, Math.floor((areaW + sp) / (pW + sp)));
+  const rows = Math.max(0, Math.floor((areaH + sp) / (pH + sp)));
+  const maxCount = cols * rows;
+  const desired  = parseInt($('desiredCount').value)||0;
+  const actual   = desired > 0 ? Math.min(desired, maxCount) : maxCount;
+  if (maxCount === 0) {
+    $('nestInfo').textContent = `⚠ ชิ้นงานใหญ่กว่าแผ่น`;
+  } else if (desired > 0 && desired > maxCount) {
+    $('nestInfo').textContent = `✅ ${cols}×${rows} = ${maxCount} ชิ้น/แผ่น  ⚠ ต้องการ ${desired} แต่จุได้สูงสุด ${maxCount}`;
+  } else if (desired > 0) {
+    $('nestInfo').textContent = `✅ ${cols}×${rows} = ${maxCount} จุได้  |  แสดง ${actual} ชิ้น`;
+  } else {
+    $('nestInfo').textContent = `✅ ${cols} × ${rows} = ${maxCount} ชิ้น / แผ่น`;
+  }
+}
+
+function renderSheet() {
+  if (!S.shapes.length) return;
+  const wrap = $('sheetWrap');
+  const sCanvas = $('sheetCanvas');
+  const ctx = sCanvas.getContext('2d');
+
+  const sW = parseFloat($('sheetW').value)||600;
+  const sH = parseFloat($('sheetH').value)||400;
+  const mg = parseFloat($('sheetMargin').value)||10;
+  const sp = parseFloat($('partSpacing').value)||5;
+  const pW = parseFloat($('workW').value)||100;
+  const pH = parseFloat($('workH').value)||100;
+
+  const maxW = wrap.clientWidth - 40;
+  const maxH = wrap.clientHeight - 40;
+  const scale = Math.min(maxW/sW, maxH/sH);
+  sCanvas.width  = Math.round(sW * scale);
+  sCanvas.height = Math.round(sH * scale);
+
+  // Sheet background
+  ctx.fillStyle = '#2a2a2a'; ctx.fillRect(0,0,sCanvas.width,sCanvas.height);
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(0.5,0.5,sCanvas.width-1,sCanvas.height-1);
+
+  // Margin guide
+  ctx.strokeStyle = '#444'; ctx.lineWidth = 0.5; ctx.setLineDash([4,4]);
+  ctx.strokeRect(mg*scale, mg*scale, (sW-2*mg)*scale, (sH-2*mg)*scale);
+  ctx.setLineDash([]);
+
+  const cols = Math.max(0, Math.floor(((sW-2*mg) + sp) / (pW + sp)));
+  const rows = Math.max(0, Math.floor(((sH-2*mg) + sp) / (pH + sp)));
+  const maxCount = cols * rows;
+  const desired  = parseInt($('desiredCount').value)||0;
+  const drawCount = desired > 0 ? Math.min(desired, maxCount) : maxCount;
+
+  // Draw each part as thumbnail
+  let partIdx = 0;
+  outer:
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (partIdx >= drawCount) break outer;
+      partIdx++;
+      const ox = (mg + c*(pW+sp)) * scale;
+      const oy = (mg + r*(pH+sp)) * scale;
+      const pw = pW * scale, ph = pH * scale;
+
+      // Part background
+      ctx.fillStyle = S.darkBg ? '#1a1a1a' : '#f5f5f5';
+      ctx.fillRect(ox, oy, pw, ph);
+      ctx.strokeStyle = '#0a7aff44'; ctx.lineWidth = 0.5;
+      ctx.strokeRect(ox, oy, pw, ph);
+
+      // Draw mini pattern
+      const patScale = pw / pCanvas.width;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(ox, oy, pw, ph); ctx.clip();
+      const fg = S.darkBg ? '#ffffff' : '#000000';
+      ctx.fillStyle = fg; ctx.strokeStyle = fg; ctx.lineWidth = 0.4;
+      ctx.beginPath();
+      for (const s of S.shapes) {
+        shapePath(ctx, ox + s.x*patScale, oy + s.y*patScale, s.r*patScale, S.pattern);
+      }
+      if (S.fill) ctx.fill(); else ctx.stroke();
+      ctx.restore();
+
+      // Part label
+      ctx.fillStyle = 'rgba(10,122,255,0.7)';
+      ctx.font = `${Math.max(8, pw*0.12)}px sans-serif`;
+      ctx.fillText(`${partIdx}`, ox+2, oy+ph-2);
+    }
+  }
+
+  // Sheet info
+  $('noImgSheet').style.display = 'none';
+  $('sheetInfoOv').style.display = 'block';
+  $('siSheet').textContent  = `${sW}×${sH}mm`;
+  $('siPart').textContent   = `${pW}×${pH}mm`;
+  $('siGrid').textContent   = `${cols}×${rows}`;
+  $('siCount').textContent  = desired > 0 ? `${drawCount} / ${maxCount} ชิ้น` : `${maxCount} ชิ้น`;
+  $('siMargin').textContent = `${mg}mm`;
+  $('siSpacing').textContent= `${sp}mm`;
+}
+
+// ── Toolpath Simulation ───────────────────────────────────
+function buildSimMoves() {
+  if (!S.shapes.length) return [];
+  const W = pCanvas.width, H = pCanvas.height;
+  const wW = parseFloat($('workW').value)||100;
+  const sc = W / wW;  // px-per-mm for canvas coords
+  const safeZ  = parseFloat($('safeZ').value);
+  const depth  = parseFloat($('cutDepth').value);
+  const moves  = [];
+  let lastX = 0, lastY = 0;
+
+  for (const s of S.shapes) {
+    const cx = s.x, cy = s.y, cr = s.r;
+    // Rapid to start point
+    const startX = cx + cr, startY = cy;
+    moves.push({ type: 'rapid', x1: lastX, y1: lastY, x2: startX, y2: startY });
+    // Arc (circle → arc; others → polygon)
+    if (S.pattern === 'circle' || S.pattern === 'dot') {
+      moves.push({ type: 'arc', cx, cy, r: cr });
+    } else {
+      const pts = getShapePoints(cx, cy, cr, S.pattern);
+      for (let i = 0; i < pts.length; i++) {
+        const prev = pts[(i-1+pts.length)%pts.length];
+        moves.push({ type: 'cut', x1: prev[0], y1: prev[1], x2: pts[i][0], y2: pts[i][1] });
+      }
+    }
+    lastX = startX; lastY = startY;
+  }
+  // Return to origin
+  moves.push({ type: 'rapid', x1: lastX, y1: lastY, x2: 0, y2: 0 });
+  return moves;
+}
+
+function getShapePoints(x, y, r, pat) {
+  switch (pat) {
+    case 'square':
+      return [[x-r,y-r],[x+r,y-r],[x+r,y+r],[x-r,y+r],[x-r,y-r]];
+    case 'diamond':
+      return [[x,y-r],[x+r,y],[x,y+r],[x-r,y],[x,y-r]];
+    case 'triangle': {
+      const hx=r*0.866,hy=r*0.5;
+      return [[x,y-r],[x+hx,y+hy],[x-hx,y+hy],[x,y-r]];
+    }
+    case 'hexagon': {
+      const pts = [];
+      for (let i = 0; i <= 6; i++) { const a=(i%6*Math.PI)/3-Math.PI/6; pts.push([x+r*Math.cos(a),y+r*Math.sin(a)]); }
+      return pts;
+    }
+    case 'cross': {
+      const t=r*0.38;
+      return [[x-t,y-r],[x+t,y-r],[x+t,y-t],[x+r,y-t],[x+r,y+t],[x+t,y+t],[x+t,y+r],[x-t,y+r],[x-t,y+t],[x-r,y+t],[x-r,y-t],[x-t,y-t],[x-t,y-r]];
+    }
+    case 'hline': { const h=Math.max(0.4,r*0.55); return [[x-r,y-h],[x+r,y-h],[x+r,y+h],[x-r,y+h],[x-r,y-h]]; }
+    case 'star': {
+      const ir=r*0.4, pts=[];
+      for (let i=0;i<=10;i++){const ii=i%10;const a=(ii*Math.PI)/5-Math.PI/2;const rr=ii%2===0?r:ir;pts.push([x+rr*Math.cos(a),y+rr*Math.sin(a)]);}
+      return pts;
+    }
+    default: return [[x,y]];
+  }
+}
+
+function initSimCanvas() {
+  const wrap = $('simWrap');
+  const sc = $('simCanvas');
+  sc.width  = wrap.clientWidth  - 2;
+  sc.height = wrap.clientHeight - 2;
+  if (!S.shapes.length) return;
+  $('noImgSim').style.display = 'none';
+  drawSimFrame(0);
+}
+
+function drawSimFrame(upTo) {
+  const sc = $('simCanvas');
+  const ctx = sc.getContext('2d');
+  const W = sc.width, H = sc.height;
+  const moves = S.simMoves;
+  if (!moves.length) return;
+
+  // Scale: simCanvas → previewCanvas space
+  const sx = W / pCanvas.width, sy = H / pCanvas.height;
+
+  ctx.fillStyle = S.darkBg ? '#111' : '#f5f5f5';
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw pattern lightly
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = S.darkBg ? '#fff' : '#000';
+  ctx.strokeStyle = S.darkBg ? '#fff' : '#000';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  for (const s of S.shapes) shapePath(ctx, s.x*sx, s.y*sy, s.r*Math.min(sx,sy), S.pattern);
+  if (S.fill) ctx.fill(); else ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Draw moves up to index
+  for (let i = 0; i < Math.min(upTo, moves.length); i++) {
+    const m = moves[i];
+    ctx.lineWidth = 1.2;
+    if (m.type === 'rapid') {
+      ctx.strokeStyle = '#ff9500'; ctx.setLineDash([4,3]);
+      ctx.beginPath(); ctx.moveTo(m.x1*sx,m.y1*sy); ctx.lineTo(m.x2*sx,m.y2*sy); ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (m.type === 'cut') {
+      ctx.strokeStyle = '#00d1a0'; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(m.x1*sx,m.y1*sy); ctx.lineTo(m.x2*sx,m.y2*sy); ctx.stroke();
+    } else if (m.type === 'arc') {
+      ctx.strokeStyle = '#0a7aff'; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(m.cx*sx, m.cy*sy, m.r*Math.min(sx,sy), 0, Math.PI*2); ctx.stroke();
+    }
+  }
+
+  // Tool position indicator
+  if (upTo > 0 && upTo <= moves.length) {
+    const last = moves[Math.min(upTo,moves.length)-1];
+    let tx, ty;
+    if (last.type === 'arc') { tx = (last.cx+last.r)*sx; ty = last.cy*sy; }
+    else { tx = last.x2*sx; ty = last.y2*sy; }
+    ctx.fillStyle = '#ff3b30';
+    ctx.beginPath(); ctx.arc(tx, ty, 5, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+$('simSpeed').addEventListener('input', () => {
+  $('simSpeedVal').textContent = $('simSpeed').value + '×';
+});
+
+$('btnSimPlay').addEventListener('click', () => {
+  if (!S.shapes.length) { alert('กรุณาสร้าง Pattern ก่อน'); return; }
+  if (S.simRunning) {
+    S.simRunning = false;
+    cancelAnimationFrame(S.simAnimId);
+    $('btnSimPlay').textContent = '▶ Play';
+    return;
+  }
+  initSimCanvas();
+  S.simMoves = buildSimMoves();
+  if (S.simIdx >= S.simMoves.length) S.simIdx = 0;
+  S.simRunning = true;
+  $('btnSimPlay').textContent = '⏸ Pause';
+  let last = 0;
+  function step(ts) {
+    if (!S.simRunning) return;
+    const spd = parseInt($('simSpeed').value) || 8;
+    const elapsed = ts - last;
+    if (elapsed > 16) {
+      last = ts;
+      S.simIdx = Math.min(S.simIdx + spd, S.simMoves.length);
+      drawSimFrame(S.simIdx);
+      const pct = ((S.simIdx / S.simMoves.length)*100).toFixed(0);
+      $('simStatus').textContent = `${S.simIdx.toLocaleString()} / ${S.simMoves.length.toLocaleString()} moves (${pct}%)`;
+    }
+    if (S.simIdx < S.simMoves.length) {
+      S.simAnimId = requestAnimationFrame(step);
+    } else {
+      S.simRunning = false;
+      $('btnSimPlay').textContent = '▶ Play';
+      $('simStatus').textContent = '✅ เสร็จสิ้น';
+    }
+  }
+  S.simAnimId = requestAnimationFrame(step);
+});
+
+$('btnSimReset').addEventListener('click', simReset);
+function simReset() {
+  S.simRunning = false;
+  cancelAnimationFrame(S.simAnimId);
+  S.simIdx = 0;
+  $('btnSimPlay').textContent = '▶ Play';
+  $('simStatus').textContent = '—';
+  if (S.shapes.length) { S.simMoves = buildSimMoves(); initSimCanvas(); }
+}
+
+// ── G-code Building ───────────────────────────────────────
+$('btnGcode').addEventListener('click', () => {
+  buildGcode();
+  const ext = machineExt();
+  download('cnc-pattern' + ext, S.lastGcode, 'text/plain');
+});
+$('btnPreview').addEventListener('click', () => {
+  buildGcode();
+  $('gcodeContent').textContent = S.lastGcode;
+  const fmtLabels = {grbl:'GRBL v1.1',mach2:'Mach2',mach3:'Mach3/Mach4',fanuc:'Fanuc',linuxcnc:'LinuxCNC',smoothie:'Smoothieboard',siemens:'Siemens 840D'};
+  $('gcodeFormatLabel').textContent = fmtLabels[S.machineFormat] || S.machineFormat;
+  $('gcodeStats').textContent = `${S.shapes.length.toLocaleString()} shapes`;
+  $('gcodeModal').classList.add('show');
+});
+$('gcodeClose').addEventListener('click',  () => $('gcodeModal').classList.remove('show'));
+$('gcodeClose2').addEventListener('click', () => $('gcodeModal').classList.remove('show'));
+$('btnGcodeDown').addEventListener('click', () => download('cnc-pattern'+machineExt(), S.lastGcode, 'text/plain'));
+
+function machineExt() {
+  return {grbl:'.nc',mach2:'.tap',mach3:'.tap',fanuc:'.nc',linuxcnc:'.ngc',smoothie:'.nc',siemens:'.mpf'}[S.machineFormat]||'.nc';
+}
+
+function buildGcode(offsetX=0, offsetY=0) {
+  if (!S.shapes.length) { alert('กรุณาเลือกรูปภาพก่อน'); return; }
+  const W    = pCanvas.width, H = pCanvas.height;
+  const wW   = parseFloat($('workW').value);
+  const depth  = parseFloat($('cutDepth').value);
+  const feed   = parseInt($('feedRate').value);
+  const plunge = parseInt($('plungeRate').value);
+  const safeZ  = parseFloat($('safeZ').value);
+  const spRPM  = parseInt($('rpm').value);
+  const units  = $('units').value;
+  const sc     = wW / W;
+  const fmt    = S.machineFormat;
+
+  const commentChar = (fmt === 'fanuc' || fmt === 'siemens') ? '(' : ';';
+  const commentEnd  = (fmt === 'fanuc' || fmt === 'siemens') ? ')' : '';
+  const cm  = s => `${commentChar} ${s}${commentEnd}\n`;
+
+  let g = '';
+  if (fmt === 'mach2' || fmt === 'mach3' || fmt === 'fanuc') g += '%\n';
+  if (fmt === 'fanuc')   g += 'O0001\n';
+  if (fmt === 'siemens') g += 'PROC CNC_PATTERN\n';
+
+  g += cm('════════════════════════════════════');
+  g += cm('CNC Pattern Generator v2');
+  g += cm(`Pattern   : ${patName(S.pattern)}`);
+  g += cm(`Shapes    : ${S.shapes.length}`);
+  g += cm(`Work area : ${$('workW').value} × ${$('workH').value} ${units}`);
+  g += cm(`Tool Ø    : ${$('toolDia').value} ${units}`);
+  g += cm(`Cut depth : ${depth} ${units}`);
+  g += cm(`Feed XY   : ${feed} ${units}/min`);
+  g += cm(`Feed Z    : ${plunge} ${units}/min`);
+  g += cm(`Safe Z    : ${safeZ} ${units}`);
+  g += cm(`Spindle   : ${spRPM} RPM`);
+  g += cm(`Format    : ${fmt.toUpperCase()}`);
+  g += cm(`Generated : ${new Date().toLocaleString('th-TH')}`);
+  g += cm('════════════════════════════════════');
+  g += '\n';
+
+  if (fmt === 'siemens') {
+    g += `G90 G71\n`;  // absolute, mm
+    g += `DIAMOF\n`;   // radius mode
+    g += `M3 S${spRPM}\n`;
+    g += `G4 F2\n`;
+    g += `G0 Z${safeZ}\n\n`;
+  } else {
+    g += units === 'mm' ? `G21\n` : `G20\n`;
+    g += `G90\nG17\n`;
+    g += fmt === 'linuxcnc' ? `G64 P0.001\n` : '';
+    g += `M3 S${spRPM}\n`;
+    g += `G4 P2.0\n`;
+    g += `G0 Z${safeZ}\n\n`;
+  }
+
+  const toolDia = parseFloat($('toolDia').value) || 0;   // used for arc radius compensation
+
+  for (let i = 0; i < S.shapes.length; i++) {
+    const s  = S.shapes[i];
+    const sx = parseFloat((s.x * sc + offsetX).toFixed(3));
+    const sy = parseFloat(((H - s.y) * sc + offsetY).toFixed(3));
+    const sr = parseFloat((s.r * sc).toFixed(3));
+    g += gcodeShape(sx, sy, sr, S.pattern, depth, feed, plunge, safeZ, i+1, fmt, toolDia);
+  }
+
+  g += `\n${cm('── End of job ──')}`;
+  if (fmt === 'siemens') {
+    g += `G0 Z${safeZ}\nG0 X0 Y0\nM5\nRET\n`;
+  } else {
+    g += `G0 Z${safeZ}\nG0 X0 Y0\nM5\nM30\n`;
+    if (fmt === 'mach2' || fmt === 'mach3' || fmt === 'fanuc') g += '%\n';
+  }
+
+  S.lastGcode = g;
+  $('statusTxt').textContent = `✅ G-code ready (${S.shapes.length.toLocaleString()} shapes)`;
+  return g;
+}
+
+function gcodeShape(x, y, r, pat, depth, feed, plunge, safeZ, n, fmt, toolDia = 0) {
+  const cmChar = (fmt==='fanuc'||fmt==='siemens') ? '(' : ';';
+  const cmEnd  = (fmt==='fanuc'||fmt==='siemens') ? ')' : '';
+  let g = `${cmChar} #${n}${cmEnd}\n`;
+  switch (pat) {
+    case 'circle': case 'dot': {
+      // Compensate for tool radius: move tool center on circle of (r - toolR)
+      // so the actual cut edge lands exactly at radius r from dot centre.
+      const toolR = toolDia / 2;
+      const arcR  = parseFloat((r - toolR).toFixed(3));
+      if (arcR <= 0.001) {
+        // Dot smaller than (or equal to) tool — single plunge/drill at centre
+        g += `G0 X${f(x)} Y${f(y)}\nG1 Z${depth} F${plunge}\nG0 Z${safeZ}\n`;
+      } else {
+        g += `G0 X${f(x+arcR)} Y${f(y)}\nG1 Z${depth} F${plunge}\nG2 X${f(x+arcR)} Y${f(y)} I${f(-arcR)} J0 F${feed}\nG0 Z${safeZ}\n`;
+      }
+      break;
+    }
+    case 'square':
+      g += `G0 X${f(x-r)} Y${f(y-r)}\nG1 Z${depth} F${plunge}\nG1 X${f(x+r)} Y${f(y-r)} F${feed}\nG1 X${f(x+r)} Y${f(y+r)}\nG1 X${f(x-r)} Y${f(y+r)}\nG1 X${f(x-r)} Y${f(y-r)}\nG0 Z${safeZ}\n`; break;
+    case 'diamond':
+      g += `G0 X${f(x)} Y${f(y-r)}\nG1 Z${depth} F${plunge}\nG1 X${f(x+r)} Y${f(y)} F${feed}\nG1 X${f(x)} Y${f(y+r)}\nG1 X${f(x-r)} Y${f(y)}\nG1 X${f(x)} Y${f(y-r)}\nG0 Z${safeZ}\n`; break;
+    case 'cross': {
+      const t = parseFloat((r*0.38).toFixed(3));
+      g += `G0 X${f(x-t)} Y${f(y-r)}\nG1 Z${depth} F${plunge}\n`;
+      g += `G1 X${f(x+t)} Y${f(y-r)} F${feed}\nG1 X${f(x+t)} Y${f(y-t)}\nG1 X${f(x+r)} Y${f(y-t)}\nG1 X${f(x+r)} Y${f(y+t)}\nG1 X${f(x+t)} Y${f(y+t)}\nG1 X${f(x+t)} Y${f(y+r)}\nG1 X${f(x-t)} Y${f(y+r)}\nG1 X${f(x-t)} Y${f(y+t)}\nG1 X${f(x-r)} Y${f(y+t)}\nG1 X${f(x-r)} Y${f(y-t)}\nG1 X${f(x-t)} Y${f(y-t)}\nG1 X${f(x-t)} Y${f(y-r)}\nG0 Z${safeZ}\n`; break;
+    }
+    case 'hline': {
+      const h = parseFloat(Math.max(0.05,r*0.55).toFixed(3));
+      g += `G0 X${f(x-r)} Y${f(y-h)}\nG1 Z${depth} F${plunge}\nG1 X${f(x+r)} Y${f(y-h)} F${feed}\nG1 X${f(x+r)} Y${f(y+h)}\nG1 X${f(x-r)} Y${f(y+h)}\nG1 X${f(x-r)} Y${f(y-h)}\nG0 Z${safeZ}\n`; break;
+    }
+    case 'triangle': {
+      const hx=parseFloat((r*0.866).toFixed(3)),hy=parseFloat((r*0.5).toFixed(3));
+      g += `G0 X${f(x)} Y${f(y-r)}\nG1 Z${depth} F${plunge}\nG1 X${f(x+hx)} Y${f(y+hy)} F${feed}\nG1 X${f(x-hx)} Y${f(y+hy)}\nG1 X${f(x)} Y${f(y-r)}\nG0 Z${safeZ}\n`; break;
+    }
+    case 'hexagon': {
+      let first=true;
+      for(let i=0;i<7;i++){
+        const a=((i%6)*Math.PI)/3-Math.PI/6;
+        const px=parseFloat((x+r*Math.cos(a)).toFixed(3)),py=parseFloat((y+r*Math.sin(a)).toFixed(3));
+        if(first){g+=`G0 X${px} Y${py}\nG1 Z${depth} F${plunge}\n`;first=false;}
+        else g+=`G1 X${px} Y${py} F${feed}\n`;
+      }
+      g+=`G0 Z${safeZ}\n`; break;
+    }
+    case 'star': {
+      const ir=r*0.4;let first=true;
+      for(let i=0;i<11;i++){
+        const ii=i%10;const a=(ii*Math.PI)/5-Math.PI/2;const rr=ii%2===0?r:ir;
+        const px=parseFloat((x+rr*Math.cos(a)).toFixed(3)),py=parseFloat((y+rr*Math.sin(a)).toFixed(3));
+        if(first){g+=`G0 X${px} Y${py}\nG1 Z${depth} F${plunge}\n`;first=false;}
+        else g+=`G1 X${px} Y${py} F${feed}\n`;
+      }
+      g+=`G0 Z${safeZ}\n`; break;
+    }
+  }
+  return g;
+}
+
+// ── SVG helpers ───────────────────────────────────────────
+function svgShapePath(x, y, r, pat) {
+  switch (pat) {
+    case 'circle': case 'dot':
+      return `M${f(x+r)} ${f(y)} A${f(r)} ${f(r)} 0 1 0 ${f(x-r)} ${f(y)} A${f(r)} ${f(r)} 0 1 0 ${f(x+r)} ${f(y)} Z `;
+    case 'square':
+      return `M${f(x-r)} ${f(y-r)} L${f(x+r)} ${f(y-r)} L${f(x+r)} ${f(y+r)} L${f(x-r)} ${f(y+r)} Z `;
+    case 'diamond':
+      return `M${f(x)} ${f(y-r)} L${f(x+r)} ${f(y)} L${f(x)} ${f(y+r)} L${f(x-r)} ${f(y)} Z `;
+    case 'cross': {
+      const t=r*0.38;
+      return `M${f(x-t)} ${f(y-r)} L${f(x+t)} ${f(y-r)} L${f(x+t)} ${f(y-t)} L${f(x+r)} ${f(y-t)} L${f(x+r)} ${f(y+t)} L${f(x+t)} ${f(y+t)} L${f(x+t)} ${f(y+r)} L${f(x-t)} ${f(y+r)} L${f(x-t)} ${f(y+t)} L${f(x-r)} ${f(y+t)} L${f(x-r)} ${f(y-t)} L${f(x-t)} ${f(y-t)} Z `;
+    }
+    case 'hline': { const h=Math.max(0.05,r*0.55); return `M${f(x-r)} ${f(y-h)} L${f(x+r)} ${f(y-h)} L${f(x+r)} ${f(y+h)} L${f(x-r)} ${f(y+h)} Z `; }
+    case 'triangle': { const hx=r*0.866,hy=r*0.5; return `M${f(x)} ${f(y-r)} L${f(x+hx)} ${f(y+hy)} L${f(x-hx)} ${f(y+hy)} Z `; }
+    case 'hexagon': {
+      let d='';
+      for(let i=0;i<6;i++){const a=(i*Math.PI)/3-Math.PI/6;const px=x+r*Math.cos(a),py=y+r*Math.sin(a);d+=(i===0?'M':'L')+f(px)+' '+f(py)+' ';}
+      return d+'Z ';
+    }
+    case 'star': {
+      const ir=r*0.4;let d='';
+      for(let i=0;i<10;i++){const a=(i*Math.PI)/5-Math.PI/2;const rr=i%2===0?r:ir;const px=x+rr*Math.cos(a),py=y+rr*Math.sin(a);d+=(i===0?'M':'L')+f(px)+' '+f(py)+' ';}
+      return d+'Z ';
+    }
+    default: return '';
+  }
+}
+
+function buildSVGString(units) {
+  const W = pCanvas.width, H = pCanvas.height;
+  const wW = parseFloat($('workW').value);
+  const wH = parseFloat($('workH').value);
+  const un = units || ($('units').value === 'mm' ? 'mm' : 'in');
+  const sc = wW / W;
+  let d = '';
+  for (const s of S.shapes) {
+    const sx = s.x * sc, sy = (H - s.y) * sc, sr = s.r * sc;
+    d += svgShapePath(sx, sy, sr, S.pattern);
+  }
+  const bg = S.darkBg ? '#111111' : '#ffffff';
+  const fg = S.darkBg ? '#ffffff' : '#000000';
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="${wW}${un}" height="${wH}${un}" viewBox="0 0 ${wW} ${wH}">
+  <!-- CNC Pattern Generator | Pattern: ${patName(S.pattern)} | Shapes: ${S.shapes.length} -->
+  <!-- Generated: ${new Date().toISOString()} -->
+  <rect width="${wW}" height="${wH}" fill="${bg}"/>
+  <path d="${d.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${(0.15*sc).toFixed(3)}"/>
+</svg>`;
+}
+
+// ── DXF Export (AC1009 / AutoCAD R12 Natural) ─────────────
+function buildDXF() {
+  const W = pCanvas.width, H = pCanvas.height;
+  const wW = parseFloat($('workW').value);
+  const sc = wW / W;
+  let dxf = '';
+
+  // ── HEADER — AC1009 = R12 ──
+  dxf += '  0\nSECTION\n  2\nHEADER\n';
+  dxf += '  9\n$ACADVER\n  1\nAC1009\n';
+  dxf += '  0\nENDSEC\n';
+
+  // ── TABLES — R12 requires only LAYER ──
+  dxf += '  0\nSECTION\n  2\nTABLES\n';
+  dxf += '  0\nTABLE\n  2\nLAYER\n 70\n1\n';
+  dxf += '  0\nLAYER\n  2\n0\n 70\n0\n 62\n7\n  6\nCONTINUOUS\n';
+  dxf += '  0\nENDTAB\n';
+  dxf += '  0\nENDSEC\n';
+
+  // ── ENTITIES — R12 uses POLYLINE + VERTEX + SEQEND ──
+  dxf += '  0\nSECTION\n  2\nENTITIES\n';
+
+  for (const s of S.shapes) {
+    const sx = s.x * sc;
+    const sy = (H - s.y) * sc;
+    const sr = s.r * sc;   // radius in mm = same as what preview draws
+    if (S.pattern === 'circle' || S.pattern === 'dot') {
+      // True CAD circle — exact arc, no segment approximation
+      dxf += `  0\nCIRCLE\n  8\n0\n 10\n${f(sx)}\n 20\n${f(sy)}\n 30\n0.0\n 40\n${f(sr)}\n`;
+    } else {
+      // Polygon shapes — s.r pixels → sr mm via *sc
+      const raw = getShapePoints(s.x, s.y, s.r, S.pattern);
+      dxf += '  0\nPOLYLINE\n  8\n0\n 66\n1\n 70\n1\n';
+      for (const [px, py] of raw) {
+        dxf += `  0\nVERTEX\n  8\n0\n 10\n${f(px*sc)}\n 20\n${f((H-py)*sc)}\n 30\n0.0\n`;
+      }
+      dxf += '  0\nSEQEND\n  8\n0\n';
+    }
+  }
+
+  dxf += '  0\nENDSEC\n';
+  dxf += '  0\nEOF\n';
+  return dxf;
+}
+
+// ══════════════════════════════════════════════════════════
+// Profiling & 2D Area Clearance
+// ══════════════════════════════════════════════════════════
+
+function togglePanel(id) {
+  $(id).classList.toggle('closed');
+}
+
+// ── Tool type helpers ────────────────────────────────────────
+let profToolType = 'endmill';
+let acToolTypeVal = 'endmill';
+
+const TOOL_ICONS = { endmill:'🔲', vbit:'🔻', ballr:'⭕', ball:'⚫' };
+const TOOL_LABELS = { endmill:'Endmill', vbit:'V-bit', ballr:'Radius R', ball:'Ball Nose' };
+
+function setProfToolType(btn, type) {
+  profToolType = type;
+  document.querySelectorAll('#profToolTypeRow .tool-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  $('profVbitP').style.display  = type === 'vbit'  ? '' : 'none';
+  $('profBallRP').style.display = type === 'ballr' ? '' : 'none';
+  // Suggest sensible defaults
+  const defs = { endmill:[1.2,5], vbit:[0.1,1], ballr:[0.5,2], ball:[0.4,1.5] };
+  if (defs[type]) { $('profStepover').value = defs[type][0]; $('profStepdown').value = defs[type][1]; }
+}
+
+function setAcToolType(btn, type) {
+  acToolTypeVal = type;
+  document.querySelectorAll('#acToolTypeRow .tool-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  $('acVbitP').style.display  = type === 'vbit'  ? '' : 'none';
+  $('acBallRP').style.display = type === 'ballr' ? '' : 'none';
+}
+
+// syncProfTool kept for backward compat (no-op now that CNC param panel is removed)
+function syncProfTool() {}
+
+// ── Profile G-code ─────────────────────────────────────────
+function calcProfileGcode(downloadNow) {
+  const wW       = parseFloat($('workW').value) || 100;
+  const wH       = parseFloat($('workH').value) || 100;
+  const profType = $('profProfile').value;
+  const allowance= parseFloat($('profAllowance').value) || 0;
+  const toolDia  = parseFloat($('profDia').value) || 3;
+  const startZ   = parseFloat($('profStartZ').value) || 0;
+  const finishZ  = parseFloat($('profFinishZ').value) || -5;
+  const stepdown = parseFloat($('profStepdown').value) || 5;
+  const feed     = parseInt($('profFeed').value) || 1500;
+  const plunge   = parseInt($('profPlunge').value) || 1200;
+  const rpm      = parseInt($('profRPM').value) || 24000;
+  const safeZ    = parseFloat($('safeZ').value) || 5;
+  const toolNum  = parseInt($('profToolNum').value) || 1;
+  const hasRamp  = $('profRamping').checked;
+  const fmt      = S.machineFormat;
+  const name     = $('profName').value || 'Profile_1';
+  const toolType = profToolType;
+  const vAngle   = parseInt($('profVAngle').value) || 60;
+  const cornerR  = parseFloat($('profCornerR').value) || 0.5;
+  const cm = s => fmt==='fanuc'||fmt==='siemens' ? `(${s})\n` : `; ${s}\n`;
+  const f2 = v => v.toFixed(3);
+
+  // Tool description for comments
+  const toolDesc = toolType === 'vbit'  ? `V-bit ${vAngle}° Ø${toolDia}mm` :
+                   toolType === 'ballr' ? `Ball R${cornerR} Ø${toolDia}mm` :
+                   toolType === 'ball'  ? `Ball Nose Ø${toolDia}mm` :
+                   `Endmill Ø${toolDia}mm`;
+
+  // Offset from boundary based on profile type
+  let off = toolDia / 2 + allowance;
+  if (profType === 'inside')  off = -(toolDia / 2 - allowance);
+  if (profType === 'on')      off = 0;
+
+  // Rectangle corners (CW for outside conventional, CCW for inside)
+  const x0 = -off, y0 = -off;
+  const x1 = wW + off, y1 = wH + off;
+
+  // Z passes
+  const depth   = Math.abs(finishZ - startZ);
+  const passes  = Math.max(1, Math.ceil(depth / stepdown));
+  const zStep   = (finishZ - startZ) / passes;
+
+  let g = '';
+  if (fmt==='mach2'||fmt==='mach3'||fmt==='fanuc') g += '%\n';
+  if (fmt==='fanuc')   g += `O${String(toolNum).padStart(4,'0')}\n`;
+  if (fmt==='siemens') g += `PROC ${name.replace(/\s/g,'_')}\n`;
+  g += cm('══════════════════════════════════');
+  g += cm(`Profiling: ${name}`);
+  g += cm(`Profile  : ${profType}  Allowance: ${allowance}mm`);
+  g += cm(`Work area: ${wW} × ${wH} mm`);
+  g += cm(`Tool     : ${TOOL_ICONS[toolType]} ${toolDesc}  T${toolNum}`);
+  g += cm(`Start Z  : ${startZ}   Finish Z: ${finishZ}   Step: ${zStep.toFixed(3)}`);
+  g += cm(`Feed XY  : ${feed}   Plunge: ${plunge}   RPM: ${rpm}`);
+  g += cm('══════════════════════════════════');
+  g += '\n';
+  g += fmt==='siemens' ? `G90 G71\nDIAMOF\n` : `G21\nG90\nG17\n`;
+  g += `T${toolNum} M6\n`;
+  g += `M3 S${rpm}\nG4 P2.0\n`;
+  g += `G0 Z${f2(safeZ)}\n`;
+  g += `G0 X${f2(x0)} Y${f2(y0)}\n\n`;
+
+  for (let p = 1; p <= passes; p++) {
+    const zLevel = parseFloat((startZ + zStep * p).toFixed(4));
+    g += cm(`Pass ${p}/${passes}  Z=${zLevel}`);
+    if (hasRamp) {
+      // Ramp diagonally to Z level over first side
+      g += `G1 X${f2(x1)} Y${f2(y0)} Z${f2(zLevel)} F${plunge}\n`;
+    } else {
+      g += `G0 X${f2(x0)} Y${f2(y0)}\n`;
+      g += `G1 Z${f2(zLevel)} F${plunge}\n`;
+    }
+    // Profile rectangle (CW = conventional outside)
+    g += `G1 X${f2(x1)} Y${f2(y0)} F${feed}\n`;
+    g += `G1 X${f2(x1)} Y${f2(y1)}\n`;
+    g += `G1 X${f2(x0)} Y${f2(y1)}\n`;
+    g += `G1 X${f2(x0)} Y${f2(y0)}\n`;
+    g += `G0 Z${f2(safeZ)}\n\n`;
+  }
+
+  g += cm('── End ──');
+  g += `G0 Z${f2(safeZ)}\nG0 X0 Y0\nM5\n`;
+  g += fmt==='siemens' ? 'RET\n' : 'M30\n';
+  if (fmt==='mach2'||fmt==='mach3'||fmt==='fanuc') g += '%\n';
+
+  if (downloadNow) {
+    const ext = {grbl:'.nc',mach2:'.tap',mach3:'.tap',fanuc:'.nc',linuxcnc:'.ngc',smoothie:'.nc',siemens:'.mpf'}[fmt]||'.nc';
+    download(`${name}${ext}`, g, 'text/plain');
+    $('statusTxt').textContent = `✅ Profile G-code: ${passes} pass${passes>1?'es':''}`;
+  }
+  return g;
+}
+
+// ── 2D Area Clearance ──────────────────────────────────────
+const acTools = [];
+let acSelectedTool = -1;
+
+function acSyncTool() {} // no-op after CNC param panel removal
+
+function acAddTool() {
+  const type   = acToolTypeVal;
+  const dia    = parseFloat($('acToolDia').value)    || 3;
+  const feed   = parseInt($('acToolFeed').value)     || 800;
+  const plunge = parseInt($('acToolPlunge').value)   || 200;
+  const rpm    = parseInt($('acToolRPM').value)      || 12000;
+  const num    = parseInt($('acToolNum').value)      || (acTools.length + 1);
+  const vAngle = parseInt($('acVAngle').value)       || 60;
+  const ballR  = parseFloat($('acCornerR').value)    || 0.5;
+  const label  = type === 'vbit'  ? `V-bit ${vAngle}° Ø${dia}` :
+                 type === 'ballr' ? `Radius R${ballR} Ø${dia}` :
+                 type === 'ball'  ? `Ball Nose Ø${dia}` :
+                 `Endmill Ø${dia}`;
+  acTools.push({ type, dia, feed, plunge, rpm, num, vAngle, ballR, name: label });
+  $('acToolNum').value = num + 1;
+  renderAcTools();
+}
+function acRemoveTool() {
+  if (acSelectedTool >= 0) acTools.splice(acSelectedTool, 1);
+  else acTools.pop();
+  acSelectedTool = -1;
+  renderAcTools();
+}
+function renderAcTools() {
+  const box = $('acToolsList');
+  if (!acTools.length) { box.innerHTML = '<div style="padding:8px;font-size:10px;color:#444;text-align:center">ยังไม่มีดอกมีด — กดเพิ่ม</div>'; return; }
+  box.innerHTML = acTools.map((t,i) =>
+    `<div class="ac-tool-item${i===acSelectedTool?' selected':''}" onclick="acSelectTool(${i})"
+          style="padding:5px 8px;cursor:pointer;font-size:10px;color:${i===acSelectedTool?'#fff':'#bbb'};background:${i===acSelectedTool?'rgba(10,122,255,0.2)':'none'}">
+       ${TOOL_ICONS[t.type]||'🔧'} T${t.num} &nbsp;<b>${t.name}</b> &nbsp;|&nbsp; Feed: ${t.feed} &nbsp;Plunge: ${t.plunge} &nbsp;RPM: ${t.rpm}
+     </div>`
+  ).join('');
+}
+function acSelectTool(i) {
+  acSelectedTool = (acSelectedTool === i) ? -1 : i;
+  renderAcTools();
+}
+function acSetupMaterial() {
+  const cur = $('acMaterialLbl').textContent;
+  const mat = prompt('กรอกชื่อวัสดุ (Material):', cur === 'Undefined' ? '' : cur);
+  if (mat !== null && mat.trim()) {
+    $('acMaterialLbl').textContent = mat.trim();
+    $('acMaterialLbl').style.color = '#00d1a0';
+  }
+}
+
+function calcAreaGcode(downloadNow) {
+  const tool = acTools.length > 0 ? acTools[0] : {
+    type: 'endmill',
+    dia: parseFloat($('toolDia').value)||3,
+    feed: parseInt($('feedRate').value)||800,
+    plunge: parseInt($('plungeRate').value)||200,
+    rpm: parseInt($('rpm').value)||12000, num:1, vAngle:60, ballR:0.5,
+    name: `Endmill Ø${parseFloat($('toolDia').value)||3}`
+  };
+  const wW      = parseFloat($('workW').value) || 100;
+  const wH      = parseFloat($('workH').value) || 100;
+  const startZ  = parseFloat($('acStartZ').value) || 0;
+  const finishZ = parseFloat($('acFinishZ').value) || -5;
+  const alw     = parseFloat($('acAllowance').value) || 0;
+  const safeZ2  = parseFloat($('acSafeZ').value) || 10;
+  const hasRamp = $('acRamping').checked;
+  const fmt     = S.machineFormat;
+  const name    = $('acName').value || 'Area_Clear_1';
+  const stepover= tool.dia * 0.6;  // 60% stepover default
+  const stepdown= Math.abs(finishZ - startZ) > 5 ? 5 : Math.abs(finishZ - startZ);
+  const passes  = Math.max(1, Math.ceil(Math.abs(finishZ - startZ) / Math.max(0.01, stepdown)));
+  const zStep   = (finishZ - startZ) / passes;
+  const cm  = s => fmt==='fanuc'||fmt==='siemens' ? `(${s})\n` : `; ${s}\n`;
+  const f2  = v => v.toFixed(3);
+
+  // Boundary with allowance
+  const x0 = alw, y0 = alw;
+  const x1 = wW - alw, y1 = wH - alw;
+
+  let g = '';
+  if (fmt==='mach2'||fmt==='mach3'||fmt==='fanuc') g += '%\n';
+  if (fmt==='fanuc')   g += `O${String(tool.num||1).padStart(4,'0')}\n`;
+  if (fmt==='siemens') g += `PROC ${name.replace(/\s/g,'_')}\n`;
+  g += cm('══════════════════════════════════');
+  g += cm(`2D Area Clearance: ${name}`);
+  g += cm(`Work area  : ${wW} × ${wH} mm`);
+  g += cm(`Tool       : ${TOOL_ICONS[tool.type]||'🔧'} ${tool.name}  T${tool.num||1}`);
+  g += cm(`Stepover   : ${f2(stepover)}mm`);
+  g += cm(`Start Z    : ${startZ}   Finish Z: ${finishZ}`);
+  g += cm(`Z passes   : ${passes} × ${f2(Math.abs(zStep))}mm`);
+  g += cm(`Feed XY    : ${tool.feed}   Plunge: ${tool.plunge}   RPM: ${tool.rpm}`);
+  g += cm('══════════════════════════════════');
+  g += '\n';
+  g += fmt==='siemens' ? `G90 G71\nDIAMOF\n` : `G21\nG90\nG17\n`;
+  g += `T${tool.num||1} M6\n`;
+  g += `M3 S${tool.rpm}\nG4 P2.0\n`;
+  g += `G0 Z${f2(safeZ2)}\n\n`;
+
+  for (let p = 1; p <= passes; p++) {
+    const zLevel = parseFloat((startZ + zStep * p).toFixed(4));
+    g += cm(`Pass ${p}/${passes}  Z=${zLevel}`);
+    let row = 0, y = y0, leftToRight = true;
+    while (y <= y1 + 0.001) {
+      const xFrom = leftToRight ? x0 : x1;
+      const xTo   = leftToRight ? x1 : x0;
+      if (row === 0) {
+        g += `G0 X${f2(xFrom)} Y${f2(y)}\n`;
+        if (hasRamp) {
+          g += `G1 X${f2(xTo)} Y${f2(y)} Z${f2(zLevel)} F${tool.plunge}\n`;
+        } else {
+          g += `G1 Z${f2(zLevel)} F${tool.plunge}\n`;
+          g += `G1 X${f2(xTo)} Y${f2(y)} F${tool.feed}\n`;
+        }
+      } else {
+        g += `G1 X${f2(xFrom)} Y${f2(y)} F${tool.feed}\n`;
+        g += `G1 X${f2(xTo)}\n`;
+      }
+      y = parseFloat((y + stepover).toFixed(4));
+      leftToRight = !leftToRight;
+      row++;
+    }
+    g += `G0 Z${f2(safeZ2)}\n\n`;
+  }
+
+  g += cm('── End ──');
+  g += `G0 Z${f2(safeZ2)}\nG0 X0 Y0\nM5\n`;
+  g += fmt==='siemens' ? 'RET\n' : 'M30\n';
+  if (fmt==='mach2'||fmt==='mach3'||fmt==='fanuc') g += '%\n';
+
+  if (downloadNow) {
+    const ext = {grbl:'.nc',mach2:'.tap',mach3:'.tap',fanuc:'.nc',linuxcnc:'.ngc',smoothie:'.nc',siemens:'.mpf'}[fmt]||'.nc';
+    download(`${name}${ext}`, g, 'text/plain');
+    $('statusTxt').textContent = `✅ Area Clearance G-code: ${passes} Z-pass${passes>1?'es':''}`;
+  }
+  return g;
+}
+
+// ── Export Modal ──────────────────────────────────────────
+$('btnExport').addEventListener('click', () => $('exportModal').classList.add('show'));
+$('exportClose').addEventListener('click',  () => $('exportModal').classList.remove('show'));
+$('exportClose2').addEventListener('click', () => $('exportModal').classList.remove('show'));
+
+function requireShapes() {
+  if (!S.shapes.length) { alert('กรุณาเลือกรูปภาพและสร้าง Pattern ก่อน'); return false; }
+  return true;
+}
+
+$('expSVG').addEventListener('click', () => {
+  if (!requireShapes()) return;
+  download('cnc-pattern.svg', buildSVGString('mm'), 'image/svg+xml');
+  status2('✅ SVG exported');
+});
+
+$('expAI').addEventListener('click', () => {
+  if (!requireShapes()) return;
+  const W = pCanvas.width, H = pCanvas.height;
+  const wW = parseFloat($('workW').value), wH = parseFloat($('workH').value);
+  const sc = wW / W;
+  let d = '';
+  for (const s of S.shapes) d += svgShapePath(s.x*sc, (H-s.y)*sc, s.r*sc, S.pattern);
+  const bg = S.darkBg ? '#111111' : '#ffffff';
+  const fg = S.darkBg ? '#ffffff' : '#000000';
+  // AI-compatible SVG (Illustrator can open SVG with ai: namespace)
+  const ai = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns:a="http://ns.adobe.com/AdobeSVGViewerExtensions/3.0/"
+     x="0px" y="0px" width="${wW}mm" height="${wH}mm" viewBox="0 0 ${wW} ${wH}"
+     xml:space="preserve">
+<!-- Adobe Illustrator compatible SVG -->
+<!-- CNC Pattern Generator | ${patName(S.pattern)} | ${S.shapes.length} shapes -->
+<rect width="${wW}" height="${wH}" fill="${bg}"/>
+<path d="${d.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${f(0.15*sc)}"/>
+</svg>`;
+  download('cnc-pattern-ai.svg', ai, 'image/svg+xml');
+  status2('✅ AI-compatible SVG exported');
+});
+
+$('expDXF').addEventListener('click', () => {
+  if (!requireShapes()) return;
+  download('cnc-pattern.dxf', buildDXF(), 'application/dxf');
+  status2('✅ DXF exported');
+});
+
+$('expPNG').addEventListener('click', () => {
+  if (!requireShapes()) return;
+  pCanvas.toBlob(blob => {
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'cnc-pattern.png' });
+    a.click();
+  }, 'image/png');
+  status2('✅ PNG exported');
+});
+
+$('expJPG').addEventListener('click', () => {
+  if (!requireShapes()) return;
+  // Draw on white bg first
+  const tmp = document.createElement('canvas');
+  tmp.width = pCanvas.width; tmp.height = pCanvas.height;
+  const tctx = tmp.getContext('2d');
+  tctx.fillStyle = '#ffffff'; tctx.fillRect(0,0,tmp.width,tmp.height);
+  tctx.drawImage(pCanvas, 0, 0);
+  tmp.toBlob(blob => {
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'cnc-pattern.jpg' });
+    a.click();
+  }, 'image/jpeg', 0.92);
+  status2('✅ JPG exported');
+});
+
+$('expPDF').addEventListener('click', () => {
+  if (!requireShapes()) return;
+  if (typeof window.jspdf === 'undefined') { alert('กำลังโหลด jsPDF...'); return; }
+  const { jsPDF } = window.jspdf;
+  const wW = parseFloat($('workW').value), wH = parseFloat($('workH').value);
+  const orient = wW >= wH ? 'landscape' : 'portrait';
+  const doc = new jsPDF({ orientation: orient, unit: 'mm', format: [wW, wH] });
+  const imgData = pCanvas.toDataURL('image/png');
+  doc.addImage(imgData, 'PNG', 0, 0, wW, wH);
+  doc.save('cnc-pattern.pdf');
+  status2('✅ PDF exported');
+});
+
+$('expGCODE').addEventListener('click', () => {
+  if (!requireShapes()) return;
+  buildGcode();
+  download('cnc-pattern'+machineExt(), S.lastGcode, 'text/plain');
+  status2(`✅ G-code (${S.machineFormat}) exported`);
+});
+
+$('expCSV').addEventListener('click', () => {
+  if (!requireShapes()) return;
+  const W = pCanvas.width, H = pCanvas.height;
+  const wW = parseFloat($('workW').value);
+  const sc = wW / W;
+  let csv = 'Index,X_mm,Y_mm,Radius_mm,SizeFraction,Pattern\n';
+  S.shapes.forEach((s,i) => {
+    csv += `${i+1},${f(s.x*sc)},${f((H-s.y)*sc)},${f(s.r*sc)},${s.frac.toFixed(4)},${S.pattern}\n`;
+  });
+  download('cnc-points.csv', csv, 'text/csv');
+  status2(`✅ CSV exported (${S.shapes.length.toLocaleString()} rows)`);
+});
+
+$('expSheetGcode').addEventListener('click', () => {
+  if (!requireShapes()) return;
+  const sW = parseFloat($('sheetW').value)||600;
+  const sH = parseFloat($('sheetH').value)||400;
+  const mg = parseFloat($('sheetMargin').value)||10;
+  const sp = parseFloat($('partSpacing').value)||5;
+  const pW = parseFloat($('workW').value)||100;
+  const pH = parseFloat($('workH').value)||100;
+  const cols = Math.max(0, Math.floor(((sW-2*mg) + sp) / (pW + sp)));
+  const rows = Math.max(0, Math.floor(((sH-2*mg) + sp) / (pH + sp)));
+  const maxCount = cols * rows;
+  if (maxCount === 0) { alert('ชิ้นงานใหญ่กว่าแผ่น'); return; }
+  const desired    = parseInt($('desiredCount').value)||0;
+  const exportCount = desired > 0 ? Math.min(desired, maxCount) : maxCount;
+
+  // Build combined G-code for all parts
+  const W = pCanvas.width, H = pCanvas.height;
+  const wW = parseFloat($('workW').value);
+  const depth  = parseFloat($('cutDepth').value);
+  const feed   = parseInt($('feedRate').value);
+  const plunge = parseInt($('plungeRate').value);
+  const safeZ  = parseFloat($('safeZ').value);
+  const spRPM  = parseInt($('rpm').value);
+  const units  = $('units').value;
+  const fmt    = S.machineFormat;
+  const sc     = wW / W;
+  const cmChar = (fmt==='fanuc'||fmt==='siemens') ? '(' : ';';
+  const cmEnd  = (fmt==='fanuc'||fmt==='siemens') ? ')' : '';
+  const cm     = s => `${cmChar} ${s}${cmEnd}\n`;
+
+  let g = '';
+  if (fmt==='mach2'||fmt==='mach3'||fmt==='fanuc') g += '%\n';
+  if (fmt==='fanuc') g += 'O0002\n';
+  g += cm('CNC Pattern Generator — Sheet G-code');
+  g += cm(`Sheet: ${sW}×${sH}mm | Margin: ${mg}mm | Spacing: ${sp}mm`);
+  g += cm(`Parts: ${exportCount} of ${maxCount} (${cols}×${rows} max)`);
+  g += '\n';
+  g += units==='mm'?`G21\n`:`G20\n`;
+  g += `G90\nM3 S${spRPM}\nG4 P2.0\nG0 Z${safeZ}\n\n`;
+
+  let partNum = 0;
+  outer2:
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (partNum >= exportCount) break outer2;
+      partNum++;
+      const ox = mg + col*(pW+sp);
+      const oy = mg + row*(pH+sp);
+      g += cm(`════ Part ${partNum} of ${exportCount} — offset X${ox} Y${oy} ════`);
+      for (let i = 0; i < S.shapes.length; i++) {
+        const s  = S.shapes[i];
+        const sx = parseFloat((s.x*sc + ox).toFixed(3));
+        const sy = parseFloat(((H-s.y)*sc + oy).toFixed(3));
+        const sr = parseFloat((s.r*sc).toFixed(3));
+        g += gcodeShape(sx,sy,sr,S.pattern,depth,feed,plunge,safeZ,i+1,fmt);
+      }
+      g += '\n';
+    }
+  }
+  g += cm('── End of sheet job ──');
+  g += `G0 Z${safeZ}\nG0 X0 Y0\nM5\nM30\n`;
+  if (fmt==='mach2'||fmt==='mach3'||fmt==='fanuc') g += '%\n';
+
+  download('cnc-sheet'+machineExt(), g, 'text/plain');
+  status2(`✅ Sheet G-code (${exportCount} parts) exported`);
+});
+
+// ── Helpers ───────────────────────────────────────────────
+function f(n) { return parseFloat(n.toFixed(3)); }
+function status2(msg) {
+  $('statusTxt').textContent = msg;
+  $('exportModal').classList.remove('show');
+}
+function download(name, content, mime) {
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([content], {type: mime})),
+    download: name
+  });
+  a.click();
+}
+
+window.addEventListener('resize', () => {
+  if (S.image) { fitCanvases(); scheduleRender(60); }
+});
+
+// ══════════════════════════════════════════════════════════════
+// ── Procedural Pattern Generator ─────────────────────────────
+// ══════════════════════════════════════════════════════════════
+
+// ─── Value-noise helpers ─────────────────────────────────────
+function _ph(x, y) {
+  let h = (x * 1619 ^ y * 31337) * 6791 ^ (x ^ y) * 1117;
+  h = (h ^ (h >> 13)) * 1274126177;
+  return ((h ^ (h >> 16)) & 0x7fffffff) / 0x7fffffff;
+}
+function _vn(x, y) {
+  const ix = x|0, iy = y|0, fx = x-ix, fy = y-iy;
+  const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy);
+  return _ph(ix,iy)*(1-ux)*(1-uy) + _ph(ix+1,iy)*ux*(1-uy) +
+         _ph(ix,iy+1)*(1-ux)*uy   + _ph(ix+1,iy+1)*ux*uy;
+}
+function _fn(x, y, oct, rough) {
+  let v=0, a=1, f=1, m=0;
+  for (let i=0; i<oct; i++) { v+=_vn(x*f,y*f)*a; m+=a; a*=rough; f*=2; }
+  return v / m;
+}
+
+// ─── Pattern math (nx,ny ∈ 0-1;  cx,cy = centre in 0-1) ────
+const PROC_FN = {
+  wave: (nx, ny, p) => {
+    const r = (p.angle||0)*Math.PI/180;
+    const proj = nx*Math.cos(r) + ny*Math.sin(r);
+    return (Math.sin(proj*(p.freq||8)*Math.PI*2 + (p.phase||0)*Math.PI/180)+1)/2;
+  },
+  rings: (nx, ny, p, cx, cy) => {
+    const dx=nx-cx, dy=ny-cy;
+    const raw = (Math.sin(Math.sqrt(dx*dx+dy*dy)*2*(p.freq||6)*Math.PI*2)+1)/2;
+    const s = (p.soft||0)/100;
+    return s<0.01 ? raw : 0.5+(raw-0.5)*(1-s*0.85);
+  },
+  spiral: (nx, ny, p, cx, cy) => {
+    const dx=nx-cx, dy=ny-cy;
+    const ang = Math.atan2(dy, dx);
+    const d   = Math.sqrt(dx*dx+dy*dy);
+    const t   = ((ang/(2*Math.PI) + d*(p.turns||5) + (p.twist||0)/360) % 1 + 1) % 1;
+    return (Math.sin(t*Math.PI*2)+1)/2;
+  },
+  radial: (nx, ny, p, cx, cy) => {
+    const dx=nx-cx, dy=ny-cy;
+    const d = Math.min(1, Math.sqrt(dx*dx+dy*dy)/0.6);
+    const v = Math.pow(d, p.curve||1.5);
+    return p.vignette ? 1-v : v;
+  },
+  checker: (nx, ny, p) => {
+    const cells = Math.round(p.cells||8), s = (p.soft||0)/100;
+    const fx=nx*cells, fy=ny*cells;
+    const ix=fx|0, iy=fy|0;
+    const base = (ix+iy)%2===0 ? 0.04 : 0.96;
+    if (s<0.01) return base;
+    const edge = Math.max(Math.abs(fx-ix-0.5), Math.abs(fy-iy-0.5))*2;
+    const t = Math.max(0, edge-(1-s)) / Math.max(0.001,s);
+    return base*(1-t) + 0.5*t;
+  },
+  diamond: (nx, ny, p) => {
+    const r = (p.angle||0)*Math.PI/180;
+    const rx=(nx-0.5)*Math.cos(r)-(ny-0.5)*Math.sin(r)+0.5;
+    const ry=(nx-0.5)*Math.sin(r)+(ny-0.5)*Math.cos(r)+0.5;
+    const d = Math.abs(rx-0.5)+Math.abs(ry-0.5);
+    return (Math.sin(d*(p.freq||5)*Math.PI*2)+1)/2;
+  },
+  noise: (nx, ny, p) => {
+    return _fn(nx*(p.scale||6), ny*(p.scale||6), Math.round(p.oct||3), (p.rough||60)/100);
+  },
+  stripe: (nx, ny, p) => {
+    const r = (p.angle||0)*Math.PI/180;
+    const proj = nx*Math.cos(r)+ny*Math.sin(r);
+    const raw = (Math.sin(proj*(p.freq||8)*Math.PI*2)+1)/2;
+    const s = (p.soft||20)/100;
+    if (s<0.01) return raw>0.5 ? 0.96 : 0.04;
+    return Math.min(1, Math.max(0, (raw-0.5)/Math.max(0.01,s)*0.5+0.5));
+  },
+  // ── New patterns ──────────────────────────────────────────────
+  gradient: (nx, ny, p) => {
+    const r = (p.angle||0)*Math.PI/180;
+    const v = (nx-0.5)*Math.cos(r)+(ny-0.5)*Math.sin(r)+0.5;
+    return Math.pow(Math.max(0,Math.min(1,v)), Math.max(0.1,p.gamma||1));
+  },
+  cross: (nx, ny, p) => {
+    const r = (p.angle||0)*Math.PI/180, f = p.freq||6;
+    const s = Math.max(0.01,(p.soft||30)/100);
+    const u = nx*Math.cos(r)-ny*Math.sin(r);
+    const v = nx*Math.sin(r)+ny*Math.cos(r);
+    const raw = Math.max((Math.sin(u*f*Math.PI*2)+1)/2,(Math.sin(v*f*Math.PI*2)+1)/2);
+    return Math.min(1,Math.max(0,(raw-0.5)/s*0.5+0.5));
+  },
+  star: (nx, ny, p, cx, cy) => {
+    const dx=nx-cx, dy=ny-cy;
+    const ang=Math.atan2(dy,dx), d=Math.sqrt(dx*dx+dy*dy);
+    const rays=Math.max(2,Math.round(p.rays||8));
+    return (Math.sin(ang*rays + (p.twist||0)/100*d*25)+1)/2;
+  },
+  hex: (nx, ny, p) => {
+    const s=p.scale||5, fill=Math.max(0.05,(p.fill||70)/100);
+    // Hex grid in axial coordinates
+    const x=nx*s*1.732, y=ny*s;
+    const q=Math.floor(x/1.732), odd=q&1;
+    const yy=y-odd*0.5, r2=Math.floor(yy);
+    const lx=x/1.732-q-0.5, ly=yy-r2-0.5;
+    const d=Math.max(Math.abs(lx),(Math.abs(lx)+Math.abs(ly)*Math.sqrt(3))/2);
+    return Math.max(0,1-d/fill);
+  },
+  zigzag: (nx, ny, p) => {
+    const r=(p.angle||0)*Math.PI/180, f=p.freq||6;
+    const u=nx*Math.cos(r)-ny*Math.sin(r);
+    const v=nx*Math.sin(r)+ny*Math.cos(r);
+    const row=Math.floor(v*f*2);
+    return (Math.sin((u+(row&1)*0.5)*f*Math.PI*2)+1)/2;
+  },
+  dotgrid: (nx, ny, p) => {
+    const r=(p.angle||0)*Math.PI/180, f=p.freq||8;
+    const u=nx*Math.cos(r)-ny*Math.sin(r);
+    const v=nx*Math.sin(r)+ny*Math.cos(r);
+    const dx=((u*f)%1+1)%1-0.5, dy=((v*f)%1+1)%1-0.5;
+    const d=Math.sqrt(dx*dx+dy*dy)*2;
+    return Math.max(0,1-d/Math.max(0.01,(p.size||60)/100));
+  },
+  triangle: (nx, ny, p) => {
+    const r=(p.angle||0)*Math.PI/180, f=p.freq||6;
+    const u=nx*Math.cos(r)-ny*Math.sin(r);
+    const v=nx*Math.sin(r)+ny*Math.cos(r);
+    const tri=Math.abs(((v*f*2)%2+2)%2-1); // triangle wave along v
+    return (Math.sin((u+tri*0.25)*f*Math.PI*2)+1)/2;
+  },
+};
+
+// ─── Parameter definitions per pattern type ──────────────────
+const PROC_PARAMS = {
+  wave:    [{id:'freq',  label:'ความถี่',         min:1,  max:30,  val:8,   step:0.5},
+            {id:'angle', label:'มุม (°)',          min:0,  max:360, val:0,   step:1},
+            {id:'phase', label:'Phase Shift (°)',  min:0,  max:360, val:0,   step:1}],
+  rings:   [{id:'freq',  label:'จำนวนวง',          min:1,  max:20,  val:6,   step:0.5},
+            {id:'soft',  label:'Softness (%)',     min:0,  max:100, val:0,   step:1}],
+  spiral:  [{id:'turns', label:'รอบ (Turns)',      min:1,  max:20,  val:5,   step:0.5},
+            {id:'twist', label:'Twist (°)',        min:-360,max:360,val:0,   step:5}],
+  radial:  [{id:'curve', label:'Curve',            min:0.2,max:5,   val:1.5, step:0.1},
+            {id:'vignette',label:'Vignette Mode',  min:0,  max:1,   val:0,   step:1}],
+  checker: [{id:'cells', label:'จำนวนช่อง',        min:2,  max:24,  val:8,   step:1},
+            {id:'soft',  label:'Softness (%)',     min:0,  max:100, val:0,   step:1}],
+  diamond: [{id:'freq',  label:'ความถี่',         min:1,  max:20,  val:5,   step:0.5},
+            {id:'angle', label:'มุม (°)',          min:0,  max:90,  val:0,   step:1}],
+  noise:   [{id:'scale', label:'Scale',            min:1,  max:20,  val:6,   step:0.5},
+            {id:'oct',   label:'Octaves',           min:1,  max:6,   val:3,   step:1},
+            {id:'rough', label:'Roughness (%)',    min:10, max:90,  val:60,  step:1}],
+  stripe:   [{id:'freq',  label:'จำนวนเส้น',        min:1,  max:30,  val:8,   step:0.5},
+             {id:'angle', label:'มุม (°)',          min:0,  max:180, val:0,   step:1},
+             {id:'soft',  label:'Softness (%)',     min:0,  max:100, val:20,  step:1}],
+  gradient: [{id:'angle', label:'มุม (°)',          min:0,  max:360, val:0,   step:1},
+             {id:'gamma', label:'Curve',            min:0.2,max:4,   val:1,   step:0.1}],
+  cross:    [{id:'freq',  label:'ความถี่',          min:1,  max:20,  val:6,   step:0.5},
+             {id:'angle', label:'มุม (°)',          min:0,  max:90,  val:0,   step:1},
+             {id:'soft',  label:'Softness (%)',     min:0,  max:100, val:30,  step:1}],
+  star:     [{id:'rays',  label:'จำนวนแฉก',         min:2,  max:24,  val:8,   step:1},
+             {id:'twist', label:'Twist',            min:-100,max:100,val:0,   step:1}],
+  hex:      [{id:'scale', label:'ขนาด',             min:2,  max:15,  val:5,   step:0.5},
+             {id:'fill',  label:'Fill (%)',         min:10, max:95,  val:70,  step:1}],
+  zigzag:   [{id:'freq',  label:'ความถี่',          min:1,  max:20,  val:6,   step:0.5},
+             {id:'angle', label:'มุม (°)',          min:0,  max:180, val:0,   step:1}],
+  dotgrid:  [{id:'freq',  label:'ความถี่',          min:2,  max:24,  val:8,   step:0.5},
+             {id:'angle', label:'มุม (°)',          min:0,  max:90,  val:0,   step:1},
+             {id:'size',  label:'ขนาดจุด (%)',      min:10, max:90,  val:60,  step:1}],
+  triangle: [{id:'freq',  label:'ความถี่',          min:1,  max:20,  val:6,   step:0.5},
+             {id:'angle', label:'มุม (°)',          min:0,  max:180, val:0,   step:1}],
+};
+
+let currentProcType = 'wave';
+const procVals = {};
+
+function setProcType(btn, type) {
+  currentProcType = type;
+  document.querySelectorAll('#procTypeGrid .tool-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  buildProcSliders();
+  $('procCenterRow').style.display = ['rings','spiral','radial','star'].includes(type) ? '' : 'none';
+  procPreview();
+}
+
+function syncProcParam(id, val, other) {
+  if (!procVals[currentProcType]) procVals[currentProcType] = {};
+  procVals[currentProcType][id] = val;
+  const el = $(other === 'r' ? `pp_r_${id}` : `pp_n_${id}`);
+  if (el) el.value = val;
+  procPreview();
+}
+
+function buildProcSliders() {
+  const params = PROC_PARAMS[currentProcType] || [];
+  if (!procVals[currentProcType]) {
+    procVals[currentProcType] = {};
+    params.forEach(p => { procVals[currentProcType][p.id] = p.val; });
+  }
+  const container = $('procSliders');
+  container.innerHTML = '';
+  params.forEach(p => {
+    const cur = procVals[currentProcType][p.id] ?? p.val;
+    const row = document.createElement('div');
+    row.className = 'in-grp';
+    row.style.marginBottom = '6px';
+    row.innerHTML =
+      `<label style="display:flex;justify-content:space-between;align-items:center">` +
+      `<span>${p.label}</span>` +
+      `<input type="number" class="num-in" id="pp_n_${p.id}"` +
+      ` value="${cur}" min="${p.min}" max="${p.max}" step="${p.step}"` +
+      ` style="width:54px;text-align:right"` +
+      ` oninput="syncProcParam('${p.id}',+this.value,'r')">` +
+      `</label>` +
+      `<input type="range" id="pp_r_${p.id}"` +
+      ` min="${p.min}" max="${p.max}" step="${p.step}" value="${cur}"` +
+      ` oninput="syncProcParam('${p.id}',+this.value,'n')">`;
+    container.appendChild(row);
+  });
+}
+
+function procPreview() {
+  const pv  = $('procPv');
+  const cx  = parseFloat($('procCX').value) / 100;
+  const cy  = parseFloat($('procCY').value) / 100;
+  const inv = $('togProcInv').classList.contains('on');
+  const fn  = PROC_FN[currentProcType];
+  const p   = procVals[currentProcType] || {};
+  if (!fn) return;
+  const W = pv.width, H = pv.height;
+  const ctx = pv.getContext('2d');
+  const id  = ctx.createImageData(W, H);
+  const buf = id.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const nx = x/W, ny = y/H;
+      let b = fn(nx, ny, p, cx, cy);
+      if (inv) b = 1-b;
+      const v = (b*255)|0, i = (y*W+x)*4;
+      buf[i] = buf[i+1] = buf[i+2] = v; buf[i+3] = 255;
+    }
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+function applyProcPattern(keepSize = false) {
+  const fn  = PROC_FN[currentProcType];
+  const p   = procVals[currentProcType] || {};
+  const cx  = parseFloat($('procCX').value) / 100;
+  const cy  = parseFloat($('procCY').value) / 100;
+  const inv = $('togProcInv').classList.contains('on');
+  if (!fn) return;
+
+  const W = 1024, H = 1024;
+  const offscreen = document.createElement('canvas');
+  offscreen.width = W; offscreen.height = H;
+  const ctx = offscreen.getContext('2d');
+  const id  = ctx.createImageData(W, H);
+  const buf = id.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const nx = x/W, ny = y/H;
+      let b = fn(nx, ny, p, cx, cy);
+      if (inv) b = 1-b;
+      const v = (b*255)|0, i = (y*W+x)*4;
+      buf[i] = buf[i+1] = buf[i+2] = v; buf[i+3] = 255;
+    }
+  }
+  ctx.putImageData(id, 0, 0);
+
+  const isFirstApply = !S.image;
+  const img = new Image();
+  img.onload = () => {
+    S.image         = img;
+    S.imageFromProc = true;
+    S.imgAspect     = 1;
+    if (!keepSize && isFirstApply) autoSetWorkSize();
+    fitCanvases();
+    zoom.show();
+    scheduleRender();
+    $('statusTxt').textContent = '✅ Procedural "' + currentProcType + '" pattern applied';
+  };
+  img.src = offscreen.toDataURL();
+}
+
+// ─── Init (Proc panel) ───────────────────────────────────────
+$('togProcInv').addEventListener('click', () => {
+  $('togProcInv').classList.toggle('on');
+  procPreview();
+});
+buildProcSliders();
+procPreview();
+
+
+
+// ============================================================
+// VECTOR TRACING MODULE  v2
+// ============================================================
+// ============================================================
+// VECTOR TRACING MODULE  v2  (Potrace-style + Centerline)
+// ============================================================
+const VEC = {
+  mode: 'centerline',
+  contours: [],
+  svgPaths: [],
+  imgW: 0, imgH: 0,
+  tileW: 0, tileH: 0,
+  showMain: false,
+};
+
+function setVecMode(mode) {
+  VEC.mode = mode;
+  ['centerline','outline','pattern'].forEach(m => {
+    const btn=$('vecMode_'+m+'Btn'); if(btn) btn.classList.toggle('active', m===mode);
+  });
+  const sh=$('vecSettings_shared'), pt=$('vecSettings_pattern');
+  if(sh) sh.style.display = mode!=='pattern' ? '' : 'none';
+  if(pt) pt.style.display = mode==='pattern'  ? '' : 'none';
+}
+
+function applyVecPreset(v) {
+  if(!v) return;
+  const P={
+    line_art:  {t:128,inv:false,b:10,c:1,s:5,m:15,e:8},
+    technical: {t:160,inv:false,b:5, c:0,s:3,m:10,e:5},
+    sketch:    {t:190,inv:false,b:15,c:2,s:7,m:20,e:12},
+    dark_bg:   {t:128,inv:true, b:10,c:1,s:5,m:15,e:8},
+  }[v]; if(!P) return;
+  const sv=(id,val,div)=>{
+    const el=$(id); if(!el)return; el.value=val;
+    const lv=$(id+'V'); if(lv) lv.textContent=div?(val/div).toFixed(1):val;
+  };
+  sv('vecThresh2',P.t);
+  if($('vecInvert'))$('vecInvert').checked=P.inv;
+  sv('vecBlur2',P.b,10); sv('vecClose',P.c);
+  sv('vecSmooth2',P.s);  sv('vecMinLen2',P.m);
+  sv('vecEps2',P.e*10,10);
+}
+
+// ── Grayscale from S.image ───────────────────────────────────
+function vecGetGray(maxDim) {
+  if(!S.image) return null;
+  const sw=S.image.naturalWidth||S.image.width;
+  const sh=S.image.naturalHeight||S.image.height;
+  const sc=Math.min(1,maxDim/sw,maxDim/sh);
+  const w=Math.round(sw*sc), h=Math.round(sh*sc);
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  c.getContext('2d').drawImage(S.image,0,0,w,h);
+  const d=c.getContext('2d').getImageData(0,0,w,h).data;
+  const g=new Float32Array(w*h);
+  for(let i=0;i<w*h;i++) g[i]=(0.299*d[i*4]+0.587*d[i*4+1]+0.114*d[i*4+2])/255;
+  return{gray:g,w,h};
+}
+
+// ── Gaussian blur (separable) ────────────────────────────────
+function vecBlur(g,w,h,sigma) {
+  if(sigma<0.3) return g;
+  const r=Math.ceil(sigma*2.5);
+  const k=[]; let ks=0;
+  for(let i=-r;i<=r;i++){const v=Math.exp(-(i*i)/(2*sigma*sigma));k.push(v);ks+=v;}
+  const kn=k.map(v=>v/ks),kl=kn.length;
+  const tmp=new Float32Array(w*h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    let s=0; for(let i=0;i<kl;i++){const xi=Math.max(0,Math.min(w-1,x+i-r));s+=kn[i]*g[y*w+xi];}
+    tmp[y*w+x]=s;
+  }
+  const out=new Float32Array(w*h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    let s=0; for(let i=0;i<kl;i++){const yi=Math.max(0,Math.min(h-1,y+i-r));s+=kn[i]*tmp[yi*w+x];}
+    out[y*w+x]=s;
+  }
+  return out;
+}
+
+// ── Threshold → binary ───────────────────────────────────────
+function vecBinarize(gray,w,h,thresh,invert) {
+  const t=thresh/255, bin=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++) bin[i]=((gray[i]<t)!==!!invert)?1:0;
+  return bin;
+}
+
+// ── Morphological dilate / erode / close ─────────────────────
+function vecMorphDilate(bin,w,h,r) {
+  if(r<1) return bin;
+  const out=new Uint8Array(w*h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    let hit=0;
+    lp: for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+      const nx=x+dx,ny=y+dy;
+      if(nx>=0&&nx<w&&ny>=0&&ny<h&&bin[ny*w+nx]){hit=1;break lp;}
+    }
+    out[y*w+x]=hit;
+  }
+  return out;
+}
+function vecMorphErode(bin,w,h,r) {
+  if(r<1) return bin;
+  const out=new Uint8Array(w*h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    let all=1;
+    lp: for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+      const nx=x+dx,ny=y+dy;
+      if(nx<0||nx>=w||ny<0||ny>=h||!bin[ny*w+nx]){all=0;break lp;}
+    }
+    out[y*w+x]=all;
+  }
+  return out;
+}
+function vecMorphClose(bin,w,h,r){return r<1?bin:vecMorphErode(vecMorphDilate(bin,w,h,r),w,h,r);}
+
+// ── Zhang-Suen thinning ──────────────────────────────────────
+function vecThinZhangSuen(bin,w,h) {
+  const s=new Uint8Array(bin);
+  const g=(x,y)=>(x<0||x>=w||y<0||y>=h)?0:s[y*w+x];
+  let changed=true;
+  while(changed){
+    changed=false;
+    for(let pass=0;pass<2;pass++){
+      const del=[];
+      for(let y=1;y<h-1;y++) for(let x=1;x<w-1;x++){
+        if(!s[y*w+x]) continue;
+        const p=[0,g(x,y-1),g(x+1,y-1),g(x+1,y),g(x+1,y+1),
+                   g(x,y+1),g(x-1,y+1),g(x-1,y),g(x-1,y-1)];
+        const B=p[1]+p[2]+p[3]+p[4]+p[5]+p[6]+p[7]+p[8];
+        if(B<2||B>6) continue;
+        let A=0; for(let i=1;i<=8;i++) if(!p[i]&&p[i%8+1]) A++;
+        if(A!==1) continue;
+        if(pass===0){if(p[1]*p[3]*p[5]||p[3]*p[5]*p[7]) continue;}
+        else        {if(p[1]*p[3]*p[7]||p[1]*p[5]*p[7]) continue;}
+        del.push(y*w+x);
+      }
+      for(const i of del){s[i]=0;changed=true;}
+    }
+  }
+  return s;
+}
+
+// ── Trace skeleton to polylines ─────────────────────────────
+function vecTraceSkeleton(skel,w,h,minLen) {
+  const vis=new Uint8Array(w*h), paths=[];
+  const nbrs=(x,y)=>{
+    const n=[];
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy) continue;
+      const nx=x+dx,ny=y+dy;
+      if(nx>=0&&nx<w&&ny>=0&&ny<h&&skel[ny*w+nx]) n.push([nx,ny]);
+    }
+    return n;
+  };
+  const eps=[];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    if(skel[y*w+x]&&nbrs(x,y).length===1) eps.push([x,y]);
+  }
+  function trace(sx,sy){
+    const path=[[sx,sy]]; vis[sy*w+sx]=1;
+    let cx=sx,cy=sy;
+    for(let step=0;step<500000;step++){
+      const next=nbrs(cx,cy).filter(([nx,ny])=>!vis[ny*w+nx]);
+      if(!next.length) break;
+      const[nx,ny]=next[0];
+      vis[ny*w+nx]=1; path.push([nx,ny]); cx=nx; cy=ny;
+      if(nbrs(cx,cy).filter(([px,py])=>!vis[py*w+px]).length>1) break;
+    }
+    return path;
+  }
+  for(const[sx,sy] of eps){
+    if(vis[sy*w+sx]) continue;
+    const p=trace(sx,sy); if(p.length>=minLen) paths.push(p);
+  }
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    if(skel[y*w+x]&&!vis[y*w+x]){
+      const p=trace(x,y); if(p.length>=minLen) paths.push(p);
+    }
+  }
+  return paths;
+}
+
+// ── Contour trace (Outline mode) ─────────────────────────────
+function vecTraceContours(bin,w,h,minLen) {
+  const vis=new Uint8Array(w*h), paths=[];
+  const dx8=[1,1,0,-1,-1,-1,0,1], dy8=[0,1,1,1,0,-1,-1,-1];
+  for(let y=1;y<h-1;y++) for(let x=1;x<w-1;x++){
+    if(!bin[y*w+x]||vis[y*w+x]) continue;
+    let bnd=false;
+    for(let d=0;d<8;d++) if(!bin[(y+dy8[d])*w+(x+dx8[d])]){bnd=true;break;}
+    if(!bnd) continue;
+    const path=[[x,y]]; vis[y*w+x]=1;
+    let cx=x,cy=y,pd=4;
+    for(let step=0;step<50000;step++){
+      let found=false;
+      for(let di=0;di<8;di++){
+        const d=(pd+6+di)%8,nx=cx+dx8[d],ny=cy+dy8[d];
+        if(nx<0||nx>=w||ny<0||ny>=h||!bin[ny*w+nx]) continue;
+        if(nx===x&&ny===y&&path.length>2){found=true;break;}
+        if(!vis[ny*w+nx]){vis[ny*w+nx]=1;path.push([nx,ny]);cx=nx;cy=ny;pd=d;found=true;break;}
+        break;
+      }
+      if(!found||(cx===x&&cy===y&&path.length>2)) break;
+    }
+    if(path.length>=minLen) paths.push(path);
+  }
+  return paths;
+}
+
+// ── Douglas-Peucker ──────────────────────────────────────────
+function vecSimplify(pts,eps) {
+  if(pts.length<=2) return pts;
+  function dp(pts,s,e){
+    let md=0,mi=s;
+    const[x1,y1]=pts[s],[x2,y2]=pts[e];
+    const ddx=x2-x1,ddy=y2-y1,len=Math.sqrt(ddx*ddx+ddy*ddy)||1e-9;
+    for(let i=s+1;i<e;i++){
+      const[px,py]=pts[i];
+      const d=Math.abs(ddy*px-ddx*py+x2*y1-y2*x1)/len;
+      if(d>md){md=d;mi=i;}
+    }
+    if(md<eps) return[pts[s],pts[e]];
+    return[...dp(pts,s,mi),...dp(pts,mi,e).slice(1)];
+  }
+  return dp(pts,0,pts.length-1);
+}
+
+// ── Cubic bezier path (Catmull-Rom tangents) ─────────────────
+function vecSmoothPath(pts,tension) {
+  if(pts.length<2) return '';
+  const t=Math.max(0,Math.min(1,(tension||5)/12));
+  let d=`M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for(let i=1;i<pts.length;i++){
+    const p0=pts[Math.max(0,i-2)],p1=pts[i-1],p2=pts[i],p3=pts[Math.min(pts.length-1,i+1)];
+    const c1x=(p1[0]+(p2[0]-p0[0])*t/3).toFixed(1);
+    const c1y=(p1[1]+(p2[1]-p0[1])*t/3).toFixed(1);
+    const c2x=(p2[0]-(p3[0]-p1[0])*t/3).toFixed(1);
+    const c2y=(p2[1]-(p3[1]-p1[1])*t/3).toFixed(1);
+    d+=` C ${c1x} ${c1y} ${c2x} ${c2y} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
+// ── Tile detection ───────────────────────────────────────────
+function vecDetectTile(gray,w,h) {
+  const mxW=Math.min(Math.floor(w/2),400), mxH=Math.min(Math.floor(h/2),400);
+  function bestPeriod(dir){
+    let bestScore=Infinity, bestP=0;
+    const step=dir==='x'?1:1;
+    for(let p=16;p<(dir==='x'?mxW:mxH);p+=step){
+      let s=0,n=0;
+      if(dir==='x'){
+        for(let y=0;y<h;y+=4) for(let x=0;x<w-p;x+=4){
+          const d=gray[y*w+x]-gray[y*w+(x+p)]; s+=d*d; n++;
+        }
+      } else {
+        for(let y=0;y<h-p;y+=4) for(let x=0;x<w;x+=4){
+          const d=gray[y*w+x]-gray[(y+p)*w+x]; s+=d*d; n++;
+        }
+      }
+      const score=n?s/n:Infinity;
+      if(score<bestScore){bestScore=score;bestP=p;}
+    }
+    return bestP;
+  }
+  const tw=bestPeriod('x'), th=bestPeriod('y');
+  let intra=0,inter=0,n=0;
+  for(let y=0;y<h-th;y+=8) for(let x=0;x<w-tw;x+=8){
+    const d=gray[y*w+x]-gray[(y+th)*w+(x+tw)]; inter+=d*d;
+    const d2=gray[y*w+x]-gray[Math.min(h-1,y+4)*w+Math.min(w-1,x+4)]; intra+=d2*d2; n++;
+  }
+  const cx=n?Math.max(0,1-inter/(intra+0.001)):0;
+  return{tw,th,cx,cy:cx};
+}
+
+// ── Preview canvas ───────────────────────────────────────────
+function vecDrawPreview(bin,w,h) {
+  const pv=$('vecPreviewCanvas'); pv.width=w; pv.height=h;
+  const ctx=pv.getContext('2d');
+  const id=ctx.createImageData(w,h);
+  for(let i=0;i<w*h;i++){
+    const v=bin[i]?30:220;
+    id.data[i*4]=id.data[i*4+1]=id.data[i*4+2]=v; id.data[i*4+3]=255;
+  }
+  ctx.putImageData(id,0,0);
+  if(VEC.svgPaths.length>0){
+    ctx.strokeStyle='#00e5ff'; ctx.lineWidth=1.2;
+    VEC.svgPaths.forEach(d=>{try{ctx.stroke(new Path2D(d));}catch(e){}});
+  }
+  if(VEC.mode==='pattern'&&VEC.tileW>0&&VEC.tileH>0){
+    ctx.strokeStyle='#ff6b35'; ctx.lineWidth=2; ctx.setLineDash([6,3]);
+    for(let x=0;x<=w;x+=VEC.tileW){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+    for(let y=0;y<=h;y+=VEC.tileH){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+    ctx.setLineDash([]);
+  }
+}
+
+// ── Main trace runner ─────────────────────────────────────────
+function runVectorTrace() {
+  if(!S.image){$('vecInfo').textContent='⚠️ กรุณาโหลดรูปก่อน';return;}
+  $('vecInfo').textContent='⏳ กำลังประมวลผล...';
+  setTimeout(()=>{
+    try{
+      const isPattern = VEC.mode==='pattern';
+      const thresh  = parseInt(isPattern?$('vecPThresh2').value:$('vecThresh2').value)||128;
+      const invert  = isPattern?$('vecInvert2').checked:$('vecInvert').checked;
+      const blurSig = isPattern?1:(parseInt($('vecBlur2').value)/10||0);
+      const closeR  = isPattern?1:(parseInt($('vecClose').value)||0);
+      const smooth  = parseInt($('vecSmooth2').value)||5;
+      const minLen  = parseInt($('vecMinLen2').value)||15;
+      const eps     = (parseInt($('vecEps2').value)/10)||0.8;
+
+      const res=vecGetGray(1200);
+      if(!res){$('vecInfo').textContent='❌ อ่านรูปไม่ได้';return;}
+      const{gray,w,h}=res;
+      VEC.imgW=w; VEC.imgH=h;
+
+      const blurred=vecBlur(gray,w,h,blurSig);
+      let bin=vecBinarize(blurred,w,h,thresh,invert);
+      bin=vecMorphClose(bin,w,h,closeR);
+
+      let paths=[];
+
+      if(VEC.mode==='outline'){
+        paths=vecTraceContours(bin,w,h,minLen);
+        VEC.tileW=0; VEC.tileH=0;
+      } else {
+        // centerline or pattern: skeletonize first
+        const skel=vecThinZhangSuen(bin,w,h);
+        paths=vecTraceSkeleton(skel,w,h,minLen);
+        if(VEC.mode==='pattern'){
+          const tile=vecDetectTile(gray,w,h);
+          VEC.tileW=tile.tw; VEC.tileH=tile.th;
+          const conf=Math.round(Math.max(tile.cx,tile.cy)*100);
+          $('vecTileInfo').textContent=
+            (tile.cx>0.25||tile.cy>0.25)
+              ?`Tile: ${tile.tw}×${tile.th}px  (ความมั่นใจ ${conf}%)`
+              :'ไม่พบ pattern ซ้ำ — แสดงรูปทั้งหมด';
+        } else {VEC.tileW=0;VEC.tileH=0;}
+      }
+
+      const rawN=paths.length;
+      VEC.contours=paths.map(p=>vecSimplify(p,eps));
+      VEC.svgPaths=VEC.contours.map(p=>vecSmoothPath(p,smooth)).filter(d=>d.length>4);
+
+      vecDrawPreview(bin,w,h);
+      VEC.showMain=true;
+      updateViewCanvas();
+      $('vecInfo').textContent=`✅ พบ ${VEC.svgPaths.length} เส้น  (จาก ${rawN} paths)`;
+    }catch(e){
+      $('vecInfo').textContent='❌ Error: '+e.message;
+      console.error(e);
+    }
+  },20);
+}
+
+// ── Export SVG ────────────────────────────────────────────────
+function exportVectorSVG() {
+  if(!VEC.svgPaths.length){alert('กรุณาตรวจจับเส้นก่อน');return;}
+  const wMm=S.workW||100, hMm=S.workH||100;
+  const sx=wMm/VEC.imgW, sy=hMm/VEC.imgH;
+  const sw=Math.max(0.05,(0.25/sx)).toFixed(3);
+  let body='';
+  if(VEC.mode==='pattern'&&VEC.tileW>0&&VEC.tileH>0){
+    const twMm=(VEC.tileW*sx).toFixed(4), thMm=(VEC.tileH*sy).toFixed(4);
+    let tp='';
+    VEC.contours.forEach((pts,i)=>{
+      if(pts.every(([x,y])=>x<VEC.tileW*1.05&&y<VEC.tileH*1.05))
+        tp+='        <path d="'+VEC.svgPaths[i]+'"/>\n';
+    });
+    body='  <defs>\n    <pattern id="vt" x="0" y="0" width="'+twMm+'" height="'+thMm+'" patternUnits="userSpaceOnUse">\n';
+    body+='      <g transform="scale('+sx.toFixed(6)+','+sy.toFixed(6)+')" fill="none" stroke="#000" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round">\n';
+    body+=tp;
+    body+='      </g>\n    </pattern>\n  </defs>\n';
+    body+='  <rect width="'+wMm+'" height="'+hMm+'" fill="url(#vt)"/>\n';
+  } else {
+    body='  <g fill="none" stroke="#000" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round" transform="scale('+sx.toFixed(6)+','+sy.toFixed(6)+')">\n';
+    VEC.svgPaths.forEach(d=>{body+='    <path d="'+d+'"/>\n';});
+    body+='  </g>\n';
+  }
+  const svg='<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="'+wMm+'mm" height="'+hMm+'mm" viewBox="0 0 '+wMm+' '+hMm+'">\n'+body+'</svg>';
+  const blob=new Blob([svg],{type:'image/svg+xml'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='vector_trace.svg'; a.click();
+}
+
+// ── Export DXF ────────────────────────────────────────────────
+function exportVectorDXF() {
+  if(!VEC.contours.length){alert('กรุณาตรวจจับเส้นก่อน');return;}
+  const wMm=S.workW||100, hMm=S.workH||100;
+  const sx=wMm/VEC.imgW, sy=hMm/VEC.imgH;
+  let dxf='0\nSECTION\n2\nENTITIES\n';
+  VEC.contours.forEach(pts=>{
+    dxf+='0\nLWPOLYLINE\n8\n0\n70\n0\n90\n'+pts.length+'\n';
+    pts.forEach(([x,y])=>{
+      dxf+='10\n'+(x*sx).toFixed(4)+'\n20\n'+((hMm-y*sy)).toFixed(4)+'\n';
+    });
+  });
+  dxf+='0\nENDSEC\n0\nEOF\n';
+  const blob=new Blob([dxf],{type:'text/plain'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='vector_trace.dxf'; a.click();
+}
+</script>
+</body>
+</html>

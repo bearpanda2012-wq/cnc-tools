@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNC Tools — เครื่องมือช่วยงาน CNC</title>
+<style>
+:root {
+  --bg:#0f1117; --card:#1a1d2e; --border:#2d3154;
+  --accent:#4361ee; --accent2:#00d1a0; --text:#e2e8f0; --muted:#8b93a7;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:var(--bg); color:var(--text);
+  font-family:'Segoe UI', system-ui, sans-serif;
+  min-height:100vh; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; padding:24px;
+}
+h1 { font-size:1.9rem; letter-spacing:-.5px; margin-bottom:8px; }
+h1 span { color:var(--accent2); }
+.sub { color:var(--muted); margin-bottom:36px; font-size:.95rem; text-align:center; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 340px)); gap:20px; width:100%; max-width:760px; justify-content:center; }
+.card {
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  padding:26px 24px; text-decoration:none; color:var(--text);
+  transition:transform .15s, border-color .15s; display:block;
+}
+.card:hover { transform:translateY(-3px); border-color:var(--accent); }
+.icon { font-size:2rem; margin-bottom:14px; }
+.card h2 { font-size:1.15rem; margin-bottom:8px; }
+.card p { color:var(--muted); font-size:.88rem; line-height:1.55; }
+.tag { display:inline-block; margin-top:14px; font-size:.75rem; font-weight:700;
+  color:var(--accent2); border:1px solid var(--accent2); border-radius:99px; padding:3px 12px; }
+footer { margin-top:44px; color:var(--muted); font-size:.78rem; }
+</style>
+</head>
+<body>
+  <h1>CNC <span>Tools</span></h1>
+  <p class="sub">เครื่องมือช่วยงาน CNC — รันบนเบราว์เซอร์ ไม่ต้องติดตั้งโปรแกรม</p>
+
+  <div class="grid">
+    <a class="card" href="pattern-generator/">
+      <div class="icon">🖼️</div>
+      <h2>CNC Pattern Generator</h2>
+      <p>แปลงรูปภาพเป็น Tool Path สำหรับงาน CNC ปรับแต่งลวดลาย และ export ไฟล์ได้</p>
+      <span class="tag">เปิดใช้งาน →</span>
+    </a>
+
+    <a class="card" href="sheetcnc/">
+      <div class="icon">📐</div>
+      <h2>SheetCNC Pro</h2>
+      <p>ถอดแผ่นและจัดวางชิ้นงานบนแผ่นวัสดุ (Nesting) พร้อม export ข้อมูลเป็น Excel</p>
+      <span class="tag">เปิดใช้งาน →</span>
+    </a>
+  </div>
+
+  <footer>สร้างด้วย Claude · โฮสต์บน GitHub Pages</footer>
+</body>
+</html>
