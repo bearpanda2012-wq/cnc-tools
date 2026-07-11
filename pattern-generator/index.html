@@ -209,6 +209,11 @@ input[type="color"] { width: 36px; height: 24px; border: none; border-radius: 5p
 .tool-type-btn:hover { background: #333; color: #ccc; }
 .tool-type-btn.active { border-color: #0a7aff; background: rgba(10,122,255,0.15); color: #fff; }
 .tool-param-box { background: #1a1a1c; border: 1px solid #2a2a2a; border-radius: 7px; padding: 8px; margin-bottom: 8px; }
+/* AI Vectorizer filter/model buttons */
+.vec-model-btn, .vec-filter-btn { transition: all 0.12s; }
+.vec-model-btn:hover, .vec-filter-btn:hover { border-color:#555!important; color:#bbb!important; }
+.vec-model-btn.active { background:#1a2a1a!important; color:#aaa!important; border-color:#2a5a2a!important; }
+.vec-filter-btn.active { background:#1a2a1a!important; color:#aaa!important; border-color:#2a5a2a!important; }
 /* ── Main area ── */
 .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #0a0a0a; }
 .main-tabs {
@@ -376,6 +381,8 @@ pre.gcode-content {
 .exp-desc { font-size: 9px; color: #555; }
 .exp-btn:hover .exp-desc { color: #888; }
 .export-footer { padding: 10px 16px; display: flex; gap: 8px; justify-content: flex-end; }
+
+#shapeThumbWrap:hover #shapeThumbOverlay { opacity: 1 !important; }
 </style>
 </head>
 <body>
@@ -408,7 +415,7 @@ pre.gcode-content {
           <span>เปลี่ยนรูป</span>
         </div>
       </div>
-      <input type="file" id="fileInput" accept="image/*" style="display:none">
+      <input type="file" id="fileInput" accept="image/*,.svg,.dxf,.dwg" style="display:none">
       <div id="imgSizeInfo" style="font-size:10px;color:#555;margin-top:6px;display:none"></div>
       <div style="display:flex;align-items:center;gap:6px;margin-top:7px">
         <span style="font-size:10px;color:#666;white-space:nowrap">ความละเอียด DPI:</span>
@@ -452,9 +459,230 @@ pre.gcode-content {
         <button class="pat-btn" data-pat="star">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9"/></svg>ดาว
         </button>
-        <button class="pat-btn" data-pat="dot">
-          <svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="3" fill="currentColor"/><circle cx="17" cy="7" r="2" fill="currentColor" opacity=".5"/><circle cx="7" cy="17" r="2" fill="currentColor" opacity=".5"/><circle cx="17" cy="17" r="1.5" fill="currentColor" opacity=".3"/></svg>ดอท Stipple
+        <button class="pat-btn" data-pat="imgshape" onclick="onImgShapeSelect()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 14l4-4 4 4 4-5 4 5" stroke-width="1.5"/><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/></svg>ลายรูป
         </button>
+        <button class="pat-btn" data-pat="lineraster">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="4" width="20" height="1.2"/><rect x="2" y="8" width="20" height="2.5"/><rect x="2" y="13" width="20" height="1.5"/><rect x="2" y="18" width="20" height="3.5"/></svg>ลายเส้น
+        </button>
+        <button class="pat-btn" data-pat="textraster">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><line x1="12" y1="3" x2="4" y2="21"/><line x1="12" y1="3" x2="20" y2="21"/><line x1="6.5" y1="14" x2="17.5" y2="14"/></svg>ลาย Text
+        </button>
+      </div>
+    </div>
+
+    <!-- ImgShape upload (shown only when imgshape pattern selected) -->
+    <div class="panel" id="panImgShape" style="display:none">
+      <div class="panel-title">🖼 รูปลาย (Shape Image)</div>
+      <div style="padding:8px 10px 10px">
+        <div id="shapeUploadArea" class="upload-area" style="padding:10px;min-height:60px"
+          onclick="$('shapeFileInput').click()">
+          <div class="upload-icon" style="font-size:20px">🎨</div>
+          <div class="upload-text" style="font-size:11px">คลิกเลือกรูปลาย</div>
+          <div class="upload-hint">PNG (มี alpha ดีที่สุด) · SVG · JPG</div>
+        </div>
+        <div id="shapeThumbWrap" style="display:none;margin-top:6px;cursor:pointer;position:relative;border-radius:6px;overflow:hidden"
+          onclick="$('shapeFileInput').click()">
+          <img id="shapeThumb" style="width:100%;height:60px;object-fit:contain;background:#111;border-radius:6px;display:block">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .18s;background:rgba(0,0,0,.5)"
+            id="shapeThumbOverlay"><span style="font-size:18px">🔄</span></div>
+        </div>
+        <input type="file" id="shapeFileInput" accept="image/*,.svg,.dxf" style="display:none">
+        <div id="shapeInfo" style="font-size:10px;color:#888;margin-top:6px"></div>
+
+        <!-- Render mode -->
+        <div style="margin-top:8px">
+          <div style="font-size:10px;color:#aaa;margin-bottom:4px">โหมดสี</div>
+          <div style="display:flex;gap:4px">
+            <button id="shModeAsisBtn" class="tool-type-btn active"
+              onclick="setShapeMode('asis')" style="flex:1;font-size:9px;padding:4px 2px">🎨 ตามรูป</button>
+            <button id="shModeGrayBtn" class="tool-type-btn"
+              onclick="setShapeMode('gray')" style="flex:1;font-size:9px;padding:4px 2px">⬛ เทา</button>
+            <button id="shModeSilBtn" class="tool-type-btn"
+              onclick="setShapeMode('sil')" style="flex:1;font-size:9px;padding:4px 2px">◼ ทึบ</button>
+          </div>
+        </div>
+
+        <!-- Silhouette threshold -->
+        <div id="shSilRow" style="display:none;margin-top:6px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+            <span>Threshold ทึบ</span>
+            <span id="shSilThV" style="color:#0a7aff;font-size:10px;font-weight:600">128</span>
+          </div>
+          <input type="range" id="shSilTh" min="10" max="245" value="128" step="1"
+            oninput="$('shSilThV').textContent=this.value;IMGSHAPE.dirty=true;scheduleRender()"
+            style="width:100%;accent-color:#0a7aff">
+          <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+            <input type="checkbox" id="shSilInvert" style="accent-color:#0a7aff"
+              onchange="IMGSHAPE.dirty=true;scheduleRender()">
+            <label for="shSilInvert" style="font-size:10px;color:#aaa">Invert</label>
+          </div>
+        </div>
+
+        <!-- Rotation per instance -->
+        <div style="margin-top:6px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+            <span>หมุนลาย (°)</span>
+            <span id="shRotV" style="color:#0a7aff;font-size:10px;font-weight:600">0°</span>
+          </div>
+          <input type="range" id="shRot" min="0" max="359" value="0" step="1"
+            oninput="$('shRotV').textContent=this.value+'°';scheduleRender()"
+            style="width:100%;accent-color:#0a7aff">
+        </div>
+      </div>
+    </div>
+
+    <!-- Line Raster settings (shown when lineraster selected) -->
+    <div class="panel" id="panLineRaster" style="display:none">
+      <div class="panel-title">〰 ลายเส้น (Line Raster)</div>
+      <div style="padding:8px 10px 10px">
+        <div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+            <span>Wave Strength (ความแรงคลื่น)</span>
+            <span id="lrWaveAmpV" style="color:#0a7aff;font-size:10px;font-weight:600">0.00</span>
+          </div>
+          <input type="range" id="lrWaveAmp" min="0" max="3.0" value="0" step="0.05"
+            oninput="$('lrWaveAmpV').textContent=parseFloat(this.value).toFixed(2);S.lrWaveAmp=+this.value;scheduleRender()"
+            style="width:100%;accent-color:#0a7aff">
+        </div>
+        <div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+            <span>Wave Size (ขนาดคลื่น)</span>
+            <span id="lrWaveFreqV" style="color:#0a7aff;font-size:10px;font-weight:600">3.0</span>
+          </div>
+          <input type="range" id="lrWaveFreq" min="0.2" max="20" value="3" step="0.2"
+            oninput="$('lrWaveFreqV').textContent=parseFloat(this.value).toFixed(1);S.lrWaveFreq=+this.value;scheduleRender()"
+            style="width:100%;accent-color:#0a7aff">
+        </div>
+        <div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+            <span>Wave Angle (ทิศทางคลื่น)</span>
+            <span id="lrWaveAngleV" style="color:#0a7aff;font-size:10px;font-weight:600">90°</span>
+          </div>
+          <input type="range" id="lrWaveAngle" min="0" max="360" value="90" step="5"
+            oninput="$('lrWaveAngleV').textContent=parseInt(this.value)+'°';S.lrWaveAngle=+this.value;scheduleRender()"
+            style="width:100%;accent-color:#0a7aff">
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+            <span>Smoothing (ความนุ่มเส้น)</span>
+            <span id="lrSmoothingV" style="color:#0a7aff;font-size:10px;font-weight:600">3</span>
+          </div>
+          <input type="range" id="lrSmoothing" min="0" max="30" value="3" step="1"
+            oninput="$('lrSmoothingV').textContent=parseInt(this.value);S.lrSmoothing=+this.value;scheduleRender()"
+            style="width:100%;accent-color:#0a7aff">
+        </div>
+      </div>
+    </div>
+
+    <!-- Text Raster settings (shown when textraster selected) -->
+    <div class="panel" id="panTextRaster" style="display:none">
+      <div class="panel-title">🔤 ลาย Text (Text Raster)</div>
+      <div style="padding:8px 10px 10px">
+        <div style="margin-bottom:8px">
+          <label style="font-size:10px;color:#aaa;display:block;margin-bottom:4px">ข้อความ (Text)</label>
+          <input type="text" id="trText" value="ABC" maxlength="64"
+            style="width:100%;background:#1a1a1c;border:1px solid #333;border-radius:6px;
+                   color:#e0e0e0;padding:5px 8px;font-size:13px;box-sizing:border-box;letter-spacing:1px"
+            oninput="S.textContent=this.value||'A';scheduleRender()">
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:10px;color:#aaa;display:block;margin-bottom:4px">Font</label>
+          <select id="trFont"
+            style="width:100%;background:#1a1a1c;border:1px solid #333;border-radius:6px;
+                   color:#e0e0e0;padding:5px 8px;font-size:11px;box-sizing:border-box"
+            onchange="S.textFont=this.value;scheduleRender()">
+            <option value="Arial">Arial</option>
+            <option value="'Times New Roman'">Times New Roman</option>
+            <option value="'Courier New'">Courier New</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Impact">Impact</option>
+            <option value="Verdana">Verdana</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#aaa;margin-bottom:4px">โหมดตัวอักษร</div>
+          <div style="display:flex;gap:4px">
+            <button id="trModeSeqBtn" class="tool-type-btn active"
+              onclick="S.textMode='seq';$('trModeSeqBtn').classList.add('active');$('trModeRndBtn').classList.remove('active');scheduleRender()"
+              style="flex:1;font-size:9px;padding:4px 2px">🔢 ลำดับ</button>
+            <button id="trModeRndBtn" class="tool-type-btn"
+              onclick="S.textMode='rnd';$('trModeRndBtn').classList.add('active');$('trModeSeqBtn').classList.remove('active');scheduleRender()"
+              style="flex:1;font-size:9px;padding:4px 2px">🎲 สุ่ม</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mix Layer panel -->
+    <div class="panel collap-panel closed" id="panMixLayer">
+      <div class="panel-title" onclick="togglePanel('panMixLayer')">🎨 ลายผสม (Mix Layer) <span class="collap-arrow">▾</span></div>
+      <div class="collap-body" style="padding:0 0 4px">
+        <div class="tog-row" style="margin-bottom:10px">
+          <span class="tog-label">เปิดใช้ Mix Layer</span>
+          <div class="toggle" id="togMixLayer"></div>
+        </div>
+        <div id="mixLayerControls" style="display:none">
+          <div style="font-size:10px;color:#aaa;margin-bottom:5px">รูปแบบที่ 2</div>
+          <div class="pattern-grid" id="mixPatGrid" style="grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:10px">
+            <button class="pat-btn active" data-mixpat="circle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>
+            </button>
+            <button class="pat-btn" data-mixpat="square">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/></svg>
+            </button>
+            <button class="pat-btn" data-mixpat="diamond">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 22,12 12,22 2,12"/></svg>
+            </button>
+            <button class="pat-btn" data-mixpat="cross">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
+            </button>
+            <button class="pat-btn" data-mixpat="hline">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="2" y1="7" x2="22" y2="7"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="17" x2="22" y2="17"/></svg>
+            </button>
+            <button class="pat-btn" data-mixpat="triangle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,3 22,20 2,20"/></svg>
+            </button>
+            <button class="pat-btn" data-mixpat="hexagon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7"/></svg>
+            </button>
+            <button class="pat-btn" data-mixpat="star">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9"/></svg>
+            </button>
+            <button class="pat-btn" data-mixpat="imgshape">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 14l4-4 4 4 4-5 4 5" stroke-width="1.5"/><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <button class="pat-btn" data-mixpat="lineraster">
+              <svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="4" width="20" height="1.2"/><rect x="2" y="8" width="20" height="2.5"/><rect x="2" y="13" width="20" height="1.5"/><rect x="2" y="18" width="20" height="3.5"/></svg>
+            </button>
+            <button class="pat-btn" data-mixpat="textraster">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><line x1="12" y1="3" x2="4" y2="21"/><line x1="12" y1="3" x2="20" y2="21"/><line x1="6.5" y1="14" x2="17.5" y2="14"/></svg>
+            </button>
+          </div>
+          <div class="ctrl" style="margin-bottom:6px">
+            <div class="ctrl-row">
+              <span class="ctrl-lbl">เส้นผ่าศูนย์กลาง (Diameter)</span>
+              <div class="ctrl-num"><input type="number" class="inline-num" id="nMixDiam" value="2.0" min="0.1" max="20" step="0.1"><span class="unit-lbl">mm</span></div>
+            </div>
+            <input type="range" id="rMixDiam" min="0.1" max="20" value="2.0" step="0.1">
+          </div>
+          <div class="ctrl" style="margin-bottom:6px">
+            <div class="ctrl-row">
+              <span class="ctrl-lbl">หมุนรูปทรง (°)</span>
+              <div class="ctrl-num"><input type="number" class="inline-num" id="nMixPatRot" value="0" min="0" max="359" step="1"><span class="unit-lbl">°</span></div>
+            </div>
+            <input type="range" id="rMixPatRot" min="0" max="359" value="0" step="1">
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+              <span>ความโปร่ง (Opacity)</span>
+              <span id="mixAlphaV" style="color:#0a7aff;font-size:10px;font-weight:600">70%</span>
+            </div>
+            <input type="range" id="mixAlpha" min="0.05" max="1.0" value="0.7" step="0.05"
+              oninput="$('mixAlphaV').textContent=Math.round(+this.value*100)+'%';S.mixAlpha=+this.value;scheduleRender()"
+              style="width:100%;accent-color:#0a7aff">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -470,17 +698,17 @@ pre.gcode-content {
       </div>
       <div class="ctrl">
         <div class="ctrl-row">
-          <span class="ctrl-lbl">Min Radius (รัศมีต่ำสุด)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nMinR" value="0.0" min="0" max="999" step="0.05"><span class="unit-lbl">mm</span></div>
+          <span class="ctrl-lbl">Min Diameter (เส้นผ่าศูนย์กลางต่ำสุด)</span>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nMinR" value="0.0" min="0" max="999" step="0.1"><span class="unit-lbl">mm</span></div>
         </div>
-        <input type="range" id="rMinR" min="0" max="50" value="0.0" step="0.05">
+        <input type="range" id="rMinR" min="0" max="100" value="0.0" step="0.1">
       </div>
       <div class="ctrl">
         <div class="ctrl-row">
-          <span class="ctrl-lbl">Max Radius (รัศมีสูงสุด)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nMaxR" value="2.0" min="0.05" max="999" step="0.05"><span class="unit-lbl">mm</span></div>
+          <span class="ctrl-lbl">Max Diameter (เส้นผ่าศูนย์กลางสูงสุด)</span>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nMaxR" value="4.0" min="0.1" max="999" step="0.1"><span class="unit-lbl">mm</span></div>
         </div>
-        <input type="range" id="rMaxR" min="0.05" max="50" value="2.0" step="0.05">
+        <input type="range" id="rMaxR" min="0.1" max="100" value="4.0" step="0.1">
       </div>
 
       <!-- Quantize sizes -->
@@ -501,6 +729,13 @@ pre.gcode-content {
           <div class="ctrl-num"><input type="number" class="inline-num" id="nAngle" value="0" min="0" max="89" step="1"><span class="unit-lbl">°</span></div>
         </div>
         <input type="range" id="rAngle" min="0" max="89" value="0" step="1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <span class="ctrl-lbl">หมุนรูปทรง (°)</span>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nPatRot" value="0" min="0" max="359" step="1"><span class="unit-lbl">°</span></div>
+        </div>
+        <input type="range" id="rPatRot" min="0" max="359" value="0" step="1">
       </div>
       <div class="ctrl">
         <div class="ctrl-row">
@@ -574,6 +809,8 @@ pre.gcode-content {
         </select>
       </div>
     </div>
+
+
 
     <!-- ══ Procedural Pattern Generator ══ -->
     <div class="panel collap-panel closed" id="panProcGen">
@@ -730,133 +967,200 @@ pre.gcode-content {
     <!-- ══ Vector Tracing Panel ══ -->
     <div class="panel collap-panel closed" id="panVec">
       <div class="panel-title" onclick="togglePanel('panVec')">
-        🔍 Vector Tracing
+        🤖 AI Vectorizer Engines <span class="collap-arrow">▾</span>
       </div>
-      <div class="panel-body" style="padding:8px 10px 10px">
+      <div class="collap-body">
 
-        <!-- Preset -->
-        <div style="margin-bottom:8px">
-          <label style="font-size:10px;color:#aaa;display:block;margin-bottom:3px">Preset</label>
-          <select id="vecPreset" onchange="applyVecPreset(this.value)"
-            style="width:100%;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;padding:3px 6px;font-size:11px">
-            <option value="">— เลือก Preset —</option>
-            <option value="line_art">Line Art (เส้นลาย)</option>
-            <option value="technical">Technical Drawing</option>
-            <option value="sketch">Sketch / ดินสอ</option>
-            <option value="dark_bg">เส้นขาวบนพื้นดำ</option>
-          </select>
+        <!-- STEP ① Input Model -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:9px;font-weight:700;color:#0a7aff;letter-spacing:1px;margin-bottom:5px">STEP ① — Input Model</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px">
+            <button class="vec-model-btn active" id="vecModel_clipart" onclick="setVecInputModel('clipart')"
+              style="font-size:9px;padding:5px 2px;border-radius:4px;border:1px solid #444;background:#1a2a1a;color:#aaa;cursor:pointer;text-align:center;line-height:1.3">
+              🎨<br>Clipart
+            </button>
+            <button class="vec-model-btn" id="vecModel_photo" onclick="setVecInputModel('photo')"
+              style="font-size:9px;padding:5px 2px;border-radius:4px;border:1px solid #444;background:#111;color:#888;cursor:pointer;text-align:center;line-height:1.3">
+              🖼️<br>Photo
+            </button>
+            <button class="vec-model-btn" id="vecModel_sketch" onclick="setVecInputModel('sketch')"
+              style="font-size:9px;padding:5px 2px;border-radius:4px;border:1px solid #444;background:#111;color:#888;cursor:pointer;text-align:center;line-height:1.3">
+              ✏️<br>Sketch
+            </button>
+            <button class="vec-model-btn" id="vecModel_drawing" onclick="setVecInputModel('drawing')"
+              style="font-size:9px;padding:5px 2px;border-radius:4px;border:1px solid #444;background:#111;color:#888;cursor:pointer;text-align:center;line-height:1.3">
+              📐<br>Drawing
+            </button>
+          </div>
         </div>
 
-        <!-- Mode tabs -->
-        <div style="display:flex;gap:4px;margin-bottom:8px">
-          <button id="vecMode_centerlineBtn" class="tool-type-btn active"
-            onclick="setVecMode('centerline')" style="flex:1;font-size:10px;padding:4px 2px">
-            ✏️ Centerline
-          </button>
-          <button id="vecMode_outlineBtn" class="tool-type-btn"
-            onclick="setVecMode('outline')" style="flex:1;font-size:10px;padding:4px 2px">
-            ⬜ Outline
-          </button>
-          <button id="vecMode_patternBtn" class="tool-type-btn"
-            onclick="setVecMode('pattern')" style="flex:1;font-size:10px;padding:4px 2px">
-            ▦ Pattern
-          </button>
+        <!-- STEP ② Algorithm -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:9px;font-weight:700;color:#0a7aff;letter-spacing:1px;margin-bottom:5px">STEP ② — Algorithm</div>
+          <div style="display:flex;gap:3px;margin-bottom:4px">
+            <button id="vecMode_centerlineBtn" class="tool-type-btn active"
+              onclick="setVecMode('centerline')" style="flex:1;font-size:9px;padding:5px 2px;line-height:1.3">
+              ✏️<br>Centerline
+            </button>
+            <button id="vecMode_outlineBtn" class="tool-type-btn"
+              onclick="setVecMode('outline')" style="flex:1;font-size:9px;padding:5px 2px;line-height:1.3">
+              ⬜<br>Outline
+            </button>
+            <button id="vecMode_patternBtn" class="tool-type-btn"
+              onclick="setVecMode('pattern')" style="flex:1;font-size:9px;padding:5px 2px;line-height:1.3">
+              ▦<br>Pattern
+            </button>
+          </div>
+          <div id="vecAlgoDesc" style="font-size:9px;color:#666;line-height:1.5;padding:3px 5px;background:#161616;border-radius:3px">
+            คำนวณแกนกลางของเส้น → ลายเดี่ยวคมชัด เหมาะ CNC/CAD
+          </div>
         </div>
 
-        <!-- Shared settings (centerline + outline) -->
-        <div id="vecSettings_shared">
+        <!-- STEP ③ Filters -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:9px;font-weight:700;color:#0a7aff;letter-spacing:1px;margin-bottom:6px">STEP ③ — Filters</div>
 
-          <!-- Threshold -->
-          <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-              <span>Threshold</span>
-              <span id="vecThresh2V" style="color:#0a7aff;font-size:10px;font-weight:600">128</span>
-            </div>
-            <input type="range" id="vecThresh2" min="10" max="245" value="128"
-              oninput="$('vecThresh2V').textContent=this.value"
-              style="width:100%;accent-color:#0a7aff">
-            <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
-              <input type="checkbox" id="vecInvert" style="accent-color:#0a7aff">
-              <label for="vecInvert" style="font-size:10px;color:#aaa">Invert (เส้นขาวบนดำ)</label>
+          <!-- Anti-aliasing -->
+          <div style="margin-bottom:7px">
+            <div style="font-size:10px;color:#ccc;margin-bottom:3px">Anti-aliasing</div>
+            <div style="display:flex;gap:3px">
+              <button class="vec-filter-btn active" id="vecAA_off" onclick="setVecFilter('aa','off')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#1a2a1a;color:#aaa;cursor:pointer">Off</button>
+              <button class="vec-filter-btn" id="vecAA_smart" onclick="setVecFilter('aa','smart')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Smart</button>
+              <button class="vec-filter-btn" id="vecAA_mid" onclick="setVecFilter('aa','mid')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Mid</button>
             </div>
           </div>
 
-          <!-- Blur -->
-          <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-              <span>Blur (ลด noise)</span>
-              <span id="vecBlur2V" style="color:#0a7aff;font-size:10px;font-weight:600">1.0</span>
+          <!-- Noise Reduction -->
+          <div style="margin-bottom:7px">
+            <div style="font-size:10px;color:#ccc;margin-bottom:3px">Noise Reduction</div>
+            <div style="display:flex;gap:3px">
+              <button class="vec-filter-btn active" id="vecNR_off" onclick="setVecFilter('nr','off')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#1a2a1a;color:#aaa;cursor:pointer">Off</button>
+              <button class="vec-filter-btn" id="vecNR_low" onclick="setVecFilter('nr','low')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Low</button>
+              <button class="vec-filter-btn" id="vecNR_high" onclick="setVecFilter('nr','high')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">High</button>
             </div>
-            <input type="range" id="vecBlur2" min="0" max="30" value="10"
-              oninput="$('vecBlur2V').textContent=(this.value/10).toFixed(1)"
-              style="width:100%;accent-color:#0a7aff">
           </div>
 
-          <!-- Close gaps -->
-          <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-              <span>ต่อเส้นขาด (Close)</span>
-              <span id="vecCloseV" style="color:#0a7aff;font-size:10px;font-weight:600">1</span>
+          <!-- Roundness -->
+          <div style="margin-bottom:7px">
+            <div style="font-size:10px;color:#ccc;margin-bottom:3px">Roundness (ความโค้งมน)</div>
+            <div style="display:flex;gap:2px">
+              <button class="vec-filter-btn" id="vecRD_off" onclick="setVecFilter('rd','off')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Off</button>
+              <button class="vec-filter-btn" id="vecRD_low" onclick="setVecFilter('rd','low')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Low</button>
+              <button class="vec-filter-btn active" id="vecRD_default" onclick="setVecFilter('rd','default')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#1a2a1a;color:#aaa;cursor:pointer">Default</button>
+              <button class="vec-filter-btn" id="vecRD_high" onclick="setVecFilter('rd','high')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">High</button>
+              <button class="vec-filter-btn" id="vecRD_max" onclick="setVecFilter('rd','max')"
+                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Max</button>
             </div>
-            <input type="range" id="vecClose" min="0" max="8" value="1"
-              oninput="$('vecCloseV').textContent=this.value"
-              style="width:100%;accent-color:#0a7aff">
           </div>
 
-          <!-- Smooth -->
-          <div style="margin-bottom:6px">
+          <!-- Min Area -->
+          <div style="margin-bottom:4px">
             <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-              <span>Smooth (เส้นโค้ง)</span>
-              <span id="vecSmooth2V" style="color:#0a7aff;font-size:10px;font-weight:600">5</span>
-            </div>
-            <input type="range" id="vecSmooth2" min="1" max="10" value="5"
-              oninput="$('vecSmooth2V').textContent=this.value"
-              style="width:100%;accent-color:#0a7aff">
-          </div>
-
-          <!-- Min line length -->
-          <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-              <span>ตัดเส้นสั้น (Min px)</span>
+              <span style="color:#ccc">Min Area (ตัดเส้นสั้น px)</span>
               <span id="vecMinLen2V" style="color:#0a7aff;font-size:10px;font-weight:600">15</span>
             </div>
             <input type="range" id="vecMinLen2" min="3" max="200" value="15"
               oninput="$('vecMinLen2V').textContent=this.value"
               style="width:100%;accent-color:#0a7aff">
           </div>
+        </div>
 
-          <!-- Simplify -->
-          <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-              <span>ลดจุด / Simplify</span>
-              <span id="vecEps2V" style="color:#0a7aff;font-size:10px;font-weight:600">0.8</span>
+        <!-- ▸ Advanced Settings (collapsed) -->
+        <details style="margin-bottom:8px">
+          <summary style="font-size:9px;color:#555;cursor:pointer;user-select:none;padding:3px 0">▸ Advanced Settings</summary>
+          <div style="padding-top:6px">
+
+            <!-- Threshold -->
+            <div style="margin-bottom:5px">
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+                <span>Threshold</span>
+                <span id="vecThresh2V" style="color:#0a7aff;font-size:10px;font-weight:600">128</span>
+              </div>
+              <input type="range" id="vecThresh2" min="10" max="245" value="128"
+                oninput="$('vecThresh2V').textContent=this.value"
+                style="width:100%;accent-color:#0a7aff">
+              <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+                <input type="checkbox" id="vecInvert" style="accent-color:#0a7aff">
+                <label for="vecInvert" style="font-size:10px;color:#aaa">Invert</label>
+              </div>
             </div>
-            <input type="range" id="vecEps2" min="1" max="60" value="8"
-              oninput="$('vecEps2V').textContent=(this.value/10).toFixed(1)"
-              style="width:100%;accent-color:#0a7aff">
+
+            <!-- Blur -->
+            <div style="margin-bottom:5px">
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+                <span>Gaussian Blur</span>
+                <span id="vecBlur2V" style="color:#0a7aff;font-size:10px;font-weight:600">1.0</span>
+              </div>
+              <input type="range" id="vecBlur2" min="0" max="30" value="10"
+                oninput="$('vecBlur2V').textContent=(this.value/10).toFixed(1)"
+                style="width:100%;accent-color:#0a7aff">
+            </div>
+
+            <!-- Close gaps -->
+            <div style="margin-bottom:5px">
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+                <span>Close Gaps (ต่อเส้นขาด)</span>
+                <span id="vecCloseV" style="color:#0a7aff;font-size:10px;font-weight:600">1</span>
+              </div>
+              <input type="range" id="vecClose" min="0" max="8" value="1"
+                oninput="$('vecCloseV').textContent=this.value"
+                style="width:100%;accent-color:#0a7aff">
+            </div>
+
+            <!-- Simplify -->
+            <div style="margin-bottom:5px">
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+                <span>Simplify (ลดจุด)</span>
+                <span id="vecEps2V" style="color:#0a7aff;font-size:10px;font-weight:600">0.8</span>
+              </div>
+              <input type="range" id="vecEps2" min="1" max="60" value="8"
+                oninput="$('vecEps2V').textContent=(this.value/10).toFixed(1)"
+                style="width:100%;accent-color:#0a7aff">
+            </div>
+
+            <!-- Stroke Width output -->
+            <div style="margin-bottom:5px">
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+                <span>Output Stroke Width</span>
+                <span id="vecStrokeWV" style="color:#0a7aff;font-size:10px;font-weight:600">1.5</span>
+              </div>
+              <input type="range" id="vecStrokeW" min="1" max="40" value="15"
+                oninput="$('vecStrokeWV').textContent=(this.value/10).toFixed(1)"
+                style="width:100%;accent-color:#0a7aff">
+            </div>
+
           </div>
+        </details>
 
-        </div><!-- /vecSettings_shared -->
-
-        <!-- Pattern-only settings -->
-        <div id="vecSettings_pattern" style="display:none">
-          <div style="margin-bottom:6px">
+        <!-- Pattern-only settings (hidden, shown by setVecMode) -->
+        <div id="vecSettings_pattern" style="display:none;margin-bottom:6px">
+          <div style="margin-bottom:5px">
             <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-              <span>Threshold</span>
+              <span>Threshold (Pattern)</span>
               <span id="vecPThresh2V" style="color:#0a7aff;font-size:10px;font-weight:600">128</span>
             </div>
             <input type="range" id="vecPThresh2" min="10" max="245" value="128"
               oninput="$('vecPThresh2V').textContent=this.value"
               style="width:100%;accent-color:#0a7aff">
-            <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+            <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
               <input type="checkbox" id="vecInvert2" style="accent-color:#0a7aff">
               <label for="vecInvert2" style="font-size:10px;color:#aaa">Invert</label>
             </div>
           </div>
-          <div id="vecTileInfo" style="font-size:10px;color:#888;line-height:1.5;margin-bottom:6px">
+          <div id="vecTileInfo" style="font-size:10px;color:#888;line-height:1.5">
             ตรวจจับ tile ซ้ำในภาพโดยอัตโนมัติ<br>แล้ว export เฉพาะ tile เดียว
           </div>
-        </div><!-- /vecSettings_pattern -->
+        </div>
 
         <!-- Preview canvas -->
         <canvas id="vecPreviewCanvas"
@@ -869,8 +1173,8 @@ pre.gcode-content {
         </div>
 
         <!-- Trace button -->
-        <button style="width:100%;margin-bottom:6px;background:#1a3a1a;color:#5dff5d;border:1px solid #2a5a2a;border-radius:5px;padding:6px;font-size:11px;font-weight:600;cursor:pointer"
-          onclick="runVectorTrace()">🔍 ตรวจจับ &amp; Trace เส้น</button>
+        <button style="width:100%;margin-bottom:6px;background:#0d2a0d;color:#5dff5d;border:1px solid #1a5a1a;border-radius:5px;padding:7px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.3px"
+          onclick="runVectorTrace()">🤖 Vectorize</button>
 
         <!-- Export buttons -->
         <div style="display:flex;gap:6px">
@@ -1205,10 +1509,6 @@ pre.gcode-content {
           <canvas id="previewCanvas"></canvas>
         </div>
         <!-- overlays (absolute to canvasWrap) -->
-        <div class="no-img" id="noImg">
-          <div class="icon">🖼</div>
-          <p>เลือกรูปภาพเพื่อเริ่มสร้าง Pattern</p>
-        </div>
         <div class="stats-ov" id="statsOv">
           <div class="st-row"><span>Shapes</span><span class="st-val" id="stShapes">—</span></div>
           <div class="st-row"><span>Pattern</span><span class="st-val" id="stPat">—</span></div>
@@ -1386,12 +1686,19 @@ pre.gcode-content {
 
 const S = {
   image: null, pattern: 'circle',
-  spacingMm: 5.0, minRmm: 0.0, maxRmm: 2.0,
-  angle: 0, contrast: 1.0, gamma: 1.0,
+  spacingMm: 5.0, minDmm: 0.0, maxDmm: 4.0,
+  angle: 0, contrast: 1.0, gamma: 1.0, patRot: 0,
   invert: false, fill: true, darkBg: false, quantRandom: false,
-  shapes: [], lastGcode: '',
+  shapes: [], mixShapes: [], lineRows: [], lastGcode: '',
   machineFormat: 'grbl',
   aspectLocked: true, imgAspect: 1,
+  // Line Raster
+  lrNx: 0, lrNy: 1,
+  lrWaveAmp: 0, lrWaveFreq: 3, lrWaveAngle: 90, lrSmoothing: 3,
+  // Text Raster
+  textContent: 'ABC', textFont: 'Arial', textMode: 'seq',
+  // Mix Layer
+  mixEnabled: false, mixPat: 'circle', mixDiamMm: 2.0, mixPatRot: 0, mixAlpha: 0.7,
   // simulation
   simMoves: [], simIdx: 0, simAnimId: null, simRunning: false
 };
@@ -1469,6 +1776,7 @@ $('workH').addEventListener('input', () => {
 $('uploadArea').addEventListener('click', () => $('fileInput').click());
 $('imgThumbWrap').addEventListener('click', () => $('fileInput').click());
 $('fileInput').addEventListener('change', e => e.target.files[0] && loadImg(e.target.files[0]));
+$('shapeFileInput').addEventListener('change', e => e.target.files[0] && loadShapeImg(e.target.files[0]));
 
 ['dragover','dragleave','drop'].forEach(ev => {
   $('uploadArea').addEventListener(ev, e => {
@@ -1483,27 +1791,134 @@ $('fileInput').addEventListener('change', e => e.target.files[0] && loadImg(e.ta
   });
 });
 
+function _applyLoadedImage(img) {
+  S.image = img;
+  S.imageFromProc = false;
+  $('imgThumb').src = img.src || img.currentSrc || '';
+  $('imgThumbWrap').style.display = 'block';
+  $('uploadArea').style.display = 'none';
+  $('statsOv').style.display = 'block';
+  S.imgAspect = img.width / img.height;
+  autoSetWorkSize();
+  fitCanvases();
+  zoom.show();
+  scheduleRender();
+}
+
 function loadImg(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  // ── DXF / DWG → render to canvas → image ──────────────────
+  if (ext === 'dxf' || ext === 'dwg') {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const imgEl = dxfToImage(e.target.result, 1200, 1200);
+      imgEl.onload = () => { _applyLoadedImage(imgEl); };
+    };
+    reader.readAsText(file);
+    return;
+  }
+
+  // ── SVG / raster image ─────────────────────────────────────
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
-    img.onload = () => {
-      S.image = img;
-      S.imageFromProc = false;   // uploaded image — Regenerate reruns halftone only
-      $('imgThumb').src = e.target.result;
-      $('imgThumbWrap').style.display = 'block';
-      $('uploadArea').style.display = 'none';
-      $('noImg').style.display = 'none';
-      $('statsOv').style.display = 'block';
-      S.imgAspect = img.width / img.height;
-      autoSetWorkSize();   // auto-set workW/workH from DPI
-      fitCanvases();
-      zoom.show();
-      scheduleRender();
-    };
+    img.onload = () => { _applyLoadedImage(img); };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+// ── DXF parser → HTMLImageElement (PNG data URL) ──────────────
+function dxfToImage(text, outW, outH) {
+  // Parse entities
+  const lines = text.replace(/\r/g,'').split('\n');
+  const entities = [];
+  let i = 0;
+  // Collect all entity sections
+  while (i < lines.length) {
+    if (lines[i].trim() === '0' && lines[i+1] && lines[i+1].trim().toUpperCase() === 'SECTION') { i+=2; continue; }
+    if (lines[i].trim() === '2' && lines[i+1] && lines[i+1].trim().toUpperCase() === 'ENTITIES') { i+=2; break; }
+    i++;
+  }
+  // Read entities until ENDSEC
+  let ent = null;
+  while (i < lines.length) {
+    const code = parseInt(lines[i]); const val = (lines[i+1]||'').trim(); i+=2;
+    if (isNaN(code)) continue;
+    if (code === 0) {
+      if (ent) entities.push(ent);
+      if (val.toUpperCase() === 'ENDSEC') break;
+      ent = { type: val.toUpperCase(), pts: [], x: 0, y: 0, x2: 0, y2: 0, r: 0, a1: 0, a2: 360, bulge: [], closed: false };
+    } else if (ent) {
+      if      (code === 10) { if(ent.type==='LWPOLYLINE'||ent.type==='POLYLINE') ent.pts.push({x:parseFloat(val),y:0,b:0}); else if(ent.pts.length&&(ent.type==='LINE'||ent.type==='VERTEX')) ent.x=parseFloat(val); else ent.x=parseFloat(val); }
+      else if (code === 20) { if(ent.type==='LWPOLYLINE'||ent.type==='POLYLINE') { if(ent.pts.length) ent.pts[ent.pts.length-1].y=parseFloat(val); } else ent.y=parseFloat(val); }
+      else if (code === 11) ent.x2=parseFloat(val);
+      else if (code === 21) ent.y2=parseFloat(val);
+      else if (code === 40) ent.r=parseFloat(val);
+      else if (code === 50) ent.a1=parseFloat(val);
+      else if (code === 51) ent.a2=parseFloat(val);
+      else if (code === 42) { if(ent.pts.length) ent.pts[ent.pts.length-1].b=parseFloat(val); }
+      else if (code === 70) { if(val&1) ent.closed=true; }
+    }
+  }
+  if (ent) entities.push(ent);
+
+  // Compute bounding box
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  const allPts = [];
+  entities.forEach(e=>{
+    const pts = e.type==='LWPOLYLINE'||e.type==='POLYLINE' ? e.pts :
+                e.type==='LINE' ? [{x:e.x,y:e.y},{x:e.x2,y:e.y2}] :
+                e.type==='CIRCLE' ? [{x:e.x-e.r,y:e.y-e.r},{x:e.x+e.r,y:e.y+e.r}] :
+                e.type==='ARC'  ? [{x:e.x-e.r,y:e.y-e.r},{x:e.x+e.r,y:e.y+e.r}] :
+                e.type==='POINT'? [{x:e.x,y:e.y}] : [];
+    pts.forEach(p=>{
+      if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
+      if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
+    });
+  });
+  if(!isFinite(minX)){minX=0;maxX=100;minY=0;maxY=100;}
+  const dxfW=maxX-minX||1, dxfH=maxY-minY||1;
+  const pad=0.05;
+  const sc=Math.min(outW*(1-2*pad)/dxfW, outH*(1-2*pad)/dxfH);
+  const ox=outW*pad - minX*sc, oy=outH*(1-pad) + minY*sc; // Y-flip (DXF Y up)
+
+  function tx(x){ return ox + x*sc; }
+  function ty(y){ return oy - y*sc; }  // flip Y
+
+  // Render to canvas
+  const c=document.createElement('canvas'); c.width=outW; c.height=outH;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,outW,outH);
+  ctx.strokeStyle='#000000'; ctx.lineWidth=Math.max(0.5, sc*0.02);
+  ctx.lineCap='round'; ctx.lineJoin='round';
+
+  entities.forEach(e=>{
+    ctx.beginPath();
+    if(e.type==='LINE'){
+      ctx.moveTo(tx(e.x),ty(e.y)); ctx.lineTo(tx(e.x2),ty(e.y2));
+    } else if(e.type==='CIRCLE'){
+      ctx.arc(tx(e.x),ty(e.y), e.r*sc, 0, Math.PI*2);
+    } else if(e.type==='ARC'){
+      // DXF arc: CCW from a1 to a2, Y-flipped → CW in canvas
+      const a1=e.a1*Math.PI/180, a2=e.a2*Math.PI/180;
+      ctx.arc(tx(e.x),ty(e.y), e.r*sc, -a2, -a1, false);
+    } else if(e.type==='LWPOLYLINE'||e.type==='POLYLINE'){
+      if(!e.pts.length) return;
+      ctx.moveTo(tx(e.pts[0].x),ty(e.pts[0].y));
+      for(let k=1;k<e.pts.length;k++) ctx.lineTo(tx(e.pts[k].x),ty(e.pts[k].y));
+      if(e.closed) ctx.closePath();
+    } else if(e.type==='POINT'){
+      ctx.arc(tx(e.x),ty(e.y),Math.max(1,sc*0.05),0,Math.PI*2);
+      ctx.fillStyle='#000'; ctx.fill(); return;
+    } else { return; }
+    ctx.stroke();
+  });
+
+  // Return as img element
+  const img = new Image(); img.src = c.toDataURL('image/png');
+  return img;
 }
 
 function fitCanvases() {
@@ -1697,6 +2112,7 @@ function updateViewCanvas() {
     return;
   }
 
+
   if (!S.shapes.length) return;
 
   // Work-area background
@@ -1712,11 +2128,109 @@ function updateViewCanvas() {
   vCtx.strokeStyle = fg;
   vCtx.lineWidth = 0.7;   // in pCanvas coordinate space (scales naturally)
 
+  // ── imgshape: stamp pre-baked offscreen at each grid point (GPU-fast) ──────
+  if (S.pattern === 'imgshape' && IMGSHAPE.normPaths && IMGSHAPE.normPaths.length) {
+    _rebuildImgshapeStamp();   // no-op if already current
+    if (_ishStamp) {
+      vCtx.imageSmoothingEnabled = true;
+      vCtx.imageSmoothingQuality = 'high';
+      for (const s of S.shapes) {
+        if (s.r < 0.5) continue;
+        const d = s.r * 2;
+        vCtx.drawImage(_ishStamp, s.x - s.r, s.y - s.r, d, d);
+      }
+      vCtx.restore();
+      return;
+    }
+    // fallback to path drawing if stamp not available
+    const np = IMGSHAPE.normPaths;
+    const rot = (parseInt($('shRot').value)||0) * Math.PI / 180;
+    const cosR = Math.cos(rot), sinR = Math.sin(rot);
+    const useRot = Math.abs(rot) > 0.01;
+    const isContour = !!IMGSHAPE.isContour;
+    vCtx.beginPath();
+    for (const s of S.shapes) {
+      if (s.r < 0.5) continue;
+      const r = s.r;
+      for (const path of np) {
+        if (path.length < 2) continue;
+        for (let i = 0; i < path.length; i++) {
+          const px = path[i].x, py = path[i].y;
+          let ttx, tty;
+          if (useRot) { ttx = s.x+(px*cosR-py*sinR)*r; tty = s.y+(px*sinR+py*cosR)*r; }
+          else { ttx = s.x+px*r; tty = s.y+py*r; }
+          if (i === 0) vCtx.moveTo(ttx, tty); else vCtx.lineTo(ttx, tty);
+        }
+        if (isContour) vCtx.closePath();
+      }
+    }
+    if (isContour && S.fill) vCtx.fill('evenodd'); else vCtx.stroke();
+    vCtx.restore();
+    return;
+  }
+
+  // ── Line Raster: re-draw from S.lineRows as vectors (crisp at any zoom) ──
+  if (S.pattern === 'lineraster') {
+    if (S.lineRows && S.lineRows.length) {
+      vCtx.fillStyle = fg;
+      _drawLineRows(vCtx, S.lineRows, S.lrNx, S.lrNy);
+    }
+    vCtx.restore();
+    return;
+  }
+
+  // ── Text Raster: re-render text vectors (crisp at any zoom) ───────
+  if (S.pattern === 'textraster') {
+    const chars = [...(S.textContent || 'ABC')];
+    if (!chars.length) chars.push('A');
+    vCtx.fillStyle = fg;
+    vCtx.textAlign = 'center';
+    vCtx.textBaseline = 'middle';
+    for (let i = 0; i < S.shapes.length; i++) {
+      const s = S.shapes[i];
+      if (s.r < 0.5) continue;
+      const ch = S.textMode === 'rnd'
+        ? chars[Math.floor(Math.random() * chars.length)]
+        : chars[i % chars.length];
+      vCtx.font = `bold ${Math.max(1, s.r * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
+      vCtx.fillText(ch, s.x, s.y);
+    }
+    _applyMixLayer(vCtx, fg);
+    vCtx.restore();
+    return;
+  }
+
   vCtx.beginPath();
-  for (const s of S.shapes) shapePath(vCtx, s.x, s.y, s.r, S.pattern);
+  for (const s of S.shapes) shapePath(vCtx, s.x, s.y, s.r, S.pattern, S.patRot);
   if (S.fill) vCtx.fill(); else vCtx.stroke();
 
+  _applyMixLayer(vCtx, fg);
+
   vCtx.restore();
+}
+
+function _applyMixLayer(ctx, fg) {
+  if (!S.mixEnabled || !S.mixPat || !S.mixShapes || !S.mixShapes.length) return;
+  const wW = parseFloat($('workW').value) || 100;
+  const r2 = Math.max(0.5, (S.mixDiamMm / 2) * (pCanvas.width / wW));
+  ctx.globalAlpha = S.mixAlpha;
+  ctx.fillStyle = fg; ctx.strokeStyle = fg;
+  if (S.mixPat === 'textraster') {
+    // Draw text characters using fillText
+    const chars = [...(S.textContent || 'A')];
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    S.mixShapes.forEach((s, i) => {
+      ctx.font = `bold ${Math.max(1, r2 * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
+      ctx.fillText(chars[i % chars.length], s.x, s.y);
+    });
+  } else {
+    ctx.beginPath();
+    for (const s of S.mixShapes) {
+      shapePath(ctx, s.x, s.y, r2, S.mixPat, S.mixPatRot);
+    }
+    if (S.fill) ctx.fill(); else ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 }
 
 // ── Controls wiring ───────────────────────────────────────
@@ -1758,12 +2272,15 @@ function bindCtrl_set(rId, nId, key, v, dec) {
   updateRangeTrack($(rId));
 }
 bindCtrl('rSpacing','nSpacing','spacingMm',1,onSpacingChange);
-bindCtrl('rMinR','nMinR','minRmm',2);
-bindCtrl('rMaxR','nMaxR','maxRmm',2);
+bindCtrl('rMinR','nMinR','minDmm',1);
+bindCtrl('rMaxR','nMaxR','maxDmm',1);
 bindCtrl('rAngle','nAngle','angle',0);
+bindCtrl('rPatRot','nPatRot','patRot',0);
 bindCtrl('rContrast','nContrast','contrast',1);
 bindCtrl('rGamma','nGamma','gamma',2);
-['rSpacing','rMinR','rMaxR','rAngle','rContrast','rGamma'].forEach(id => updateRangeTrack($(id)));
+bindCtrl('rMixDiam','nMixDiam','mixDiamMm',1);
+bindCtrl('rMixPatRot','nMixPatRot','mixPatRot',0);
+['rSpacing','rMinR','rMaxR','rAngle','rPatRot','rContrast','rGamma','rMixDiam','rMixPatRot'].forEach(id => updateRangeTrack($(id)));
 
 function tog(id, key) {
   $(id).addEventListener('click', function() {
@@ -1774,6 +2291,22 @@ function tog(id, key) {
 }
 tog('togInvert','invert'); tog('togFill','fill'); tog('togDarkBg','darkBg');
 tog('togQuantRandom','quantRandom');
+// Mix Layer toggle (custom — shows/hides controls)
+$('togMixLayer').addEventListener('click', function() {
+  S.mixEnabled = !S.mixEnabled;
+  this.classList.toggle('on', S.mixEnabled);
+  $('mixLayerControls').style.display = S.mixEnabled ? '' : 'none';
+  scheduleRender();
+});
+// Mix Pattern grid
+$('mixPatGrid').addEventListener('click', e => {
+  const btn = e.target.closest('[data-mixpat]');
+  if (!btn) return;
+  $('mixPatGrid').querySelectorAll('.pat-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  S.mixPat = btn.dataset.mixpat;
+  if (S.mixEnabled) scheduleRender();
+});
 
 $('quantSizes').addEventListener('input', () => {
   // Auto-enable/disable random when sizes are typed
@@ -1788,9 +2321,15 @@ $('quantSizes').addEventListener('input', () => {
 $('patternGrid').addEventListener('click', e => {
   const btn = e.target.closest('[data-pat]');
   if (!btn) return;
-  document.querySelectorAll('.pat-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#patternGrid .pat-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   S.pattern = btn.dataset.pat;
+  const psh = $('panImgShape');
+  if(psh) psh.style.display = (S.pattern==='imgshape') ? '' : 'none';
+  const plr = $('panLineRaster');
+  if(plr) plr.style.display = (S.pattern==='lineraster') ? '' : 'none';
+  const ptr = $('panTextRaster');
+  if(ptr) ptr.style.display = (S.pattern==='textraster') ? '' : 'none';
   scheduleRender();
 });
 
@@ -1827,7 +2366,11 @@ function scheduleRender(ms = 200) {       // 200 ms debounce — prevents rapid-
 // ── Core generation ───────────────────────────────────────
 let _generating = false;                  // mutex — only one render at a time
 function generatePattern() {
-  if (!S.image) {
+  // imgshape mode can work without a source photo (uniform grid)
+  // lineraster and textraster also work without a source photo (uniform brightness)
+  const _noImgOk = (S.pattern === 'imgshape' && IMGSHAPE.normPaths && IMGSHAPE.normPaths.length)
+                 || S.pattern === 'lineraster' || S.pattern === 'textraster';
+  if (!S.image && !_noImgOk) {
     $('statusTxt').textContent = '⚠️ โหลดรูปภาพก่อน หรือกด "ใช้ลายนี้ & Generate" จาก Procedural';
     return;
   }
@@ -1838,6 +2381,7 @@ function generatePattern() {
   }
   _generating = true;
   $('procOv').classList.add('show');
+  if (IMGSHAPE.dirty) _buildShapeCanvas();
   $('statusTxt').textContent = '⏳ กำลังสร้าง...';
   requestAnimationFrame(() => {
     try {
@@ -1860,15 +2404,17 @@ function _generate() {
   const workW_mm = parseFloat($('workW').value) || 100;
   const mmToPx   = W / workW_mm;
   let spacingPx = S.spacingMm * mmToPx;
-  const minRpx    = S.minRmm    * mmToPx;
-  const maxRpx    = S.maxRmm    * mmToPx;
+  const minRpx    = (S.minDmm / 2) * mmToPx;
+  const maxRpx    = (S.maxDmm / 2) * mmToPx;
   const angleRad  = S.angle * Math.PI / 180;
   if (spacingPx < 1) { _generating = false; $('procOv').classList.remove('show'); return; }
 
-  const imgData = iCtx.getImageData(0, 0, W, H);
-  const px = imgData.data;
+  // imgshape without source photo → use uniform brightness 0.5
+  const imgData = S.image ? iCtx.getImageData(0, 0, W, H) : null;
+  const px = imgData ? imgData.data : null;
 
   function bright(x, y) {
+    if (!px) return 0.5;   // uniform size when no source image
     const xi = Math.max(0, Math.min(W-1, Math.round(x)));
     const yi = Math.max(0, Math.min(H-1, Math.round(y)));
     const i  = (yi * W + xi) * 4;
@@ -1876,6 +2422,12 @@ function _generate() {
     lum = Math.pow(Math.max(0, lum), S.gamma);
     lum = 0.5 + (lum - 0.5) * S.contrast;
     return Math.max(0, Math.min(1, lum));
+  }
+
+  // ── Line Raster: completely different render path ──────────
+  if (S.pattern === 'lineraster') {
+    _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright);
+    return;
   }
 
   // Parse quantize sizes — values are DIAMETERS (mm); internally use radius = diameter/2
@@ -1950,9 +2502,71 @@ function _generate() {
 
   const fg = S.darkBg ? '#ffffff' : '#000000';
   pCtx.fillStyle = fg; pCtx.strokeStyle = fg; pCtx.lineWidth = 0.7;
-  pCtx.beginPath();
-  for (const s of shapes) shapePath(pCtx, s.x, s.y, s.r, S.pattern);
-  if (S.fill) pCtx.fill(); else pCtx.stroke();
+
+  if (S.pattern === 'textraster') {
+    // Text Raster: fillText at each grid position, size = r
+    const chars = [...(S.textContent || 'ABC')];
+    if (!chars.length) chars.push('A');
+    pCtx.fillStyle = fg;
+    pCtx.textAlign = 'center';
+    pCtx.textBaseline = 'middle';
+    for (let i = 0; i < shapes.length; i++) {
+      const s = shapes[i];
+      if (s.r < 0.5) continue;
+      const ch = S.textMode === 'rnd'
+        ? chars[Math.floor(Math.random() * chars.length)]
+        : chars[i % chars.length];
+      pCtx.font = `bold ${Math.max(1, s.r * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
+      pCtx.fillText(ch, s.x, s.y);
+    }
+  } else {
+    pCtx.beginPath();
+    for (const s of shapes) shapePath(pCtx, s.x, s.y, s.r, S.pattern, S.patRot);
+    if (S.fill) pCtx.fill(); else pCtx.stroke();
+  }
+
+  // ── Compute mix layer offset positions (half grid unit between main dots) ──
+  {
+    const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
+    // Offset = 0.5 step in both grid axes → lands exactly between 4 nearest neighbors
+    const offX = spacingPx * 0.5 * (cosA - sinA);
+    const offY = spacingPx * 0.5 * (sinA + cosA);
+    const mixShapes = [];
+    for (const s of shapes) {
+      const mx = s.x + offX, my = s.y + offY;
+      if (mx < -maxRpx - 1 || mx > W + maxRpx + 1 || my < -maxRpx - 1 || my > H + maxRpx + 1) continue;
+      let mb = bright(mx, my);
+      if (S.invert) mb = 1 - mb;
+      const mt = 1 - mb;
+      let mr = minRpx + mt * (maxRpx - minRpx);
+      if (!useQuant) mr = Math.min(mr, spacingPx * 0.40);
+      if (mr < 0.25) continue;
+      mixShapes.push({ x: mx, y: my, r: mr });
+    }
+    S.mixShapes = mixShapes;
+  }
+
+  // ── Mix Layer second pass ──────────────────────────────────
+  if (S.mixEnabled && S.mixPat && S.mixShapes.length) {
+    const mixR2 = Math.max(0.5, (S.mixDiamMm / 2) * mmToPx);
+    pCtx.globalAlpha = S.mixAlpha;
+    pCtx.fillStyle = fg; pCtx.strokeStyle = fg;
+    if (S.mixPat === 'textraster') {
+      const chars = [...(S.textContent || 'A')];
+      pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
+      S.mixShapes.forEach((s, i) => {
+        pCtx.font = `bold ${Math.max(1, mixR2 * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
+        pCtx.fillText(chars[i % chars.length], s.x, s.y);
+      });
+    } else {
+      pCtx.beginPath();
+      for (const s of S.mixShapes) {
+        shapePath(pCtx, s.x, s.y, mixR2, S.mixPat, S.mixPatRot);
+      }
+      if (S.fill) pCtx.fill(); else pCtx.stroke();
+    }
+    pCtx.globalAlpha = 1;
+  }
 
   S.shapes = shapes;
   updateViewCanvas();   // re-render display at current zoom level (crisp vectors)
@@ -1967,29 +2581,136 @@ function _generate() {
   }
 }
 
+// ── Line Raster: draw helper (works for any perpendicular normal nx,ny) ──
+function _drawLineRows(ctx, lineRows, nx, ny) {
+  for (const pts of lineRows) {
+    if (pts.length < 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].cx + pts[0].hw * nx, pts[0].cy + pts[0].hw * ny);
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i].cx + pts[i].hw * nx, pts[i].cy + pts[i].hw * ny);
+    }
+    for (let i = pts.length - 1; i >= 0; i--) {
+      ctx.lineTo(pts[i].cx - pts[i].hw * nx, pts[i].cy - pts[i].hw * ny);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+// ── Line Raster renderer ──────────────────────────────────
+function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright) {
+  const waveAmp    = S.lrWaveAmp * spacingPx;
+  const waveFreq   = S.lrWaveFreq;
+  const waveAngle  = (S.lrWaveAngle || 90) * Math.PI / 180; // 2D wave propagation direction
+  const smoothWin  = Math.max(0, Math.round(S.lrSmoothing || 0));
+  const fg = S.darkBg ? '#ffffff' : '#000000';
+
+  // Direction vectors: scan lines go along (lx,ly), spaced in perpendicular (nx,ny)
+  const rotRad = S.patRot * Math.PI / 180;
+  const lx =  Math.cos(rotRad), ly =  Math.sin(rotRad);
+  const nx = -Math.sin(rotRad), ny =  Math.cos(rotRad);
+
+  const cx0 = W / 2, cy0 = H / 2;
+  const halfDiag = Math.sqrt(W * W + H * H) / 2;
+  // Finer step for smoother curves
+  const tStep = Math.max(0.5, spacingPx * 0.025);
+  // Wavelength in canvas pixels: larger waveFreq = more wave cycles = smaller wave
+  const wavelength = Math.max(1, W / waveFreq);
+
+  // ── 1. Compute lineRows using 2D plane wave (all rows share same wave phase) ──
+  const lineRows = [];
+  for (let d = -halfDiag - spacingPx; d <= halfDiag + spacingPx; d += spacingPx) {
+    const lcx = cx0 + d * nx;
+    const lcy = cy0 + d * ny;
+
+    // First pass: collect raw hw values for smoothing
+    const rawHw = [];
+    const rawPos = [];
+
+    for (let t = -halfDiag - spacingPx; t <= halfDiag + spacingPx; t += tStep) {
+      const px = lcx + t * lx;
+      const py = lcy + t * ly;
+
+      // 2D plane wave — displacement depends on 2D position, NOT row index
+      // All lines share the same wave → smooth flowing contours like Vectoraster
+      const wA = waveAmp * Math.sin(2 * Math.PI *
+        (px * Math.cos(waveAngle) + py * Math.sin(waveAngle)) / wavelength);
+
+      const imgX = Math.max(0, Math.min(W - 1, Math.round(px)));
+      const imgY = Math.max(0, Math.min(H - 1, Math.round(py)));
+      let b = bright(imgX, imgY);
+      if (S.invert) b = 1 - b;
+      rawHw.push(minRpx + (1 - b) * (maxRpx - minRpx));
+      rawPos.push({ px, py, wA });
+    }
+
+    // Second pass: smooth hw (Vectoraster "Smoothing" — avoids abrupt width jumps)
+    const pts = [];
+    const n = rawHw.length;
+    for (let i = 0; i < n; i++) {
+      let sum = 0, cnt = 0;
+      const lo = Math.max(0, i - smoothWin), hi = Math.min(n - 1, i + smoothWin);
+      for (let j = lo; j <= hi; j++) { sum += rawHw[j]; cnt++; }
+      const hw = sum / cnt;
+      const { px, py, wA } = rawPos[i];
+      pts.push({ cx: px + wA * nx, cy: py + wA * ny, hw });
+    }
+    lineRows.push(pts);
+  }
+
+  // ── 2. Draw to pCanvas (no canvas rotation — lines ARE angled geometrically) ──
+  pCtx.fillStyle = fg;
+  _drawLineRows(pCtx, lineRows, nx, ny);
+
+  S.lrNx = nx; S.lrNy = ny;
+  S.lineRows = lineRows;
+  S.shapes = [{ x: W * 0.5, y: H * 0.5, r: spacingPx * 0.5, rMm: null, frac: 0.5 }];
+  updateViewCanvas();
+  updateStats();
+  updateNestInfo();
+  $('procOv').classList.remove('show');
+  _generating = false;
+  $('statusTxt').textContent = `✅ วาดแล้ว ${lineRows.length.toLocaleString()} เส้น (Line Raster)`;
+}
+
 // ── Shape path builders ───────────────────────────────────
-function shapePath(ctx, x, y, r, pat) {
+function shapePath(ctx, x, y, r, pat, rot) {
+  const a = (rot || 0) * Math.PI / 180;
+  const ca = Math.cos(a), sa = Math.sin(a);
+  function rp(dx, dy) { return [x + dx*ca - dy*sa, y + dx*sa + dy*ca]; }
+  let p;
   switch (pat) {
     case 'circle': case 'dot':
       ctx.moveTo(x+r, y); ctx.arc(x, y, r, 0, Math.PI*2); break;
     case 'square':
-      ctx.rect(x-r, y-r, r*2, r*2); break;
+      p=rp(-r,-r); ctx.moveTo(p[0],p[1]);
+      [rp(r,-r),rp(r,r),rp(-r,r)].forEach(q=>ctx.lineTo(q[0],q[1]));
+      ctx.closePath(); break;
     case 'diamond':
-      ctx.moveTo(x, y-r); ctx.lineTo(x+r, y); ctx.lineTo(x, y+r); ctx.lineTo(x-r, y); ctx.closePath(); break;
+      p=rp(0,-r); ctx.moveTo(p[0],p[1]);
+      [rp(r,0),rp(0,r),rp(-r,0)].forEach(q=>ctx.lineTo(q[0],q[1]));
+      ctx.closePath(); break;
     case 'cross': {
       const t = r * 0.38;
-      ctx.rect(x-t, y-r, t*2, r*2); ctx.rect(x-r, y-t, r*2, t*2); break;
+      p=rp(-t,-r); ctx.moveTo(p[0],p[1]);
+      [rp(t,-r),rp(t,-t),rp(r,-t),rp(r,t),rp(t,t),rp(t,r),rp(-t,r),rp(-t,t),rp(-r,t),rp(-r,-t),rp(-t,-t),rp(-t,-r)].forEach(q=>ctx.lineTo(q[0],q[1]));
+      ctx.closePath(); break;
     }
     case 'hline': {
       const h = Math.max(0.4, r * 0.55);
-      ctx.rect(x-r, y-h, r*2, h*2); break;
+      p=rp(-r,-h); ctx.moveTo(p[0],p[1]);
+      [rp(r,-h),rp(r,h),rp(-r,h)].forEach(q=>ctx.lineTo(q[0],q[1]));
+      ctx.closePath(); break;
     }
     case 'triangle':
-      ctx.moveTo(x, y-r); ctx.lineTo(x+r*0.866, y+r*0.5); ctx.lineTo(x-r*0.866, y+r*0.5); ctx.closePath(); break;
+      p=rp(0,-r); ctx.moveTo(p[0],p[1]);
+      [rp(r*0.866,r*0.5),rp(-r*0.866,r*0.5)].forEach(q=>ctx.lineTo(q[0],q[1]));
+      ctx.closePath(); break;
     case 'hexagon': {
       for (let i = 0; i < 6; i++) {
-        const a = (i * Math.PI)/3 - Math.PI/6;
-        const px = x + r*Math.cos(a), py = y + r*Math.sin(a);
+        const ang = (i * Math.PI)/3 - Math.PI/6 + a;
+        const px = x + r*Math.cos(ang), py = y + r*Math.sin(ang);
         i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
       }
       ctx.closePath(); break;
@@ -1997,13 +2718,32 @@ function shapePath(ctx, x, y, r, pat) {
     case 'star': {
       const ir = r * 0.4;
       for (let i = 0; i < 10; i++) {
-        const a = (i * Math.PI)/5 - Math.PI/2;
+        const ang = (i * Math.PI)/5 - Math.PI/2 + a;
         const rr = i%2===0 ? r : ir;
-        const px = x + rr*Math.cos(a), py = y + rr*Math.sin(a);
+        const px = x + rr*Math.cos(ang), py = y + rr*Math.sin(ang);
         i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
       }
       ctx.closePath(); break;
     }
+    case 'imgshape': {
+      // Square tile (image placeholder)
+      p=rp(-r,-r); ctx.moveTo(p[0],p[1]);
+      [rp(r,-r),rp(r,r),rp(-r,r)].forEach(q=>ctx.lineTo(q[0],q[1]));
+      ctx.closePath(); break;
+    }
+    case 'lineraster': {
+      // 3 thin horizontal strips (rotated by pat rotation)
+      const h = Math.max(0.3, r * 0.18);
+      for (const g of [-r*0.58, 0, r*0.58]) {
+        const p1 = rp(-r, g-h); ctx.moveTo(p1[0], p1[1]);
+        [rp(r, g-h), rp(r, g+h), rp(-r, g+h)].forEach(q=>ctx.lineTo(q[0],q[1]));
+        ctx.closePath();
+      }
+      break;
+    }
+    default:
+      // textraster and unknowns: caller handles via fillText or falls back to circle
+      ctx.moveTo(x+r, y); ctx.arc(x, y, r, 0, Math.PI*2); break;
   }
 }
 
@@ -2015,7 +2755,7 @@ function updateStats() {
   const wH = parseFloat($('workH').value) || 100;
   const feed = parseFloat($('feedRate').value) || 800;
   const units = $('units').value;
-  const avgR_mm = (S.minRmm + S.maxRmm) / 2;
+  const avgR_mm = (S.minDmm + S.maxDmm) / 4; // diameter → radius: avg(d/2)
   const pathLen = S.shapes.length * 2 * Math.PI * avgR_mm;
   const timeSec = pathLen / feed * 60;
   const mmToPx = W / wW;
@@ -2028,7 +2768,8 @@ function updateStats() {
 }
 function patName(p) {
   return {circle:'Circle',square:'Square',diamond:'Diamond',cross:'Cross',
-          hline:'H-Line',triangle:'Triangle',hexagon:'Hexagon',star:'Star',dot:'Dot'}[p]||p;
+          hline:'H-Line',triangle:'Triangle',hexagon:'Hexagon',star:'Star',dot:'Dot',
+          lineraster:'Line Raster',textraster:'Text Raster'}[p]||p;
 }
 
 // ── Sheet Nesting ─────────────────────────────────────────
@@ -2117,7 +2858,7 @@ function renderSheet() {
       ctx.fillStyle = fg; ctx.strokeStyle = fg; ctx.lineWidth = 0.4;
       ctx.beginPath();
       for (const s of S.shapes) {
-        shapePath(ctx, ox + s.x*patScale, oy + s.y*patScale, s.r*patScale, S.pattern);
+        shapePath(ctx, ox + s.x*patScale, oy + s.y*patScale, s.r*patScale, S.pattern, S.patRot);
       }
       if (S.fill) ctx.fill(); else ctx.stroke();
       ctx.restore();
@@ -2160,7 +2901,7 @@ function buildSimMoves() {
     if (S.pattern === 'circle' || S.pattern === 'dot') {
       moves.push({ type: 'arc', cx, cy, r: cr });
     } else {
-      const pts = getShapePoints(cx, cy, cr, S.pattern);
+      const pts = getShapePoints(cx, cy, cr, S.pattern, S.patRot);
       for (let i = 0; i < pts.length; i++) {
         const prev = pts[(i-1+pts.length)%pts.length];
         moves.push({ type: 'cut', x1: prev[0], y1: prev[1], x2: pts[i][0], y2: pts[i][1] });
@@ -2173,29 +2914,32 @@ function buildSimMoves() {
   return moves;
 }
 
-function getShapePoints(x, y, r, pat) {
+function getShapePoints(x, y, r, pat, rot) {
+  const a = (rot || 0) * Math.PI / 180;
+  const ca = Math.cos(a), sa = Math.sin(a);
+  function rp(dx, dy) { return [x + dx*ca - dy*sa, y + dx*sa + dy*ca]; }
   switch (pat) {
     case 'square':
-      return [[x-r,y-r],[x+r,y-r],[x+r,y+r],[x-r,y+r],[x-r,y-r]];
+      return [rp(-r,-r),rp(r,-r),rp(r,r),rp(-r,r),rp(-r,-r)];
     case 'diamond':
-      return [[x,y-r],[x+r,y],[x,y+r],[x-r,y],[x,y-r]];
+      return [rp(0,-r),rp(r,0),rp(0,r),rp(-r,0),rp(0,-r)];
     case 'triangle': {
       const hx=r*0.866,hy=r*0.5;
-      return [[x,y-r],[x+hx,y+hy],[x-hx,y+hy],[x,y-r]];
+      return [rp(0,-r),rp(hx,hy),rp(-hx,hy),rp(0,-r)];
     }
     case 'hexagon': {
       const pts = [];
-      for (let i = 0; i <= 6; i++) { const a=(i%6*Math.PI)/3-Math.PI/6; pts.push([x+r*Math.cos(a),y+r*Math.sin(a)]); }
+      for (let i = 0; i <= 6; i++) { const ang=(i%6*Math.PI)/3-Math.PI/6+a; pts.push([x+r*Math.cos(ang),y+r*Math.sin(ang)]); }
       return pts;
     }
     case 'cross': {
       const t=r*0.38;
-      return [[x-t,y-r],[x+t,y-r],[x+t,y-t],[x+r,y-t],[x+r,y+t],[x+t,y+t],[x+t,y+r],[x-t,y+r],[x-t,y+t],[x-r,y+t],[x-r,y-t],[x-t,y-t],[x-t,y-r]];
+      return [rp(-t,-r),rp(t,-r),rp(t,-t),rp(r,-t),rp(r,t),rp(t,t),rp(t,r),rp(-t,r),rp(-t,t),rp(-r,t),rp(-r,-t),rp(-t,-t),rp(-t,-r)];
     }
-    case 'hline': { const h=Math.max(0.4,r*0.55); return [[x-r,y-h],[x+r,y-h],[x+r,y+h],[x-r,y+h],[x-r,y-h]]; }
+    case 'hline': { const h=Math.max(0.4,r*0.55); return [rp(-r,-h),rp(r,-h),rp(r,h),rp(-r,h),rp(-r,-h)]; }
     case 'star': {
       const ir=r*0.4, pts=[];
-      for (let i=0;i<=10;i++){const ii=i%10;const a=(ii*Math.PI)/5-Math.PI/2;const rr=ii%2===0?r:ir;pts.push([x+rr*Math.cos(a),y+rr*Math.sin(a)]);}
+      for (let i=0;i<=10;i++){const ii=i%10;const ang=(ii*Math.PI)/5-Math.PI/2+a;const rr=ii%2===0?r:ir;pts.push([x+rr*Math.cos(ang),y+rr*Math.sin(ang)]);}
       return pts;
     }
     default: return [[x,y]];
@@ -2231,7 +2975,7 @@ function drawSimFrame(upTo) {
   ctx.strokeStyle = S.darkBg ? '#fff' : '#000';
   ctx.lineWidth = 0.5;
   ctx.beginPath();
-  for (const s of S.shapes) shapePath(ctx, s.x*sx, s.y*sy, s.r*Math.min(sx,sy), S.pattern);
+  for (const s of S.shapes) shapePath(ctx, s.x*sx, s.y*sy, s.r*Math.min(sx,sy), S.pattern, S.patRot);
   if (S.fill) ctx.fill(); else ctx.stroke();
   ctx.globalAlpha = 1;
 
@@ -2338,7 +3082,9 @@ function machineExt() {
 }
 
 function buildGcode(offsetX=0, offsetY=0) {
-  if (!S.shapes.length) { alert('กรุณาเลือกรูปภาพก่อน'); return; }
+  if (!S.shapes.length && !(S.pattern === 'lineraster' && S.lineRows && S.lineRows.length)) {
+    alert('กรุณาสร้าง Pattern ก่อน'); return;
+  }
   const W    = pCanvas.width, H = pCanvas.height;
   const wW   = parseFloat($('workW').value);
   const depth  = parseFloat($('cutDepth').value);
@@ -2391,13 +3137,42 @@ function buildGcode(offsetX=0, offsetY=0) {
   }
 
   const toolDia = parseFloat($('toolDia').value) || 0;   // used for arc radius compensation
+  const f3 = v => v.toFixed(3);
+
+  if (S.pattern === 'lineraster' && S.lineRows && S.lineRows.length) {
+    // ── Line Raster: horizontal scan lines with variable step-over depth ──
+    // Each row segment = one G1 pass at the row's average brightness-driven depth
+    let lineNum = 0;
+    for (const pts of S.lineRows) {
+      if (pts.length < 2) continue;
+      lineNum++;
+      // Sample a few points to estimate average half-width → encode as depth fraction
+      const avgHW = pts.reduce((a, p) => a + p.hw, 0) / pts.length;
+      const depthFrac = (avgHW - (S.minDmm/2) * (wW/pCanvas.width)) /
+                        Math.max(0.001, ((S.maxDmm - S.minDmm)/2) * (wW/pCanvas.width));
+      const cutD = parseFloat((depth * Math.max(0.05, depthFrac)).toFixed(3));
+      const rowSc = wW / pCanvas.width;
+      const startX = parseFloat(f3(pts[0].cx * rowSc + offsetX));
+      const startY = parseFloat(f3((pCanvas.height - pts[0].cy) * rowSc + offsetY));
+      const endX   = parseFloat(f3(pts[pts.length-1].cx * rowSc + offsetX));
+      const endY   = parseFloat(f3((pCanvas.height - pts[pts.length-1].cy) * rowSc + offsetY));
+      g += `${cm(`Row ${lineNum}`)}`;
+      g += `G0 X${f3(startX)} Y${f3(startY)}\nG1 Z${cutD} F${plunge}\nG1 X${f3(endX)} Y${f3(endY)} F${feed}\nG0 Z${safeZ}\n`;
+    }
+    g += `\n${cm('── End of job ──')}`;
+    if (fmt === 'siemens') { g += `G0 Z${safeZ}\nG0 X0 Y0\nM5\nRET\n`; }
+    else { g += `G0 Z${safeZ}\nG0 X0 Y0\nM5\nM30\n`; if (fmt === 'mach2' || fmt === 'mach3' || fmt === 'fanuc') g += '%\n'; }
+    S.lastGcode = g;
+    $('statusTxt').textContent = `✅ G-code ready (${S.lineRows.length.toLocaleString()} scan lines)`;
+    return g;
+  }
 
   for (let i = 0; i < S.shapes.length; i++) {
     const s  = S.shapes[i];
     const sx = parseFloat((s.x * sc + offsetX).toFixed(3));
     const sy = parseFloat(((H - s.y) * sc + offsetY).toFixed(3));
     const sr = parseFloat((s.r * sc).toFixed(3));
-    g += gcodeShape(sx, sy, sr, S.pattern, depth, feed, plunge, safeZ, i+1, fmt, toolDia);
+    g += gcodeShape(sx, sy, sr, S.pattern, depth, feed, plunge, safeZ, i+1, fmt, toolDia, S.patRot);
   }
 
   g += `\n${cm('── End of job ──')}`;
@@ -2413,7 +3188,7 @@ function buildGcode(offsetX=0, offsetY=0) {
   return g;
 }
 
-function gcodeShape(x, y, r, pat, depth, feed, plunge, safeZ, n, fmt, toolDia = 0) {
+function gcodeShape(x, y, r, pat, depth, feed, plunge, safeZ, n, fmt, toolDia = 0, rot = 0) {
   const cmChar = (fmt==='fanuc'||fmt==='siemens') ? '(' : ';';
   const cmEnd  = (fmt==='fanuc'||fmt==='siemens') ? ')' : '';
   let g = `${cmChar} #${n}${cmEnd}\n`;
@@ -2431,74 +3206,28 @@ function gcodeShape(x, y, r, pat, depth, feed, plunge, safeZ, n, fmt, toolDia = 
       }
       break;
     }
-    case 'square':
-      g += `G0 X${f(x-r)} Y${f(y-r)}\nG1 Z${depth} F${plunge}\nG1 X${f(x+r)} Y${f(y-r)} F${feed}\nG1 X${f(x+r)} Y${f(y+r)}\nG1 X${f(x-r)} Y${f(y+r)}\nG1 X${f(x-r)} Y${f(y-r)}\nG0 Z${safeZ}\n`; break;
-    case 'diamond':
-      g += `G0 X${f(x)} Y${f(y-r)}\nG1 Z${depth} F${plunge}\nG1 X${f(x+r)} Y${f(y)} F${feed}\nG1 X${f(x)} Y${f(y+r)}\nG1 X${f(x-r)} Y${f(y)}\nG1 X${f(x)} Y${f(y-r)}\nG0 Z${safeZ}\n`; break;
-    case 'cross': {
-      const t = parseFloat((r*0.38).toFixed(3));
-      g += `G0 X${f(x-t)} Y${f(y-r)}\nG1 Z${depth} F${plunge}\n`;
-      g += `G1 X${f(x+t)} Y${f(y-r)} F${feed}\nG1 X${f(x+t)} Y${f(y-t)}\nG1 X${f(x+r)} Y${f(y-t)}\nG1 X${f(x+r)} Y${f(y+t)}\nG1 X${f(x+t)} Y${f(y+t)}\nG1 X${f(x+t)} Y${f(y+r)}\nG1 X${f(x-t)} Y${f(y+r)}\nG1 X${f(x-t)} Y${f(y+t)}\nG1 X${f(x-r)} Y${f(y+t)}\nG1 X${f(x-r)} Y${f(y-t)}\nG1 X${f(x-t)} Y${f(y-t)}\nG1 X${f(x-t)} Y${f(y-r)}\nG0 Z${safeZ}\n`; break;
-    }
-    case 'hline': {
-      const h = parseFloat(Math.max(0.05,r*0.55).toFixed(3));
-      g += `G0 X${f(x-r)} Y${f(y-h)}\nG1 Z${depth} F${plunge}\nG1 X${f(x+r)} Y${f(y-h)} F${feed}\nG1 X${f(x+r)} Y${f(y+h)}\nG1 X${f(x-r)} Y${f(y+h)}\nG1 X${f(x-r)} Y${f(y-h)}\nG0 Z${safeZ}\n`; break;
-    }
-    case 'triangle': {
-      const hx=parseFloat((r*0.866).toFixed(3)),hy=parseFloat((r*0.5).toFixed(3));
-      g += `G0 X${f(x)} Y${f(y-r)}\nG1 Z${depth} F${plunge}\nG1 X${f(x+hx)} Y${f(y+hy)} F${feed}\nG1 X${f(x-hx)} Y${f(y+hy)}\nG1 X${f(x)} Y${f(y-r)}\nG0 Z${safeZ}\n`; break;
-    }
-    case 'hexagon': {
-      let first=true;
-      for(let i=0;i<7;i++){
-        const a=((i%6)*Math.PI)/3-Math.PI/6;
-        const px=parseFloat((x+r*Math.cos(a)).toFixed(3)),py=parseFloat((y+r*Math.sin(a)).toFixed(3));
-        if(first){g+=`G0 X${px} Y${py}\nG1 Z${depth} F${plunge}\n`;first=false;}
-        else g+=`G1 X${px} Y${py} F${feed}\n`;
+    default: {
+      const pts = getShapePoints(x, y, r, pat, rot);
+      let first = true;
+      for (const [px, py] of pts) {
+        if (first) { g += `G0 X${f(px)} Y${f(py)}\nG1 Z${depth} F${plunge}\n`; first = false; }
+        else g += `G1 X${f(px)} Y${f(py)} F${feed}\n`;
       }
-      g+=`G0 Z${safeZ}\n`; break;
-    }
-    case 'star': {
-      const ir=r*0.4;let first=true;
-      for(let i=0;i<11;i++){
-        const ii=i%10;const a=(ii*Math.PI)/5-Math.PI/2;const rr=ii%2===0?r:ir;
-        const px=parseFloat((x+rr*Math.cos(a)).toFixed(3)),py=parseFloat((y+rr*Math.sin(a)).toFixed(3));
-        if(first){g+=`G0 X${px} Y${py}\nG1 Z${depth} F${plunge}\n`;first=false;}
-        else g+=`G1 X${px} Y${py} F${feed}\n`;
-      }
-      g+=`G0 Z${safeZ}\n`; break;
+      g += `G0 Z${safeZ}\n`;
     }
   }
   return g;
 }
 
 // ── SVG helpers ───────────────────────────────────────────
-function svgShapePath(x, y, r, pat) {
-  switch (pat) {
-    case 'circle': case 'dot':
-      return `M${f(x+r)} ${f(y)} A${f(r)} ${f(r)} 0 1 0 ${f(x-r)} ${f(y)} A${f(r)} ${f(r)} 0 1 0 ${f(x+r)} ${f(y)} Z `;
-    case 'square':
-      return `M${f(x-r)} ${f(y-r)} L${f(x+r)} ${f(y-r)} L${f(x+r)} ${f(y+r)} L${f(x-r)} ${f(y+r)} Z `;
-    case 'diamond':
-      return `M${f(x)} ${f(y-r)} L${f(x+r)} ${f(y)} L${f(x)} ${f(y+r)} L${f(x-r)} ${f(y)} Z `;
-    case 'cross': {
-      const t=r*0.38;
-      return `M${f(x-t)} ${f(y-r)} L${f(x+t)} ${f(y-r)} L${f(x+t)} ${f(y-t)} L${f(x+r)} ${f(y-t)} L${f(x+r)} ${f(y+t)} L${f(x+t)} ${f(y+t)} L${f(x+t)} ${f(y+r)} L${f(x-t)} ${f(y+r)} L${f(x-t)} ${f(y+t)} L${f(x-r)} ${f(y+t)} L${f(x-r)} ${f(y-t)} L${f(x-t)} ${f(y-t)} Z `;
-    }
-    case 'hline': { const h=Math.max(0.05,r*0.55); return `M${f(x-r)} ${f(y-h)} L${f(x+r)} ${f(y-h)} L${f(x+r)} ${f(y+h)} L${f(x-r)} ${f(y+h)} Z `; }
-    case 'triangle': { const hx=r*0.866,hy=r*0.5; return `M${f(x)} ${f(y-r)} L${f(x+hx)} ${f(y+hy)} L${f(x-hx)} ${f(y+hy)} Z `; }
-    case 'hexagon': {
-      let d='';
-      for(let i=0;i<6;i++){const a=(i*Math.PI)/3-Math.PI/6;const px=x+r*Math.cos(a),py=y+r*Math.sin(a);d+=(i===0?'M':'L')+f(px)+' '+f(py)+' ';}
-      return d+'Z ';
-    }
-    case 'star': {
-      const ir=r*0.4;let d='';
-      for(let i=0;i<10;i++){const a=(i*Math.PI)/5-Math.PI/2;const rr=i%2===0?r:ir;const px=x+rr*Math.cos(a),py=y+rr*Math.sin(a);d+=(i===0?'M':'L')+f(px)+' '+f(py)+' ';}
-      return d+'Z ';
-    }
-    default: return '';
-  }
+function svgShapePath(x, y, r, pat, rot) {
+  if (pat === 'circle' || pat === 'dot')
+    return `M${f(x+r)} ${f(y)} A${f(r)} ${f(r)} 0 1 0 ${f(x-r)} ${f(y)} A${f(r)} ${f(r)} 0 1 0 ${f(x+r)} ${f(y)} Z `;
+  const pts = getShapePoints(x, y, r, pat, rot);
+  if (!pts.length) return '';
+  let d = `M${f(pts[0][0])} ${f(pts[0][1])} `;
+  for (let i = 1; i < pts.length; i++) d += `L${f(pts[i][0])} ${f(pts[i][1])} `;
+  return d + 'Z ';
 }
 
 function buildSVGString(units) {
@@ -2507,66 +3236,3283 @@ function buildSVGString(units) {
   const wH = parseFloat($('workH').value);
   const un = units || ($('units').value === 'mm' ? 'mm' : 'in');
   const sc = wW / W;
+  const bg = S.darkBg ? '#111111' : '#ffffff';
+  const fg = S.darkBg ? '#ffffff' : '#000000';
+  const hdr = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${wW}${un}" height="${wH}${un}" viewBox="0 0 ${wW} ${wH}">\n  <!-- CNC Pattern Generator | Pattern: ${patName(S.pattern)} -->\n  <rect width="${wW}" height="${wH}" fill="${bg}"/>`;
+
+  // ── Line Raster SVG: filled polyline strips ───────────────
+  if (S.pattern === 'lineraster' && S.lineRows && S.lineRows.length) {
+    const lnx = S.lrNx || 0, lny = S.lrNy || 1;
+    let strips = '';
+    for (const pts of S.lineRows) {
+      if (pts.length < 2) continue;
+      // Edge A (+normal side) then Edge B (-normal side) reversed → closed polygon
+      let edgeA = pts.map(p =>
+        `${((p.cx + p.hw*lnx)*sc).toFixed(3)},${((H - p.cy - p.hw*lny)*sc).toFixed(3)}`).join(' ');
+      let edgeB = pts.slice().reverse().map(p =>
+        `${((p.cx - p.hw*lnx)*sc).toFixed(3)},${((H - p.cy + p.hw*lny)*sc).toFixed(3)}`).join(' ');
+      strips += `  <polygon points="${edgeA} ${edgeB}" fill="${fg}"/>\n`;
+    }
+    return `${hdr}\n${strips}</svg>`;
+  }
+
+  // ── Text Raster SVG: <text> elements ─────────────────────
+  if (S.pattern === 'textraster') {
+    const chars = [...(S.textContent || 'ABC')];
+    if (!chars.length) chars.push('A');
+    let texts = '';
+    for (let i = 0; i < S.shapes.length; i++) {
+      const s = S.shapes[i];
+      if (s.r < 0.5) continue;
+      const ch = S.textMode === 'rnd'
+        ? chars[Math.floor(Math.random() * chars.length)]
+        : chars[i % chars.length];
+      const fs = (s.r * 1.9 * sc).toFixed(3);
+      const tx = (s.x * sc).toFixed(3), ty = ((H - s.y) * sc).toFixed(3);
+      texts += `  <text x="${tx}" y="${ty}" font-size="${fs}" font-family="${S.textFont||'Arial'}" font-weight="bold" text-anchor="middle" dominant-baseline="middle" fill="${fg}">${ch}</text>\n`;
+    }
+    return `${hdr}\n${texts}</svg>`;
+  }
+
+  // ── Standard shapes SVG ───────────────────────────────────
   let d = '';
   for (const s of S.shapes) {
     const sx = s.x * sc, sy = (H - s.y) * sc, sr = s.r * sc;
-    d += svgShapePath(sx, sy, sr, S.pattern);
+    d += svgShapePath(sx, sy, sr, S.pattern, S.patRot);
   }
-  const bg = S.darkBg ? '#111111' : '#ffffff';
-  const fg = S.darkBg ? '#ffffff' : '#000000';
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-     width="${wW}${un}" height="${wH}${un}" viewBox="0 0 ${wW} ${wH}">
-  <!-- CNC Pattern Generator | Pattern: ${patName(S.pattern)} | Shapes: ${S.shapes.length} -->
-  <!-- Generated: ${new Date().toISOString()} -->
-  <rect width="${wW}" height="${wH}" fill="${bg}"/>
-  <path d="${d.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${(0.15*sc).toFixed(3)}"/>
-</svg>`;
+  // Mix Layer overlay path
+  let d2 = '';
+  if (S.mixEnabled && S.mixPat && S.mixShapes && S.mixShapes.length) {
+    const mixR = Math.max(0.001, S.mixDiamMm / 2); // radius in mm (sc already mm scale)
+    for (const s of S.mixShapes) {
+      const sx = s.x * sc, sy = (H - s.y) * sc;
+      d2 += svgShapePath(sx, sy, mixR, S.mixPat, S.patRot);
+    }
+  }
+  let svg = `${hdr}\n  <path d="${d.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${(0.15*sc).toFixed(3)}"/>`;
+  if (d2) svg += `\n  <path d="${d2.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${(0.15*sc).toFixed(3)}" opacity="${S.mixAlpha.toFixed(2)}"/>`;
+  svg += '\n</svg>';
+  return svg;
 }
 
-// ── DXF Export (AC1009 / AutoCAD R12 Natural) ─────────────
+// ══ DXF SPLINE entities for 4-pointed star (exact cubic bezier, zero kinks) ══
+// Outputs 4 SPLINE entities (one per quadrant) — each is the exact degenerate cubic bezier
+// P1=P2=C. AutoCAD renders as a perfectly smooth curve. G1 continuity at tips guaranteed.
+// hBase: starting hex handle (integer); ownerH: model-space block record handle (hex string)
+function _gen4StarSplineDXF(cx, cy, R, k, rotRad, hBase, ownerH) {
+  const tips = [[0,1],[1,0],[0,-1],[-1,0]];    // N E S W (DXF Y-up)
+  const ctls = [[k,k],[k,-k],[-k,-k],[-k,k]]; // NE SE SW NW controls (P1=P2=C)
+  const cosA = Math.cos(rotRad), sinA = Math.sin(rotRad);
+  const ff = v => v.toFixed(4);
+  let dxf = '';
+
+  for (let seg = 0; seg < 4; seg++) {
+    const rawPts = [tips[seg], ctls[seg], ctls[seg], tips[(seg+1)%4]];
+    const wpts = rawPts.map(([px,py]) => [
+      cx + (px*cosA - py*sinA)*R,
+      cy + (px*sinA + py*cosA)*R
+    ]);
+    const h = (hBase + seg).toString(16).toUpperCase();
+    dxf += `  0\nSPLINE\n  5\n${h}\n330\n${ownerH}\n`;
+    dxf += '100\nAcDbEntity\n  8\n0\n';
+    dxf += '100\nAcDbSpline\n';
+    dxf += ' 70\n0\n';   // flags: 0 (not periodic, not rational)
+    dxf += ' 71\n3\n';   // degree = 3
+    dxf += ' 72\n8\n';   // knot count = 8
+    dxf += ' 73\n4\n';   // control point count = 4
+    dxf += ' 74\n0\n';   // fit point count = 0
+    // Clamped knot vector [0,0,0,0,1,1,1,1] — single cubic bezier segment
+    dxf += ' 40\n0.0\n 40\n0.0\n 40\n0.0\n 40\n0.0\n';
+    dxf += ' 40\n1.0\n 40\n1.0\n 40\n1.0\n 40\n1.0\n';
+    for (const [wx,wy] of wpts) {
+      dxf += ` 10\n${ff(wx)}\n 20\n${ff(wy)}\n 30\n0.0000\n`;
+    }
+  }
+  return dxf;
+}
+
+// ══ DXF ARC entities for 4-pointed star ══
+// Outputs nArcsPerSeg true circular ARC entities per bezier quadrant (4*nArcsPerSeg total).
+// Each ARC = G2/G3 in CNC — perfectly smooth, no segmentation, no straight lines.
+function _gen4StarArcDXF(cx, cy, R, k, rotRad, nArcsPerSeg) {
+  if (!nArcsPerSeg) nArcsPerSeg = 3;
+  const tips = [[0,1],[1,0],[0,-1],[-1,0]];
+  const ctls = [[k,k],[k,-k],[-k,-k],[-k,k]];
+  const cosA = Math.cos(rotRad), sinA = Math.sin(rotRad);
+  const ff = v => v.toFixed(4);
+  let dxf = '';
+
+  // Degenerate cubic bezier: B(t)=mt³P0 + 3t·mt·C + t³P3
+  function bpt(P0,C,P3,t) {
+    const mt=1-t;
+    return [mt*mt*mt*P0[0]+3*t*mt*C[0]+t*t*t*P3[0],
+            mt*mt*mt*P0[1]+3*t*mt*C[1]+t*t*t*P3[1]];
+  }
+
+  for (let seg = 0; seg < 4; seg++) {
+    const P0=tips[seg], C=ctls[seg], P3=tips[(seg+1)%4];
+    for (let i = 0; i < nArcsPerSeg; i++) {
+      const t0=i/nArcsPerSeg, t1=(i+1)/nArcsPerSeg, tm=(t0+t1)/2;
+      const a=bpt(P0,C,P3,t0), m=bpt(P0,C,P3,tm), b=bpt(P0,C,P3,t1);
+
+      const cc = _cc3(a[0],a[1],m[0],m[1],b[0],b[1]);
+      if (!cc) {
+        // Near-straight segment → LINE fallback
+        const ra=[a[0]*cosA-a[1]*sinA, a[0]*sinA+a[1]*cosA];
+        const rb=[b[0]*cosA-b[1]*sinA, b[0]*sinA+b[1]*cosA];
+        dxf+=`  0\nLINE\n  8\n0\n 10\n${ff(cx+ra[0]*R)}\n 20\n${ff(cy+ra[1]*R)}\n 30\n0.0\n`;
+        dxf+=` 11\n${ff(cx+rb[0]*R)}\n 21\n${ff(cy+rb[1]*R)}\n 31\n0.0\n`;
+        continue;
+      }
+
+      // Rotate arc center and all points to world coords
+      const rcx=cc.cx*cosA-cc.cy*sinA, rcy=cc.cx*sinA+cc.cy*cosA;
+      const wCX=cx+rcx*R, wCY=cy+rcy*R, arcR=cc.r*R;
+
+      const ra2=[a[0]*cosA-a[1]*sinA, a[0]*sinA+a[1]*cosA];
+      const rb2=[b[0]*cosA-b[1]*sinA, b[0]*sinA+b[1]*cosA];
+      const rm =[m[0]*cosA-m[1]*sinA, m[0]*sinA+m[1]*cosA];
+      const waX=cx+ra2[0]*R, waY=cy+ra2[1]*R;
+      const wbX=cx+rb2[0]*R, wbY=cy+rb2[1]*R;
+      const wmX=cx+rm[0]*R,  wmY=cy+rm[1]*R;
+
+      let sAng=Math.atan2(waY-wCY,waX-wCX)*180/Math.PI;
+      let eAng=Math.atan2(wbY-wCY,wbX-wCX)*180/Math.PI;
+      let mAng=Math.atan2(wmY-wCY,wmX-wCX)*180/Math.PI;
+      if(sAng<0) sAng+=360;
+      if(eAng<0) eAng+=360;
+      if(mAng<0) mAng+=360;
+
+      // Ensure CCW arc passes through midpoint: sAng → mAng → eAng
+      const e2=eAng<sAng?eAng+360:eAng;
+      const m2=mAng<sAng?mAng+360:mAng;
+      if(m2>e2) [sAng,eAng]=[eAng,sAng]; // swap if midpoint not on CCW arc
+
+      dxf+=`  0\nARC\n  8\n0\n 10\n${ff(wCX)}\n 20\n${ff(wCY)}\n 30\n0.0\n`;
+      dxf+=` 40\n${ff(arcR)}\n 50\n${ff(sAng)}\n 51\n${ff(eAng)}\n`;
+    }
+  }
+  return dxf;
+}
+
+// ══ Parametric 4-pointed concave star (cubic bezier, perfectly symmetric) ══
+// k=concavity 0.15=deep 0.45=shallow; N=vertex count; rotRad in DXF Y-up coords
+function _gen4StarPolyline(cx, cy, R, k, rotRad, N) {
+  const tips = [[0,1],[1,0],[0,-1],[-1,0]];    // N E S W (DXF Y-up)
+  const ctls = [[k,k],[k,-k],[-k,-k],[-k,k]]; // NE SE SW NW inward controls
+  const cosA = Math.cos(rotRad), sinA = Math.sin(rotRad);
+  const nSeg  = Math.ceil(N / 4);
+  const verts = [];
+  for (let seg = 0; seg < 4; seg++) {
+    const P0 = tips[seg], C = ctls[seg], P3 = tips[(seg+1)%4];
+    for (let i = 0; i < nSeg; i++) {
+      const t = i / nSeg, mt = 1 - t;
+      // Degenerate cubic bezier (P1=P2=C): B(t) = mt³P0 + 3t·mt·C + t³P3
+      const lx = mt*mt*mt*P0[0] + 3*t*mt*C[0] + t*t*t*P3[0];
+      const ly = mt*mt*mt*P0[1] + 3*t*mt*C[1] + t*t*t*P3[1];
+      const rx = lx*cosA - ly*sinA;
+      const ry = lx*sinA + ly*cosA;
+      verts.push({x: cx + rx*R, y: cy + ry*R, bulge: 0});
+    }
+  }
+  return verts;
+}
+
+// ══ Least-squares cubic bezier fit to an ordered array of world-space points ══
+// pts: [{x,y}…]; returns [P0, P1, P2, P3]  (P0/P3 are pts[0]/pts[last])
+// Uses arc-length parameterisation so short segments don't over-weight the fit.
+function fitCubicSeg(pts) {
+  const P0 = pts[0], P3 = pts[pts.length - 1];
+  if (pts.length <= 2) {
+    return [P0,
+      { x: P0.x*0.6667 + P3.x*0.3333, y: P0.y*0.6667 + P3.y*0.3333 },
+      { x: P0.x*0.3333 + P3.x*0.6667, y: P0.y*0.3333 + P3.y*0.6667 },
+      P3];
+  }
+  // Arc-length parameterisation
+  const lens = [0];
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i].x - pts[i-1].x, dy = pts[i].y - pts[i-1].y;
+    lens.push(lens[i-1] + Math.hypot(dx, dy));
+  }
+  const L = lens[lens.length-1] || 1;
+  const ts = lens.map(l => l / L);
+  // Normal equations:  B(t) = (1-t)³P0 + 3t(1-t)²P1 + 3t²(1-t)P2 + t³P3
+  // For interior points: A1(t)·P1 + A2(t)·P2 = pts[i] – (1-t)³P0 – t³P3
+  let a00=0, a01=0, a11=0, bx0=0, by0=0, bx1=0, by1=0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const t = ts[i], mt = 1 - t;
+    const a1 = 3*t*mt*mt, a2 = 3*t*t*mt;
+    const rx = pts[i].x - mt*mt*mt*P0.x - t*t*t*P3.x;
+    const ry = pts[i].y - mt*mt*mt*P0.y - t*t*t*P3.y;
+    a00 += a1*a1; a01 += a1*a2; a11 += a2*a2;
+    bx0 += a1*rx; by0 += a1*ry;
+    bx1 += a2*rx; by1 += a2*ry;
+  }
+  const det = a00*a11 - a01*a01;
+  if (Math.abs(det) < 1e-12) {
+    return [P0,
+      { x: P0.x*0.6667 + P3.x*0.3333, y: P0.y*0.6667 + P3.y*0.3333 },
+      { x: P0.x*0.3333 + P3.x*0.6667, y: P0.y*0.3333 + P3.y*0.6667 },
+      P3];
+  }
+  return [P0,
+    { x: (a11*bx0 - a01*bx1) / det, y: (a11*by0 - a01*by1) / det },
+    { x: (a00*bx1 - a01*bx0) / det, y: (a00*by1 - a01*by0) / det },
+    P3];
+}
+
+// ══ 4 SPLINE entities fitted directly to the traced contour ══
+// This matches the canvas preview (which draws normPath as a polyline) far better
+// than the parametric k-based star, and preserves the original aspect ratio.
+//
+// normPath: array of {x,y} in canvas Y-down coordinates (as in IMGSHAPE.normPaths[0])
+// rot:      UI rotation angle in radians (positive = CCW on screen, same sign as canvas)
+// hBase/ownerH: DXF handle bookkeeping (integer / hex string)
+function _gen4StarContourSplineDXF(cx, cy, R, normPath, rot, hBase, ownerH) {
+  const ff = v => v.toFixed(4);
+  const pts = normPath;
+  const n = pts.length;
+  if (n < 8) return '';
+
+  // Find 4 extreme tips.  In canvas Y-down space:
+  //   North = min y (top),  South = max y (bottom),  East = max x,  West = min x
+  let iN=0, iE=0, iS=0, iW=0;
+  for (let i = 0; i < n; i++) {
+    if (pts[i].y < pts[iN].y) iN = i;
+    if (pts[i].x > pts[iE].x) iE = i;
+    if (pts[i].y > pts[iS].y) iS = i;
+    if (pts[i].x < pts[iW].x) iW = i;
+  }
+  // Sort by contour index → 4 arcs in traversal order (works for CW or CCW)
+  const tipIdxs = [iN, iE, iS, iW].sort((a, b) => a - b);
+
+  function getArc(i1, i2) {
+    const arc = [];
+    if (i2 >= i1) { for (let i = i1; i <= i2; i++) arc.push(pts[i]); }
+    else           { for (let i = i1; i < n;  i++) arc.push(pts[i]);
+                     for (let i = 0;  i <= i2; i++) arc.push(pts[i]); }
+    return arc;
+  }
+  const arcs = [
+    getArc(tipIdxs[0], tipIdxs[1]),
+    getArc(tipIdxs[1], tipIdxs[2]),
+    getArc(tipIdxs[2], tipIdxs[3]),
+    getArc(tipIdxs[3], tipIdxs[0])   // wraps around end of array
+  ];
+
+  // Convert normPath canvas-space point → DXF world coordinates (Y-up)
+  // This mirrors the canvas drawing: canvas_x = cx + (px*cosR-py*sinR)*R
+  //                                  dxf_y   = cy - (px*sinR+py*cosR)*R  (Y-flip)
+  const cosR = Math.cos(rot), sinR = Math.sin(rot);
+  function toWorld(p) {
+    const xr = p.x * cosR - p.y * sinR;
+    const yr = p.x * sinR + p.y * cosR;
+    return { x: cx + xr * R, y: cy - yr * R };
+  }
+
+  let dxf = '';
+  for (let seg = 0; seg < 4; seg++) {
+    const arc = arcs[seg];
+    if (arc.length < 2) continue;
+    const wArc = arc.map(toWorld);
+    const [P0, P1, P2, P3] = fitCubicSeg(wArc);
+
+    const h = (hBase + seg).toString(16).toUpperCase();
+    dxf += `  0\nSPLINE\n  5\n${h}\n330\n${ownerH}\n`;
+    dxf += '100\nAcDbEntity\n  8\n0\n';
+    dxf += '100\nAcDbSpline\n';
+    dxf += ' 70\n0\n';  // open (not closed/periodic)
+    dxf += ' 71\n3\n';  // cubic
+    dxf += ' 72\n8\n';  // 8 knots
+    dxf += ' 73\n4\n';  // 4 control points
+    dxf += ' 74\n0\n';  // 0 fit points
+    dxf += ' 40\n0.0\n 40\n0.0\n 40\n0.0\n 40\n0.0\n';
+    dxf += ' 40\n1.0\n 40\n1.0\n 40\n1.0\n 40\n1.0\n';
+    for (const p of [P0, P1, P2, P3]) {
+      dxf += ` 10\n${ff(p.x)}\n 20\n${ff(p.y)}\n 30\n0.0000\n`;
+    }
+  }
+  return dxf;
+}
+
+// ══ DXF Arc-fitting helpers ═════════════════════════════════════
+// Circumcircle of 3 points → {cx,cy,r} or null if collinear / radius huge
+function _cc3(x1,y1,x2,y2,x3,y3) {
+  const ax=x2-x1,ay=y2-y1,bx=x3-x1,by=y3-y1;
+  const D=2*(ax*by-ay*bx);
+  if(Math.abs(D)<1e-10) return null;
+  const ux=(by*(ax*ax+ay*ay)-ay*(bx*bx+by*by))/D;
+  const uy=(ax*(bx*bx+by*by)-bx*(ax*ax+ay*ay))/D;
+  const r=Math.sqrt(ux*ux+uy*uy);
+  if(r>1000) return null; // effectively straight line
+  return {cx:x1+ux,cy:y1+uy,r};
+}
+
+// BULGE from arc P1→P2 with circle center C.
+// Positive = CCW (center to LEFT of P1→P2). NOTE: Y-flip (canvas→DXF) negates sign.
+function _bulge2D(x1,y1,x2,y2,cx,cy) {
+  const dx=x2-x1,dy=y2-y1;
+  const d=Math.sqrt(dx*dx+dy*dy);
+  const r=Math.sqrt((x1-cx)*(x1-cx)+(y1-cy)*(y1-cy));
+  if(d<1e-10||r<1e-10) return 0;
+  const sinH=Math.min(1,d/(2*r));
+  const th=2*Math.asin(sinH);
+  const sign=(dx*(cy-y1)-dy*(cx-x1))>=0?1:-1;
+  return sign*Math.tan(th/4);
+}
+
+// Greedy arc fitting: pts=[[x,y],...] → [{x,y,bulge}] for LWPOLYLINE
+// tol = max perpendicular deviation from fitted circle (same units as pts)
+function _fitArcs(pts, closed, tol) {
+  const n=pts.length;
+  if(n<3) return pts.map(([x,y])=>({x,y,bulge:0}));
+  const get=i=>pts[closed?((i%n+n)%n):Math.min(Math.max(i,0),n-1)];
+  const res=[];
+  let i=0;
+  const totalEnd=closed?n:n-1;
+  while(i<totalEnd){
+    const[x1,y1]=get(i);
+    let jBest=i+1,ccBest=null;
+    if(i+2<=(closed?i+n-2:n-1)){
+      const[x2,y2]=get(i+1),[x3,y3]=get(i+2);
+      const cc=_cc3(x1,y1,x2,y2,x3,y3);
+      if(cc){
+        let j=i+3;
+        const maxJ=closed?i+n-1:n-1;
+        while(j<=maxJ){
+          const[px,py]=get(j);
+          const dev=Math.abs(Math.sqrt((px-cc.cx)*(px-cc.cx)+(py-cc.cy)*(py-cc.cy))-cc.r);
+          if(dev>tol) break;
+          j++;
+        }
+        if(j-1>i+1){jBest=j-1;ccBest=cc;}
+      }
+    }
+    const[x2,y2]=get(jBest);
+    const bulge=ccBest?_bulge2D(x1,y1,x2,y2,ccBest.cx,ccBest.cy):0;
+    res.push({x:x1,y:y1,bulge});
+    i=jBest;
+  }
+  if(!closed) res.push({x:pts[n-1][0],y:pts[n-1][1],bulge:0});
+  return res;
+}
+
+// ── DXF Export — uses ezdxf-generated AC1015 boilerplate (AutoCAD LT 2017 compatible) ──
+
+// Complete AC1015/R2000 boilerplate (HEADER+CLASSES+TABLES+BLOCKS) generated by ezdxf.
+// Entities (SECTION ENTITIES...ENDSEC) are injected between DXF_BEFORE and DXF_AFTER.
+// *Model_Space BLOCK_RECORD handle = 17 (hex); all entities use 330\n17 as owner.
+const DXF_BEFORE = `  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  9
+$ACADMAINTVER
+ 70
+6
+  9
+$DWGCODEPAGE
+  3
+ANSI_1252
+  9
+$INSBASE
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$EXTMIN
+ 10
+1e+20
+ 20
+1e+20
+ 30
+1e+20
+  9
+$EXTMAX
+ 10
+-1e+20
+ 20
+-1e+20
+ 30
+-1e+20
+  9
+$LIMMIN
+ 10
+0.0
+ 20
+0.0
+  9
+$LIMMAX
+ 10
+420.0
+ 20
+297.0
+  9
+$ORTHOMODE
+ 70
+0
+  9
+$REGENMODE
+ 70
+1
+  9
+$FILLMODE
+ 70
+1
+  9
+$QTEXTMODE
+ 70
+0
+  9
+$MIRRTEXT
+ 70
+1
+  9
+$LTSCALE
+ 40
+1.0
+  9
+$ATTMODE
+ 70
+1
+  9
+$TEXTSIZE
+ 40
+2.5
+  9
+$TRACEWID
+ 40
+1.0
+  9
+$TEXTSTYLE
+  7
+Standard
+  9
+$CLAYER
+  8
+0
+  9
+$CELTYPE
+  6
+ByLayer
+  9
+$CECOLOR
+ 62
+256
+  9
+$CELTSCALE
+ 40
+1.0
+  9
+$DISPSILH
+ 70
+0
+  9
+$DIMSCALE
+ 40
+1.0
+  9
+$DIMASZ
+ 40
+2.5
+  9
+$DIMEXO
+ 40
+0.625
+  9
+$DIMDLI
+ 40
+3.75
+  9
+$DIMRND
+ 40
+0.0
+  9
+$DIMDLE
+ 40
+0.0
+  9
+$DIMEXE
+ 40
+1.25
+  9
+$DIMTP
+ 40
+0.0
+  9
+$DIMTM
+ 40
+0.0
+  9
+$DIMTXT
+ 40
+2.5
+  9
+$DIMCEN
+ 40
+2.5
+  9
+$DIMTSZ
+ 40
+0.0
+  9
+$DIMTOL
+ 70
+0
+  9
+$DIMLIM
+ 70
+0
+  9
+$DIMTIH
+ 70
+0
+  9
+$DIMTOH
+ 70
+0
+  9
+$DIMSE1
+ 70
+0
+  9
+$DIMSE2
+ 70
+0
+  9
+$DIMTAD
+ 70
+1
+  9
+$DIMZIN
+ 70
+8
+  9
+$DIMBLK
+  1
+
+  9
+$DIMASO
+ 70
+1
+  9
+$DIMSHO
+ 70
+1
+  9
+$DIMPOST
+  1
+
+  9
+$DIMAPOST
+  1
+
+  9
+$DIMALT
+ 70
+0
+  9
+$DIMALTD
+ 70
+3
+  9
+$DIMALTF
+ 40
+0.03937007874
+  9
+$DIMLFAC
+ 40
+1.0
+  9
+$DIMTOFL
+ 70
+1
+  9
+$DIMTVP
+ 40
+0.0
+  9
+$DIMTIX
+ 70
+0
+  9
+$DIMSOXD
+ 70
+0
+  9
+$DIMSAH
+ 70
+0
+  9
+$DIMBLK1
+  1
+
+  9
+$DIMBLK2
+  1
+
+  9
+$DIMSTYLE
+  2
+ISO-25
+  9
+$DIMCLRD
+ 70
+0
+  9
+$DIMCLRE
+ 70
+0
+  9
+$DIMCLRT
+ 70
+0
+  9
+$DIMTFAC
+ 40
+1.0
+  9
+$DIMGAP
+ 40
+0.625
+  9
+$DIMJUST
+ 70
+0
+  9
+$DIMSD1
+ 70
+0
+  9
+$DIMSD2
+ 70
+0
+  9
+$DIMTOLJ
+ 70
+0
+  9
+$DIMTZIN
+ 70
+8
+  9
+$DIMALTZ
+ 70
+0
+  9
+$DIMALTTZ
+ 70
+0
+  9
+$DIMUPT
+ 70
+0
+  9
+$DIMDEC
+ 70
+2
+  9
+$DIMTDEC
+ 70
+2
+  9
+$DIMALTU
+ 70
+2
+  9
+$DIMALTTD
+ 70
+3
+  9
+$DIMTXSTY
+  7
+Standard
+  9
+$DIMAUNIT
+ 70
+0
+  9
+$DIMADEC
+ 70
+0
+  9
+$DIMALTRND
+ 40
+0.0
+  9
+$DIMAZIN
+ 70
+0
+  9
+$DIMDSEP
+ 70
+44
+  9
+$DIMATFIT
+ 70
+3
+  9
+$DIMFRAC
+ 70
+0
+  9
+$DIMLDRBLK
+  1
+
+  9
+$DIMLUNIT
+ 70
+2
+  9
+$DIMLWD
+ 70
+-2
+  9
+$DIMLWE
+ 70
+-2
+  9
+$DIMTMOVE
+ 70
+0
+  9
+$LUNITS
+ 70
+2
+  9
+$LUPREC
+ 70
+4
+  9
+$SKETCHINC
+ 40
+1.0
+  9
+$FILLETRAD
+ 40
+10.0
+  9
+$AUNITS
+ 70
+0
+  9
+$AUPREC
+ 70
+2
+  9
+$MENU
+  1
+.
+  9
+$ELEVATION
+ 40
+0.0
+  9
+$PELEVATION
+ 40
+0.0
+  9
+$THICKNESS
+ 40
+0.0
+  9
+$LIMCHECK
+ 70
+0
+  9
+$CHAMFERA
+ 40
+0.0
+  9
+$CHAMFERB
+ 40
+0.0
+  9
+$CHAMFERC
+ 40
+0.0
+  9
+$CHAMFERD
+ 40
+0.0
+  9
+$SKPOLY
+ 70
+0
+  9
+$TDCREATE
+ 40
+2461233.387928241
+  9
+$TDUCREATE
+ 40
+2458532.153996898
+  9
+$TDUPDATE
+ 40
+2461233.387928241
+  9
+$TDUUPDATE
+ 40
+2458532.1544311
+  9
+$TDINDWG
+ 40
+0.0
+  9
+$TDUSRTIMER
+ 40
+0.0
+  9
+$USRTIMER
+ 70
+1
+  9
+$ANGBASE
+ 50
+0.0
+  9
+$ANGDIR
+ 70
+0
+  9
+$PDMODE
+ 70
+0
+  9
+$PDSIZE
+ 40
+0.0
+  9
+$PLINEWID
+ 40
+0.0
+  9
+$SPLFRAME
+ 70
+0
+  9
+$SPLINETYPE
+ 70
+6
+  9
+$SPLINESEGS
+ 70
+8
+  9
+$HANDSEED
+  5
+32
+  9
+$SURFTAB1
+ 70
+6
+  9
+$SURFTAB2
+ 70
+6
+  9
+$SURFTYPE
+ 70
+6
+  9
+$SURFU
+ 70
+6
+  9
+$SURFV
+ 70
+6
+  9
+$UCSBASE
+  2
+
+  9
+$UCSNAME
+  2
+
+  9
+$UCSORG
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSXDIR
+ 10
+1.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSYDIR
+ 10
+0.0
+ 20
+1.0
+ 30
+0.0
+  9
+$UCSORTHOREF
+  2
+
+  9
+$UCSORTHOVIEW
+ 70
+0
+  9
+$UCSORGTOP
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSORGBOTTOM
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSORGLEFT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSORGRIGHT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSORGFRONT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSORGBACK
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSBASE
+  2
+
+  9
+$PUCSNAME
+  2
+
+  9
+$PUCSORG
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSXDIR
+ 10
+1.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSYDIR
+ 10
+0.0
+ 20
+1.0
+ 30
+0.0
+  9
+$PUCSORTHOREF
+  2
+
+  9
+$PUCSORTHOVIEW
+ 70
+0
+  9
+$PUCSORGTOP
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSORGBOTTOM
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSORGLEFT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSORGRIGHT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSORGFRONT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSORGBACK
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$USERI1
+ 70
+0
+  9
+$USERI2
+ 70
+0
+  9
+$USERI3
+ 70
+0
+  9
+$USERI4
+ 70
+0
+  9
+$USERI5
+ 70
+0
+  9
+$USERR1
+ 40
+0.0
+  9
+$USERR2
+ 40
+0.0
+  9
+$USERR3
+ 40
+0.0
+  9
+$USERR4
+ 40
+0.0
+  9
+$USERR5
+ 40
+0.0
+  9
+$WORLDVIEW
+ 70
+1
+  9
+$SHADEDGE
+ 70
+3
+  9
+$SHADEDIF
+ 70
+70
+  9
+$TILEMODE
+ 70
+1
+  9
+$MAXACTVP
+ 70
+64
+  9
+$PINSBASE
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PLIMCHECK
+ 70
+0
+  9
+$PEXTMIN
+ 10
+1e+20
+ 20
+1e+20
+ 30
+1e+20
+  9
+$PEXTMAX
+ 10
+-1e+20
+ 20
+-1e+20
+ 30
+-1e+20
+  9
+$PLIMMIN
+ 10
+0.0
+ 20
+0.0
+  9
+$PLIMMAX
+ 10
+420.0
+ 20
+297.0
+  9
+$UNITMODE
+ 70
+0
+  9
+$VISRETAIN
+ 70
+1
+  9
+$PLINEGEN
+ 70
+0
+  9
+$PSLTSCALE
+ 70
+1
+  9
+$TREEDEPTH
+ 70
+3020
+  9
+$CMLSTYLE
+  2
+Standard
+  9
+$CMLJUST
+ 70
+0
+  9
+$CMLSCALE
+ 40
+20.0
+  9
+$PROXYGRAPHICS
+ 70
+1
+  9
+$MEASUREMENT
+ 70
+1
+  9
+$CELWEIGHT
+370
+-1
+  9
+$ENDCAPS
+280
+0
+  9
+$JOINSTYLE
+280
+0
+  9
+$LWDISPLAY
+290
+0
+  9
+$INSUNITS
+ 70
+6
+  9
+$HYPERLINKBASE
+  1
+
+  9
+$STYLESHEET
+  1
+
+  9
+$XEDIT
+290
+1
+  9
+$CEPSNTYPE
+380
+0
+  9
+$PSTYLEMODE
+290
+1
+  9
+$FINGERPRINTGUID
+  2
+{E18782E4-56F9-4A92-A833-3CFC279E9AC9}
+  9
+$VERSIONGUID
+  2
+{719D296E-FD81-4235-B3B6-7912219EC079}
+  9
+$EXTNAMES
+290
+1
+  9
+$PSVPSCALE
+ 40
+0.0
+  9
+$OLESTARTUP
+290
+0
+  0
+ENDSEC
+  0
+SECTION
+  2
+CLASSES
+  0
+CLASS
+  1
+ACDBDICTIONARYWDFLT
+  2
+AcDbDictionaryWithDefault
+  3
+ObjectDBX Classes
+ 90
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+SUN
+  2
+AcDbSun
+  3
+SCENEOE
+ 90
+1153
+280
+0
+281
+0
+  0
+CLASS
+  1
+VISUALSTYLE
+  2
+AcDbVisualStyle
+  3
+ObjectDBX Classes
+ 90
+4095
+280
+0
+281
+0
+  0
+CLASS
+  1
+MATERIAL
+  2
+AcDbMaterial
+  3
+ObjectDBX Classes
+ 90
+1153
+280
+0
+281
+0
+  0
+CLASS
+  1
+SCALE
+  2
+AcDbScale
+  3
+ObjectDBX Classes
+ 90
+1153
+280
+0
+281
+0
+  0
+CLASS
+  1
+TABLESTYLE
+  2
+AcDbTableStyle
+  3
+ObjectDBX Classes
+ 90
+4095
+280
+0
+281
+0
+  0
+CLASS
+  1
+MLEADERSTYLE
+  2
+AcDbMLeaderStyle
+  3
+ACDB_MLEADERSTYLE_CLASS
+ 90
+4095
+280
+0
+281
+0
+  0
+CLASS
+  1
+DICTIONARYVAR
+  2
+AcDbDictionaryVar
+  3
+ObjectDBX Classes
+ 90
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+CELLSTYLEMAP
+  2
+AcDbCellStyleMap
+  3
+ObjectDBX Classes
+ 90
+1152
+280
+0
+281
+0
+  0
+CLASS
+  1
+MENTALRAYRENDERSETTINGS
+  2
+AcDbMentalRayRenderSettings
+  3
+SCENEOE
+ 90
+1024
+280
+0
+281
+0
+  0
+CLASS
+  1
+ACDBDETAILVIEWSTYLE
+  2
+AcDbDetailViewStyle
+  3
+ObjectDBX Classes
+ 90
+1025
+280
+0
+281
+0
+  0
+CLASS
+  1
+ACDBSECTIONVIEWSTYLE
+  2
+AcDbSectionViewStyle
+  3
+ObjectDBX Classes
+ 90
+1025
+280
+0
+281
+0
+  0
+CLASS
+  1
+RASTERVARIABLES
+  2
+AcDbRasterVariables
+  3
+ISM
+ 90
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+ACDBPLACEHOLDER
+  2
+AcDbPlaceHolder
+  3
+ObjectDBX Classes
+ 90
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+LAYOUT
+  2
+AcDbLayout
+  3
+ObjectDBX Classes
+ 90
+0
+280
+0
+281
+0
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+VPORT
+  5
+8
+330
+0
+100
+AcDbSymbolTable
+ 70
+1
+  0
+VPORT
+  5
+23
+330
+8
+100
+AcDbSymbolTableRecord
+100
+AcDbViewportTableRecord
+  2
+*Active
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 11
+1.0
+ 21
+1.0
+ 12
+0.0
+ 22
+0.0
+ 13
+0.0
+ 23
+0.0
+ 14
+0.5
+ 24
+0.5
+ 15
+0.5
+ 25
+0.5
+ 16
+0.0
+ 26
+0.0
+ 36
+1.0
+ 17
+0.0
+ 27
+0.0
+ 37
+0.0
+ 40
+1000.0
+ 41
+1.34
+ 42
+50.0
+ 43
+0.0
+ 44
+0.0
+ 50
+0.0
+ 51
+0.0
+ 71
+0
+ 72
+1000
+ 73
+1
+ 74
+3
+ 75
+0
+ 76
+0
+ 77
+0
+ 78
+0
+281
+0
+ 65
+0
+146
+0.0
+  0
+ENDTAB
+  0
+TABLE
+  2
+LTYPE
+  5
+2
+330
+0
+100
+AcDbSymbolTable
+ 70
+3
+  0
+LTYPE
+  5
+24
+330
+2
+100
+AcDbSymbolTableRecord
+100
+AcDbLinetypeTableRecord
+  2
+ByBlock
+ 70
+0
+  3
+
+ 72
+65
+ 73
+0
+ 40
+0.0
+  0
+LTYPE
+  5
+25
+330
+2
+100
+AcDbSymbolTableRecord
+100
+AcDbLinetypeTableRecord
+  2
+ByLayer
+ 70
+0
+  3
+
+ 72
+65
+ 73
+0
+ 40
+0.0
+  0
+LTYPE
+  5
+26
+330
+2
+100
+AcDbSymbolTableRecord
+100
+AcDbLinetypeTableRecord
+  2
+Continuous
+ 70
+0
+  3
+
+ 72
+65
+ 73
+0
+ 40
+0.0
+  0
+ENDTAB
+  0
+TABLE
+  2
+LAYER
+  5
+1
+330
+0
+100
+AcDbSymbolTable
+ 70
+2
+  0
+LAYER
+  5
+27
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+0
+ 70
+0
+ 62
+7
+  6
+Continuous
+370
+-3
+390
+13
+  0
+LAYER
+  5
+28
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+Defpoints
+ 70
+0
+ 62
+7
+  6
+Continuous
+290
+0
+370
+-3
+390
+13
+  0
+ENDTAB
+  0
+TABLE
+  2
+STYLE
+  5
+5
+330
+0
+100
+AcDbSymbolTable
+ 70
+1
+  0
+STYLE
+  5
+29
+330
+5
+100
+AcDbSymbolTableRecord
+100
+AcDbTextStyleTableRecord
+  2
+Standard
+ 70
+0
+ 40
+0.0
+ 41
+1.0
+ 50
+0.0
+ 71
+0
+ 42
+2.5
+  3
+txt
+  4
+
+  0
+ENDTAB
+  0
+TABLE
+  2
+VIEW
+  5
+7
+330
+0
+100
+AcDbSymbolTable
+ 70
+0
+  0
+ENDTAB
+  0
+TABLE
+  2
+UCS
+  5
+6
+330
+0
+100
+AcDbSymbolTable
+ 70
+0
+  0
+ENDTAB
+  0
+TABLE
+  2
+APPID
+  5
+3
+330
+0
+100
+AcDbSymbolTable
+ 70
+3
+  0
+APPID
+  5
+2A
+330
+3
+100
+AcDbSymbolTableRecord
+100
+AcDbRegAppTableRecord
+  2
+ACAD
+ 70
+0
+  0
+APPID
+  5
+2F
+330
+3
+100
+AcDbSymbolTableRecord
+100
+AcDbRegAppTableRecord
+  2
+HATCHBACKGROUNDCOLOR
+ 70
+0
+  0
+APPID
+  5
+30
+330
+3
+100
+AcDbSymbolTableRecord
+100
+AcDbRegAppTableRecord
+  2
+EZDXF
+ 70
+0
+  0
+ENDTAB
+  0
+TABLE
+  2
+DIMSTYLE
+  5
+4
+330
+0
+100
+AcDbSymbolTable
+ 70
+1
+100
+AcDbDimStyleTable
+  0
+DIMSTYLE
+105
+2B
+330
+4
+100
+AcDbSymbolTableRecord
+100
+AcDbDimStyleTableRecord
+  2
+Standard
+ 70
+0
+  3
+
+  4
+
+ 40
+1.0
+ 41
+2.5
+ 42
+0.625
+ 43
+3.75
+ 44
+1.25
+ 45
+0.0
+ 46
+0.0
+ 47
+0.0
+ 48
+0.0
+140
+2.5
+141
+2.5
+142
+0.0
+143
+0.03937007874
+144
+1.0
+145
+0.0
+146
+1.0
+147
+0.625
+148
+0.0
+ 71
+0
+ 72
+0
+ 73
+0
+ 74
+0
+ 75
+0
+ 76
+0
+ 77
+1
+ 78
+8
+ 79
+3
+170
+0
+171
+3
+172
+1
+173
+0
+174
+0
+175
+0
+176
+0
+177
+0
+178
+0
+179
+2
+271
+2
+272
+2
+273
+2
+274
+3
+275
+0
+276
+0
+277
+2
+278
+44
+279
+0
+280
+0
+281
+0
+282
+0
+283
+0
+284
+8
+285
+0
+286
+0
+288
+0
+289
+3
+371
+-2
+372
+-2
+  0
+ENDTAB
+  0
+TABLE
+  2
+BLOCK_RECORD
+  5
+9
+330
+0
+100
+AcDbSymbolTable
+ 70
+2
+  0
+BLOCK_RECORD
+  5
+17
+330
+9
+100
+AcDbSymbolTableRecord
+100
+AcDbBlockTableRecord
+  2
+*Model_Space
+340
+1A
+  0
+BLOCK_RECORD
+  5
+1B
+330
+9
+100
+AcDbSymbolTableRecord
+100
+AcDbBlockTableRecord
+  2
+*Paper_Space
+340
+1E
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+BLOCKS
+  0
+BLOCK
+  5
+18
+330
+17
+100
+AcDbEntity
+  8
+0
+100
+AcDbBlockBegin
+  2
+*Model_Space
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+*Model_Space
+  1
+
+  0
+ENDBLK
+  5
+19
+330
+17
+100
+AcDbEntity
+  8
+0
+100
+AcDbBlockEnd
+  0
+BLOCK
+  5
+1C
+330
+1B
+100
+AcDbEntity
+  8
+0
+100
+AcDbBlockBegin
+  2
+*Paper_Space
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+*Paper_Space
+  1
+
+  0
+ENDBLK
+  5
+1D
+330
+1B
+100
+AcDbEntity
+  8
+0
+100
+AcDbBlockEnd
+  0
+ENDSEC
+`;
+
+// OBJECTS section (dictionaries + LAYOUTs) generated by ezdxf — exactly what AutoCAD LT needs.
+const DXF_AFTER = `  0
+SECTION
+  2
+OBJECTS
+  0
+DICTIONARY
+  5
+A
+330
+0
+100
+AcDbDictionary
+281
+1
+  3
+ACAD_COLOR
+350
+B
+  3
+ACAD_GROUP
+350
+C
+  3
+ACAD_LAYOUT
+350
+D
+  3
+ACAD_MATERIAL
+350
+E
+  3
+ACAD_MLEADERSTYLE
+350
+F
+  3
+ACAD_MLINESTYLE
+350
+10
+  3
+ACAD_PLOTSETTINGS
+350
+11
+  3
+ACAD_PLOTSTYLENAME
+350
+12
+  3
+ACAD_SCALELIST
+350
+14
+  3
+ACAD_TABLESTYLE
+350
+15
+  3
+ACAD_VISUALSTYLE
+350
+16
+  3
+EZDXF_META
+350
+2D
+  0
+DICTIONARY
+  5
+B
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+DICTIONARY
+  5
+C
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+DICTIONARY
+  5
+D
+330
+A
+100
+AcDbDictionary
+281
+1
+  3
+Model
+350
+1A
+  3
+Layout1
+350
+1E
+  0
+DICTIONARY
+  5
+E
+330
+A
+100
+AcDbDictionary
+281
+1
+  3
+ByBlock
+350
+1F
+  3
+ByLayer
+350
+20
+  3
+Global
+350
+21
+  0
+DICTIONARY
+  5
+F
+330
+A
+100
+AcDbDictionary
+281
+1
+  3
+Standard
+350
+2C
+  0
+DICTIONARY
+  5
+10
+330
+A
+100
+AcDbDictionary
+281
+1
+  3
+Standard
+350
+22
+  0
+DICTIONARY
+  5
+11
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+ACDBDICTIONARYWDFLT
+  5
+12
+330
+A
+100
+AcDbDictionary
+281
+1
+  3
+Normal
+350
+13
+100
+AcDbDictionaryWithDefault
+340
+13
+  0
+ACDBPLACEHOLDER
+  5
+13
+330
+12
+  0
+DICTIONARY
+  5
+14
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+DICTIONARY
+  5
+15
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+DICTIONARY
+  5
+16
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+LAYOUT
+  5
+1A
+330
+D
+100
+AcDbPlotSettings
+  1
+
+  4
+A3
+  6
+
+ 40
+7.5
+ 41
+20.0
+ 42
+7.5
+ 43
+20.0
+ 44
+420.0
+ 45
+297.0
+ 46
+0.0
+ 47
+0.0
+ 48
+0.0
+ 49
+0.0
+140
+0.0
+141
+0.0
+142
+1.0
+143
+1.0
+ 70
+1024
+ 72
+1
+ 73
+0
+ 74
+5
+  7
+
+ 75
+16
+ 76
+0
+ 77
+2
+ 78
+300
+147
+1.0
+148
+0.0
+149
+0.0
+100
+AcDbLayout
+  1
+Model
+ 70
+1
+ 71
+0
+ 10
+0.0
+ 20
+0.0
+ 11
+420.0
+ 21
+297.0
+ 12
+0.0
+ 22
+0.0
+ 32
+0.0
+ 14
+1e+20
+ 24
+1e+20
+ 34
+1e+20
+ 15
+-1e+20
+ 25
+-1e+20
+ 35
+-1e+20
+146
+0.0
+ 13
+0.0
+ 23
+0.0
+ 33
+0.0
+ 16
+1.0
+ 26
+0.0
+ 36
+0.0
+ 17
+0.0
+ 27
+1.0
+ 37
+0.0
+ 76
+1
+330
+17
+  0
+LAYOUT
+  5
+1E
+330
+D
+100
+AcDbPlotSettings
+  1
+
+  4
+A3
+  6
+
+ 40
+7.5
+ 41
+20.0
+ 42
+7.5
+ 43
+20.0
+ 44
+420.0
+ 45
+297.0
+ 46
+0.0
+ 47
+0.0
+ 48
+0.0
+ 49
+0.0
+140
+0.0
+141
+0.0
+142
+1.0
+143
+1.0
+ 70
+0
+ 72
+1
+ 73
+0
+ 74
+5
+  7
+
+ 75
+16
+ 76
+0
+ 77
+2
+ 78
+300
+147
+1.0
+148
+0.0
+149
+0.0
+100
+AcDbLayout
+  1
+Layout1
+ 70
+1
+ 71
+1
+ 10
+0.0
+ 20
+0.0
+ 11
+420.0
+ 21
+297.0
+ 12
+0.0
+ 22
+0.0
+ 32
+0.0
+ 14
+1e+20
+ 24
+1e+20
+ 34
+1e+20
+ 15
+-1e+20
+ 25
+-1e+20
+ 35
+-1e+20
+146
+0.0
+ 13
+0.0
+ 23
+0.0
+ 33
+0.0
+ 16
+1.0
+ 26
+0.0
+ 36
+0.0
+ 17
+0.0
+ 27
+1.0
+ 37
+0.0
+ 76
+1
+330
+1B
+  0
+MATERIAL
+  5
+1F
+102
+{ACAD_REACTORS
+330
+E
+102
+}
+330
+E
+100
+AcDbMaterial
+  1
+ByBlock
+  2
+
+ 70
+0
+ 40
+1.0
+ 71
+1
+ 41
+1.0
+ 91
+-1023410177
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 44
+0.5
+ 73
+0
+ 45
+1.0
+ 46
+1.0
+ 77
+1
+  4
+
+ 78
+1
+ 79
+1
+170
+1
+ 48
+1.0
+171
+1
+  6
+
+172
+1
+173
+1
+174
+1
+140
+1.0
+141
+1.0
+175
+1
+  7
+
+176
+1
+177
+1
+178
+1
+143
+1.0
+179
+1
+  8
+
+270
+1
+271
+1
+272
+1
+145
+1.0
+146
+1.0
+273
+1
+  9
+
+274
+1
+275
+1
+276
+1
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 94
+63
+  0
+MATERIAL
+  5
+20
+102
+{ACAD_REACTORS
+330
+E
+102
+}
+330
+E
+100
+AcDbMaterial
+  1
+ByLayer
+  2
+
+ 70
+0
+ 40
+1.0
+ 71
+1
+ 41
+1.0
+ 91
+-1023410177
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 44
+0.5
+ 73
+0
+ 45
+1.0
+ 46
+1.0
+ 77
+1
+  4
+
+ 78
+1
+ 79
+1
+170
+1
+ 48
+1.0
+171
+1
+  6
+
+172
+1
+173
+1
+174
+1
+140
+1.0
+141
+1.0
+175
+1
+  7
+
+176
+1
+177
+1
+178
+1
+143
+1.0
+179
+1
+  8
+
+270
+1
+271
+1
+272
+1
+145
+1.0
+146
+1.0
+273
+1
+  9
+
+274
+1
+275
+1
+276
+1
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 94
+63
+  0
+MATERIAL
+  5
+21
+102
+{ACAD_REACTORS
+330
+E
+102
+}
+330
+E
+100
+AcDbMaterial
+  1
+Global
+  2
+
+ 70
+0
+ 40
+1.0
+ 71
+1
+ 41
+1.0
+ 91
+-1023410177
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 44
+0.5
+ 73
+0
+ 45
+1.0
+ 46
+1.0
+ 77
+1
+  4
+
+ 78
+1
+ 79
+1
+170
+1
+ 48
+1.0
+171
+1
+  6
+
+172
+1
+173
+1
+174
+1
+140
+1.0
+141
+1.0
+175
+1
+  7
+
+176
+1
+177
+1
+178
+1
+143
+1.0
+179
+1
+  8
+
+270
+1
+271
+1
+272
+1
+145
+1.0
+146
+1.0
+273
+1
+  9
+
+274
+1
+275
+1
+276
+1
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 94
+63
+  0
+MLINESTYLE
+  5
+22
+102
+{ACAD_REACTORS
+330
+10
+102
+}
+330
+10
+100
+AcDbMlineStyle
+  2
+Standard
+ 70
+0
+  3
+
+ 62
+256
+ 51
+90.0
+ 52
+90.0
+ 71
+2
+ 49
+0.5
+ 62
+256
+  6
+BYLAYER
+ 49
+-0.5
+ 62
+256
+  6
+BYLAYER
+  0
+MLEADERSTYLE
+  5
+2C
+102
+{ACAD_REACTORS
+330
+F
+102
+}
+330
+F
+100
+AcDbMLeaderStyle
+179
+2
+170
+2
+171
+1
+172
+0
+ 90
+2
+ 40
+0.0
+ 41
+0.0
+173
+1
+ 91
+-1056964608
+ 92
+-2
+290
+1
+ 42
+2.0
+291
+1
+ 43
+8.0
+  3
+Standard
+ 44
+4.0
+300
+
+342
+29
+174
+1
+175
+1
+176
+0
+178
+1
+ 93
+-1056964608
+ 45
+4.0
+292
+0
+297
+0
+ 46
+4.0
+ 94
+-1056964608
+ 47
+1.0
+ 49
+1.0
+140
+1.0
+294
+1
+141
+0.0
+177
+0
+142
+1.0
+295
+0
+296
+0
+143
+3.75
+271
+0
+272
+9
+273
+9
+  0
+DICTIONARY
+  5
+2D
+330
+A
+100
+AcDbDictionary
+280
+1
+281
+1
+  3
+CREATED_BY_EZDXF
+350
+2E
+  3
+WRITTEN_BY_EZDXF
+350
+31
+  0
+DICTIONARYVAR
+  5
+2E
+330
+2D
+100
+DictionaryVariables
+280
+0
+  1
+1.4.4 @ 2026-07-11T02:18:37.019658+00:00
+  0
+DICTIONARYVAR
+  5
+31
+330
+2D
+100
+DictionaryVariables
+280
+0
+  1
+1.4.4 @ 2026-07-11T02:18:37.024698+00:00
+  0
+ENDSEC
+  0
+EOF
+`;
+
+
+
 function buildDXF() {
   const W = pCanvas.width, H = pCanvas.height;
   const wW = parseFloat($('workW').value);
   const sc = wW / W;
-  let dxf = '';
+  const ff = v => v.toFixed(4);
+  const f6 = v => v.toFixed(6);
 
-  // ── HEADER — AC1009 = R12 ──
-  dxf += '  0\nSECTION\n  2\nHEADER\n';
-  dxf += '  9\n$ACADVER\n  1\nAC1009\n';
-  dxf += '  0\nENDSEC\n';
+  // Entity handles start at 0x200 — well above ezdxf boilerplate max (0x32 = 50)
+  let _h = 0x200;
+  const nh = () => (_h++).toString(16).toUpperCase();
+  const MS_OWNER = '17'; // *Model_Space BLOCK_RECORD handle (ezdxf boilerplate)
 
-  // ── TABLES — R12 requires only LAYER ──
-  dxf += '  0\nSECTION\n  2\nTABLES\n';
-  dxf += '  0\nTABLE\n  2\nLAYER\n 70\n1\n';
-  dxf += '  0\nLAYER\n  2\n0\n 70\n0\n 62\n7\n  6\nCONTINUOUS\n';
-  dxf += '  0\nENDTAB\n';
-  dxf += '  0\nENDSEC\n';
+  function polyline(verts, closed) {
+    if (verts.length < 2) return '';
+    const ph = nh();
+    let s = `  0\nPOLYLINE\n  5\n${ph}\n330\n${MS_OWNER}\n`;
+    s += '100\nAcDbEntity\n  8\n0\n';
+    s += `100\nAcDb2dPolyline\n 66\n1\n 70\n${closed ? 1 : 0}\n 10\n0.0\n 20\n0.0\n 30\n0.0\n`;
+    for (const v of verts) {
+      const vh = nh();
+      s += `  0\nVERTEX\n  5\n${vh}\n330\n${ph}\n`;
+      s += '100\nAcDbEntity\n  8\n0\n';
+      s += `100\nAcDb2dVertex\n 10\n${ff(v.x)}\n 20\n${ff(v.y)}\n 30\n0.0\n 70\n0\n`;
+      if (Math.abs(v.bulge) > 1e-6) s += ` 42\n${f6(v.bulge)}\n`;
+    }
+    const sq = nh();
+    s += `  0\nSEQEND\n  5\n${sq}\n330\n${ph}\n`;
+    s += '100\nAcDbEntity\n  8\n0\n100\nAcDbSequenceEnd\n';
+    return s;
+  }
 
-  // ── ENTITIES — R12 uses POLYLINE + VERTEX + SEQEND ──
-  dxf += '  0\nSECTION\n  2\nENTITIES\n';
+  // ── ENTITIES ──────────────────────────────────────────────────────────
+  let entities = '';
 
-  for (const s of S.shapes) {
-    const sx = s.x * sc;
-    const sy = (H - s.y) * sc;
-    const sr = s.r * sc;   // radius in mm = same as what preview draws
-    if (S.pattern === 'circle' || S.pattern === 'dot') {
-      // True CAD circle — exact arc, no segment approximation
-      dxf += `  0\nCIRCLE\n  8\n0\n 10\n${f(sx)}\n 20\n${f(sy)}\n 30\n0.0\n 40\n${f(sr)}\n`;
-    } else {
-      // Polygon shapes — s.r pixels → sr mm via *sc
-      const raw = getShapePoints(s.x, s.y, s.r, S.pattern);
-      dxf += '  0\nPOLYLINE\n  8\n0\n 66\n1\n 70\n1\n';
-      for (const [px, py] of raw) {
-        dxf += `  0\nVERTEX\n  8\n0\n 10\n${f(px*sc)}\n 20\n${f((H-py)*sc)}\n 30\n0.0\n`;
+  // Pre-compute imgshape representation (once, reused for all instances)
+  let _ishArcs = null;
+  if (S.pattern === 'imgshape' && IMGSHAPE.normPaths && IMGSHAPE.normPaths.length) {
+    const rot    = (parseInt($('shRot').value) || 0) * Math.PI / 180;
+    const isCont = !!IMGSHAPE.isContour;
+
+    if (isCont && IMGSHAPE.normPaths[0]) {
+      const path = IMGSHAPE.normPaths[0];
+      let maxR2 = 0, minR2 = Infinity;
+      for (const p of path) {
+        const r2 = p.x*p.x + p.y*p.y;
+        if (r2 > maxR2) maxR2 = r2;
+        if (r2 < minR2) minR2 = r2;
       }
-      dxf += '  0\nSEQEND\n  8\n0\n';
+      const ratio = Math.sqrt(minR2) / Math.sqrt(maxR2);
+      let kStar = (8 * ratio / Math.SQRT2 - 1) / 6;
+      kStar = isNaN(kStar) ? 0.30 : Math.max(0.15, Math.min(0.45, kStar));
+      _ishArcs = [{ starMode: true, k: kStar, rot: -rot }];
+
+    } else {
+      const cosR = Math.cos(rot), sinR = Math.sin(rot);
+      const useRot = Math.abs(rot) > 0.01;
+      _ishArcs = IMGSHAPE.normPaths.map(path => {
+        const rPts = path.map(pt => useRot
+          ? [pt.x*cosR - pt.y*sinR, pt.x*sinR + pt.y*cosR]
+          : [pt.x, pt.y]
+        );
+        return _fitArcs(rPts, false, 0.02);
+      });
     }
   }
 
-  dxf += '  0\nENDSEC\n';
-  dxf += '  0\nEOF\n';
-  return dxf;
+  for (const s of S.shapes) {
+    const sx = s.x * sc, sy = (H - s.y) * sc, sr = s.r * sc;
+
+    if (S.pattern === 'circle' || S.pattern === 'dot') {
+      const ch = nh();
+      entities += `  0\nCIRCLE\n  5\n${ch}\n330\n${MS_OWNER}\n100\nAcDbEntity\n  8\n0\n100\nAcDbCircle\n 10\n${ff(sx)}\n 20\n${ff(sy)}\n 30\n0.0\n 40\n${ff(sr)}\n`;
+
+    } else if (S.pattern === 'imgshape') {
+      if (!_ishArcs) continue;
+      const isCont = !!IMGSHAPE.isContour;
+      if (isCont && _ishArcs[0] && _ishArcs[0].starMode) {
+        // Use the actual traced contour for bezier fitting — matches the canvas preview
+        // and preserves the original aspect ratio (unlike the parametric k-based star).
+        const _np0 = IMGSHAPE.normPaths[0];
+        const _rot0 = -_ishArcs[0].rot;   // _ishArcs[0].rot == -rot; undo the sign
+        if (_np0 && _np0.length >= 8) {
+          entities += _gen4StarContourSplineDXF(sx, sy, sr, _np0, _rot0, _h, MS_OWNER);
+        } else {
+          entities += _gen4StarSplineDXF(sx, sy, sr, _ishArcs[0].k, _ishArcs[0].rot, _h, MS_OWNER);
+        }
+        _h += 4;
+      } else {
+        for (const arcPath of _ishArcs) {
+          if (arcPath.length < 2) continue;
+          const verts = arcPath.map(v => ({
+            x: (s.x + v.x * s.r) * sc,
+            y: (H - (s.y + v.y * s.r)) * sc,
+            bulge: -v.bulge
+          }));
+          entities += polyline(verts, false);
+        }
+      }
+
+    } else {
+      const raw = getShapePoints(s.x, s.y, s.r, S.pattern, S.patRot);
+      if (raw.length < 2) continue;
+      const verts = raw.map(([px, py]) => ({x: px*sc, y: (H-py)*sc, bulge: 0}));
+      entities += polyline(verts, true);
+    }
+  }
+
+  // Patch $HANDSEED in boilerplate to be above our highest entity handle
+  const handseed = _h.toString(16).toUpperCase();
+  const patchedBefore = DXF_BEFORE.replace(
+    '  9\n$HANDSEED\n  5\n32\n',
+    `  9\n$HANDSEED\n  5\n${handseed}\n`
+  );
+
+  return patchedBefore
+    + '  0\nSECTION\n  2\nENTITIES\n'
+    + entities
+    + '  0\nENDSEC\n'
+    + DXF_AFTER;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2861,7 +6807,7 @@ $('expAI').addEventListener('click', () => {
   const wW = parseFloat($('workW').value), wH = parseFloat($('workH').value);
   const sc = wW / W;
   let d = '';
-  for (const s of S.shapes) d += svgShapePath(s.x*sc, (H-s.y)*sc, s.r*sc, S.pattern);
+  for (const s of S.shapes) d += svgShapePath(s.x*sc, (H-s.y)*sc, s.r*sc, S.pattern, S.patRot);
   const bg = S.darkBg ? '#111111' : '#ffffff';
   const fg = S.darkBg ? '#ffffff' : '#000000';
   // AI-compatible SVG (Illustrator can open SVG with ai: namespace)
@@ -2997,7 +6943,7 @@ $('expSheetGcode').addEventListener('click', () => {
         const sx = parseFloat((s.x*sc + ox).toFixed(3));
         const sy = parseFloat(((H-s.y)*sc + oy).toFixed(3));
         const sr = parseFloat((s.r*sc).toFixed(3));
-        g += gcodeShape(sx,sy,sr,S.pattern,depth,feed,plunge,safeZ,i+1,fmt);
+        g += gcodeShape(sx,sy,sr,S.pattern,depth,feed,plunge,safeZ,i+1,fmt,0,S.patRot);
       }
       g += '\n';
     }
@@ -3304,12 +7250,12 @@ function applyProcPattern(keepSize = false) {
     fitCanvases();
     zoom.show();
     scheduleRender();
-    $('statusTxt').textContent = '✅ Procedural "' + currentProcType + '" pattern applied';
+    $('statusTxt').textContent = '\u2705 Procedural "' + currentProcType + '" pattern applied';
   };
   img.src = offscreen.toDataURL();
 }
 
-// ─── Init (Proc panel) ───────────────────────────────────────
+// ─── Init (Proc panel) ───────────────────────────────────────────
 $('togProcInv').addEventListener('click', () => {
   $('togProcInv').classList.toggle('on');
   procPreview();
@@ -3317,6 +7263,320 @@ $('togProcInv').addEventListener('click', () => {
 buildProcSliders();
 procPreview();
 
+
+
+
+// ============================================================
+// IMGSHAPE MODULE  — custom image as pattern element
+// ============================================================
+const IMGSHAPE = { img: null, canvas: null, normPaths: [], rawPaths: [], mode: 'asis', dirty: false, version: 0 };
+
+// ── Offscreen stamp cache for imgshape fast rendering ────────────────────────
+// Pre-bakes the shape into a 512×512 canvas once; updateViewCanvas() stamps it
+// with drawImage() instead of re-tracing every path point for every shape instance.
+let _ishStamp = null, _ishStampKey = '';
+function _rebuildImgshapeStamp() {
+  const np = IMGSHAPE.normPaths;
+  if (!np || !np.length) { _ishStamp = null; return; }
+  const rot    = (parseInt($('shRot').value) || 0) * Math.PI / 180;
+  const fg     = S.darkBg ? '#ffffff' : '#000000';
+  const key    = `${IMGSHAPE.version}|${rot.toFixed(4)}|${S.fill ? 1 : 0}|${fg}`;
+  if (_ishStamp && _ishStampKey === key) return; // already current — skip rebuild
+  const SZ = 512, half = SZ / 2;
+  const oc = document.createElement('canvas'); oc.width = oc.height = SZ;
+  const octx = oc.getContext('2d');
+  octx.clearRect(0, 0, SZ, SZ);
+  octx.strokeStyle = fg; octx.fillStyle = fg;
+  octx.lineWidth   = 2;  // 2px in 512-unit space → ~1px when drawn at typical shape size
+  octx.lineCap = 'round'; octx.lineJoin = 'round';
+  const cosR = Math.cos(rot), sinR = Math.sin(rot);
+  const useRot = Math.abs(rot) > 0.01;
+  const isContour = !!IMGSHAPE.isContour;
+  octx.beginPath();
+  for (const path of np) {
+    if (path.length < 2) continue;
+    for (let i = 0; i < path.length; i++) {
+      const px = path[i].x, py = path[i].y;
+      let rx = px, ry = py;
+      if (useRot) { rx = px*cosR - py*sinR; ry = px*sinR + py*cosR; }
+      const tx = half + rx * half, ty = half + ry * half;
+      if (i === 0) octx.moveTo(tx, ty); else octx.lineTo(tx, ty);
+    }
+    if (isContour) octx.closePath();
+  }
+  if (isContour && S.fill) octx.fill('evenodd'); else octx.stroke();
+  _ishStamp = oc; _ishStampKey = key;
+}
+
+function setShapeMode(m) {
+  IMGSHAPE.mode = m;
+  ['asis','gray','sil'].forEach(k=>{
+    const b=$('shMode'+k.charAt(0).toUpperCase()+k.slice(1)+'Btn');
+    if(b) b.classList.toggle('active', k===m);
+  });
+  const sr=$('shSilRow'); if(sr) sr.style.display = m==='sil'?'':'none';
+  if (IMGSHAPE.img) { _buildShapeCanvas(); scheduleRender(); }
+}
+
+function onImgShapeSelect() {
+  const p = $('panImgShape');
+  if (p) p.style.display = '';
+}
+
+function _buildShapeCanvas() {
+  if (!IMGSHAPE.img) return;
+  const SZ = 400, N = SZ*SZ;
+
+  // ── 1. Display canvas (white bg) ─────────────────────────────────
+  const c = document.createElement('canvas'); c.width = SZ; c.height = SZ;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, SZ, SZ);
+  ctx.drawImage(IMGSHAPE.img, 0, 0, SZ, SZ);
+  IMGSHAPE.canvas = c;
+
+  // ── 2. Alpha-preserving canvas (no white fill → keeps alpha=0 for transparent px) ──
+  const cA = document.createElement('canvas'); cA.width = SZ; cA.height = SZ;
+  cA.getContext('2d').drawImage(IMGSHAPE.img, 0, 0, SZ, SZ);
+  const d = cA.getContext('2d').getImageData(0, 0, SZ, SZ).data;
+
+  // ── 3. Pre-compute grayscale + alpha ONCE (shared across all strategies) ──
+  const gray = new Float32Array(N);
+  const alphaA = new Uint8Array(N);
+  let hasAlpha = false;
+  for (let i = 0; i < N; i++) {
+    gray[i]   = (0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]) / 255;
+    alphaA[i] = d[i*4+3];
+    if (alphaA[i] < 200) hasAlpha = true;
+  }
+
+  // ── 4. Fast morphological close r=1 (reuses two shared temp buffers) ─
+  const _tmp1 = new Uint8Array(N), _tmp2 = new Uint8Array(N);
+  function morphClose1(bin) {
+    // dilate
+    _tmp1.fill(0);
+    for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
+      if (!bin[y*SZ+x]) continue;
+      const y0=y>0?y-1:0, y1=y<SZ-1?y+1:SZ-1;
+      const x0=x>0?x-1:0, x1=x<SZ-1?x+1:SZ-1;
+      for (let ny=y0;ny<=y1;ny++) for (let nx=x0;nx<=x1;nx++) _tmp1[ny*SZ+nx]=1;
+    }
+    // erode — border pixels always become 0 (OOB neighbors missing)
+    _tmp2.fill(0);
+    for (let y=1;y<SZ-1;y++) {
+      const row=y*SZ;
+      for (let x=1;x<SZ-1;x++) {
+        if (_tmp1[row-SZ+x-1] && _tmp1[row-SZ+x] && _tmp1[row-SZ+x+1] &&
+            _tmp1[row   +x-1] && _tmp1[row   +x] && _tmp1[row   +x+1] &&
+            _tmp1[row+SZ+x-1] && _tmp1[row+SZ+x] && _tmp1[row+SZ+x+1])
+          _tmp2[row+x] = 1;
+      }
+    }
+    return _tmp2;
+  }
+
+  // ── 5. Largest interior CC (pre-allocated queue, indexed directions) ──
+  const _vis  = new Uint8Array(N);
+  const _q    = new Int32Array(N);   // pre-allocated BFS queue
+  function largestInteriorCC(bin) {
+    _vis.fill(0);
+    let bestStart = -1, bestSize = 0;
+    for (let start = 0; start < N; start++) {
+      if (!bin[start] || _vis[start]) continue;
+      _vis[start] = 1; _q[0] = start;
+      let head = 0, tail = 1, size = 1;
+      const bx = start%SZ, by = (start/SZ)|0;
+      let border = (bx===0||bx===SZ-1||by===0||by===SZ-1);
+      while (head < tail) {
+        const idx = _q[head++], x = idx%SZ, y = (idx/SZ)|0;
+        // 4-connectivity, unrolled (no array destructuring in hot path)
+        let nx, ny, ni;
+        nx=x+1; if(nx<SZ){ni=y*SZ+nx; if(bin[ni]&&!_vis[ni]){_vis[ni]=1;_q[tail++]=ni;size++;if(nx===SZ-1)border=true;}}
+        nx=x-1; if(nx>=0){ni=y*SZ+nx; if(bin[ni]&&!_vis[ni]){_vis[ni]=1;_q[tail++]=ni;size++;if(nx===0)border=true;}}
+        ny=y+1; if(ny<SZ){ni=ny*SZ+x; if(bin[ni]&&!_vis[ni]){_vis[ni]=1;_q[tail++]=ni;size++;if(ny===SZ-1)border=true;}}
+        ny=y-1; if(ny>=0){ni=ny*SZ+x; if(bin[ni]&&!_vis[ni]){_vis[ni]=1;_q[tail++]=ni;size++;if(ny===0)border=true;}}
+      }
+      if (!border && size > bestSize) { bestSize = size; bestStart = start; }
+    }
+    if (bestStart < 0 || bestSize < 500) return null;
+    // Second BFS to build mask
+    const mask = new Uint8Array(N);
+    mask[bestStart] = 1; _q[0] = bestStart;
+    let head = 0, tail = 1;
+    while (head < tail) {
+      const idx = _q[head++], x = idx%SZ, y = (idx/SZ)|0;
+      let nx, ny, ni;
+      nx=x+1; if(nx<SZ){ni=y*SZ+nx; if(bin[ni]&&!mask[ni]){mask[ni]=1;_q[tail++]=ni;}}
+      nx=x-1; if(nx>=0){ni=y*SZ+nx; if(bin[ni]&&!mask[ni]){mask[ni]=1;_q[tail++]=ni;}}
+      ny=y+1; if(ny<SZ){ni=ny*SZ+x; if(bin[ni]&&!mask[ni]){mask[ni]=1;_q[tail++]=ni;}}
+      ny=y-1; if(ny>=0){ni=ny*SZ+x; if(bin[ni]&&!mask[ni]){mask[ni]=1;_q[tail++]=ni;}}
+    }
+    return mask;
+  }
+
+  // ── 6. Build all binary images at once (shared gray already computed) ──
+  const strategies = [];
+  if (hasAlpha) {
+    const b = new Uint8Array(N);
+    for (let i=0;i<N;i++) b[i] = alphaA[i] > 102 ? 1 : 0;
+    strategies.push(['alpha', b]);
+  }
+  for (const th of [0.25, 0.5, 0.75]) {
+    const bHi = new Uint8Array(N), bLo = new Uint8Array(N);
+    for (let i=0;i<N;i++) { bHi[i]=gray[i]>th?1:0; bLo[i]=gray[i]<th?1:0; }
+    strategies.push([`lum>${th}`, bHi]);
+    strategies.push([`lum<${th}`, bLo]);
+  }
+
+  // ── 7. Try each strategy; pick the most detailed result ──────────
+  let bestSimp = null, bestScore = 0, bestDebug = '';
+  for (const [label, bin] of strategies) {
+    const closed  = morphClose1(bin);
+    const mask    = largestInteriorCC(closed);
+    if (!mask) continue;
+    const contour = _outerBoundary(mask, SZ, SZ);
+    // Background "frame" after erode has contour = 4*(SZ-2)-4 = 1588; canvas border = 4*(SZ-1) = 1596
+    // Reject those two known-bad values but accept large valid sparkles (e.g. R=170 → contour≈1528)
+    if (contour.length < 8 || contour.length >= 4*(SZ-2) - 4) continue;
+    const simp    = vecSimplify(contour, 0.8);
+    if (simp.length > bestScore) {
+      bestScore = simp.length; bestSimp = simp;
+      let area = 0; for (let i=0;i<N;i++) area+=mask[i];
+      bestDebug = `${label}|raw:${contour.length}|mask:${area}`;
+      if (bestScore > 50) break;  // early exit — good enough
+    }
+  }
+
+  if (bestSimp && bestSimp.length >= 8) {
+    const half = SZ / 2;
+    // Re-simplify with higher eps to strip pixel-level staircase artifacts,
+    // then apply 2 rounds of Chaikin corner-cutting to smooth the curves.
+    // (bestSimp used eps=0.8 for strategy selection; now clean up for output)
+    const clean  = vecSimplify(bestSimp, 1.5);
+    const smooth = chaikinSmooth(clean, true, 2);
+    IMGSHAPE.normPaths = [ smooth.map(([x,y]) => ({ x:(x-half)/half, y:(y-half)/half })) ];
+    // rawPaths = pre-Chaikin simplified contour; used in DXF export to preserve sharp corners
+    IMGSHAPE.rawPaths  = [ bestSimp.map(([x,y]) => ({ x:(x-half)/half, y:(y-half)/half })) ];
+    IMGSHAPE.isContour = true; IMGSHAPE.dirty = false; IMGSHAPE.version++;
+    _ishStamp = null; // invalidate stamp cache
+    $('shapeInfo').textContent = `✅ ${smooth.length} จุด (raw:${bestSimp.length}→clean:${clean.length}→smooth) (${bestDebug}) (outline)`;
+    return;
+  }
+
+  // ── 8. Fallback: skeleton for line-art / very thin shapes ────────
+  const binSk = new Uint8Array(N);
+  if (hasAlpha) {
+    for (let i=0;i<N;i++) binSk[i] = alphaA[i] > 102 ? 1 : 0;
+  } else {
+    const thSk = (parseInt($('shSilTh').value)||128) / 255;
+    const invSk = $('shSilInvert').checked;
+    for (let i=0;i<N;i++) binSk[i] = (gray[i] < thSk) !== invSk ? 1 : 0;
+  }
+  const closedSk = morphClose1(binSk);
+  const skel     = vecThinZhangSuen(closedSk, SZ, SZ);
+  const allPaths = vecTraceSkeleton(skel, SZ, SZ, 4);
+  allPaths.sort((a,b) => b.length - a.length);
+  const simp2   = allPaths.slice(0, 8).map(p => vecSimplify(p, 1.5));
+  const smooth2 = simp2.map(p => chaikinSmooth(p, false, 1)); // 1 round for open strokes
+  const half2 = SZ / 2;
+  IMGSHAPE.normPaths = smooth2.map(pts => pts.map(([x,y]) => ({ x:(x-half2)/half2, y:(y-half2)/half2 })));
+  IMGSHAPE.rawPaths  = simp2.map(pts => pts.map(([x,y]) => ({ x:(x-half2)/half2, y:(y-half2)/half2 })));
+  IMGSHAPE.isContour = false; IMGSHAPE.dirty = false; IMGSHAPE.version++;
+  _ishStamp = null; // invalidate stamp cache
+  $('shapeInfo').textContent =
+    `✅ ${IMGSHAPE.normPaths.length} เส้น (skeleton)  (${IMGSHAPE.img.naturalWidth}×${IMGSHAPE.img.naturalHeight}px)`;
+}
+
+// ── Flood-fill from center → binary mask of main component ──
+function _ffMask(bin, w, h) {
+  const mask = new Uint8Array(w * h);
+  const cx = w >> 1, cy = h >> 1;
+  let sx = cx, sy = cy;
+  if (!bin[sy*w+sx]) {
+    let found = false;
+    outer: for (let r = 1; r < Math.max(w,h); r++) {
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+        const nx = cx+dx, ny = cy+dy;
+        if (nx>=0&&nx<w&&ny>=0&&ny<h&&bin[ny*w+nx]) { sx=nx; sy=ny; found=true; break outer; }
+      }
+    }
+    if (!found) return mask;
+  }
+  const q = [sy*w+sx]; mask[sy*w+sx] = 1;
+  let head = 0;
+  while (head < q.length) {
+    const idx = q[head++], x = idx%w, y = (idx/w)|0;
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx=x+dx, ny=y+dy;
+      if (nx<0||nx>=w||ny<0||ny>=h) continue;
+      const ni=ny*w+nx;
+      if (bin[ni]&&!mask[ni]) { mask[ni]=1; q.push(ni); }
+    }
+  }
+  return mask;
+}
+
+// ── Left-hand-rule boundary trace ───────────────────────────────
+// Keeps the shape on the LEFT while walking — correctly handles
+// both convex corners AND concave re-entrant corners (stars, sparkles, etc.)
+// Uses 4-connectivity (N/E/S/W); D-P simplification smooths staircase diagonals.
+function _outerBoundary(bin, w, h) {
+  // Start at topmost-leftmost foreground pixel (on outer boundary by definition)
+  let sx=-1, sy=-1;
+  loop: for (let y=0;y<h;y++) for (let x=0;x<w;x++) if(bin[y*w+x]){sx=x;sy=y;break loop;}
+  if (sx<0) return [];
+
+  // 4-connected: N=0, E=1, S=2, W=3
+  const DX=[0,1,0,-1], DY=[-1,0,1,0];
+
+  const contour=[[sx,sy]];
+  let cx=sx, cy=sy;
+  let dir=2; // face South initially (topmost pixel → shape is below us)
+
+  for (let step=0; step<w*h*4+10; step++) {
+    // Priority: turn left → go straight → turn right → U-turn
+    // (left-hand rule keeps shape boundary on our left)
+    const L=(dir+3)%4, R=(dir+1)%4, B=(dir+2)%4;
+    let moved=false;
+    for (const d of [L, dir, R, B]) {
+      const nx=cx+DX[d], ny=cy+DY[d];
+      if (nx>=0&&nx<w&&ny>=0&&ny<h&&bin[ny*w+nx]) {
+        dir=d; cx=nx; cy=ny; moved=true; break;
+      }
+    }
+    if (!moved) break; // isolated pixel — can't continue
+    if (cx===sx&&cy===sy) break; // returned to start — boundary closed
+    contour.push([cx,cy]);
+  }
+  return contour;
+}
+
+function loadShapeImg(file) {
+  const ext = (file.name||'').split('.').pop().toLowerCase();
+  const read = (txt) => {
+    const img = new Image();
+    img.onload = () => {
+      IMGSHAPE.img = img;
+      IMGSHAPE.dirty = true;
+      $('shapeThumb').src = img.src;
+      $('shapeThumbWrap').style.display = 'block';
+      $('shapeUploadArea').style.display = 'none';
+      $('shapeInfo').textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
+      _buildShapeCanvas();
+      scheduleRender();
+    };
+    img.src = txt;
+  };
+  if (ext==='dxf') {
+    const r=new FileReader(); r.onload=e=>{ const img=dxfToImage(e.target.result,512,512); img.onload=()=>{ IMGSHAPE.img=img;IMGSHAPE.dirty=true;$('shapeThumb').src=img.src;$('shapeThumbWrap').style.display='block';$('shapeUploadArea').style.display='none';_buildShapeCanvas();scheduleRender();}; }; r.readAsText(file);
+  } else {
+    const r=new FileReader(); r.onload=e=>read(e.target.result); r.readAsDataURL(file);
+  }
+}
+
+// ============================================================
+// IMAGE TILE PATTERN MODULE
+// ============================================================
 
 
 // ============================================================
@@ -3327,6 +7587,10 @@ procPreview();
 // ============================================================
 const VEC = {
   mode: 'centerline',
+  inputModel: 'clipart',   // clipart | photo | sketch | drawing
+  antiAlias: 'off',        // off | smart | mid
+  noiseReduce: 'off',      // off | low | high
+  roundness: 'default',    // off | low | default | high | max
   contours: [],
   svgPaths: [],
   imgW: 0, imgH: 0,
@@ -3334,23 +7598,85 @@ const VEC = {
   showMain: false,
 };
 
+// ── Input Model descriptions ─────────────────────────────────
+const VEC_ALGO_DESC = {
+  centerline: 'คำนวณแกนกลางของเส้น → ลายเดี่ยวคมชัด เหมาะ CNC/CAD',
+  outline:    'ตามเส้นขอบรูปทรง → Filled shape เหมาะงาน artwork',
+  pattern:    'ตรวจจับ tile ซ้ำแล้ว export pattern เดี่ยว',
+};
+
 function setVecMode(mode) {
   VEC.mode = mode;
   ['centerline','outline','pattern'].forEach(m => {
     const btn=$('vecMode_'+m+'Btn'); if(btn) btn.classList.toggle('active', m===mode);
   });
-  const sh=$('vecSettings_shared'), pt=$('vecSettings_pattern');
-  if(sh) sh.style.display = mode!=='pattern' ? '' : 'none';
-  if(pt) pt.style.display = mode==='pattern'  ? '' : 'none';
+  const pt=$('vecSettings_pattern');
+  if(pt) pt.style.display = mode==='pattern' ? '' : 'none';
+  const desc=$('vecAlgoDesc');
+  if(desc) desc.textContent = VEC_ALGO_DESC[mode]||'';
 }
 
+// ── Input Model preset ────────────────────────────────────────
+function setVecInputModel(model) {
+  VEC.inputModel = model;
+  document.querySelectorAll('.vec-model-btn').forEach(b=>{
+    const active = b.id === 'vecModel_'+model;
+    b.classList.toggle('active', active);
+    b.style.background = active ? '#1a2a1a' : '#111';
+    b.style.color       = active ? '#aaa'    : '#555';
+    b.style.borderColor = active ? '#2a5a2a' : '#333';
+  });
+  // Apply preset values
+  const sv=(id,val,div)=>{
+    const el=$(id); if(!el)return; el.value=val;
+    const lv=$(id+'V'); if(lv) lv.textContent=div?(val/div).toFixed(1):val;
+  };
+  const presets = {
+    clipart: {t:128,inv:false,b:5, c:0,nr:'off',aa:'off', rd:'default',m:10,e:8},
+    photo:   {t:140,inv:false,b:15,c:1,nr:'low', aa:'smart',rd:'high',  m:15,e:10},
+    sketch:  {t:185,inv:false,b:12,c:2,nr:'low', aa:'smart',rd:'high',  m:20,e:12},
+    drawing: {t:155,inv:false,b:8, c:1,nr:'off', aa:'smart',rd:'default',m:12,e:8},
+  };
+  const P = presets[model]; if(!P) return;
+  sv('vecThresh2',P.t);
+  if($('vecInvert'))$('vecInvert').checked=P.inv;
+  sv('vecBlur2',P.b,10); sv('vecClose',P.c); sv('vecMinLen2',P.m);
+  sv('vecEps2',P.e,10);
+  setVecFilter('aa',P.aa);
+  setVecFilter('nr',P.nr);
+  setVecFilter('rd',P.rd);
+}
+
+// ── Filter button state ───────────────────────────────────────
+function setVecFilter(type, val) {
+  const prefixMap = { aa:'vecAA_', nr:'vecNR_', rd:'vecRD_' };
+  const stateMap  = { aa:'antiAlias', nr:'noiseReduce', rd:'roundness' };
+  const keysMap   = { aa:['off','smart','mid'], nr:['off','low','high'],
+                      rd:['off','low','default','high','max'] };
+  VEC[stateMap[type]] = val;
+  keysMap[type].forEach(k=>{
+    const b=$(prefixMap[type]+k); if(!b) return;
+    const active = k===val;
+    b.classList.toggle('active', active);
+    b.style.background = active ? '#1a2a1a' : '#111';
+    b.style.color       = active ? '#aaa'    : '#555';
+    b.style.borderColor = active ? '#2a5a2a' : '#333';
+  });
+}
+
+// ── Roundness → chaikin iterations + bezier tension ──────────
+function vecRoundnessParams(rd) {
+  return {off:[0,3], low:[1,4], default:[2,6], high:[3,8], max:[4,10]}[rd] || [2,6];
+}
+
+// ── Legacy preset (kept for backward compat) ──────────────────
 function applyVecPreset(v) {
   if(!v) return;
   const P={
-    line_art:  {t:128,inv:false,b:10,c:1,s:5,m:15,e:8},
-    technical: {t:160,inv:false,b:5, c:0,s:3,m:10,e:5},
-    sketch:    {t:190,inv:false,b:15,c:2,s:7,m:20,e:12},
-    dark_bg:   {t:128,inv:true, b:10,c:1,s:5,m:15,e:8},
+    line_art:  {t:128,inv:false,b:10,c:1,m:15,e:8},
+    technical: {t:160,inv:false,b:5, c:0,m:10,e:5},
+    sketch:    {t:190,inv:false,b:15,c:2,m:20,e:12},
+    dark_bg:   {t:128,inv:true, b:10,c:1,m:15,e:8},
   }[v]; if(!P) return;
   const sv=(id,val,div)=>{
     const el=$(id); if(!el)return; el.value=val;
@@ -3358,9 +7684,8 @@ function applyVecPreset(v) {
   };
   sv('vecThresh2',P.t);
   if($('vecInvert'))$('vecInvert').checked=P.inv;
-  sv('vecBlur2',P.b,10); sv('vecClose',P.c);
-  sv('vecSmooth2',P.s);  sv('vecMinLen2',P.m);
-  sv('vecEps2',P.e*10,10);
+  sv('vecBlur2',P.b,10); sv('vecClose',P.c); sv('vecMinLen2',P.m);
+  sv('vecEps2',P.e,10);
 }
 
 // ── Grayscale from S.image ───────────────────────────────────
@@ -3519,7 +7844,7 @@ function vecTraceContours(bin,w,h,minLen) {
         if(nx<0||nx>=w||ny<0||ny>=h||!bin[ny*w+nx]) continue;
         if(nx===x&&ny===y&&path.length>2){found=true;break;}
         if(!vis[ny*w+nx]){vis[ny*w+nx]=1;path.push([nx,ny]);cx=nx;cy=ny;pd=d;found=true;break;}
-        break;
+        // visited-but-not-start: try next direction (was: break → caused fragments)
       }
       if(!found||(cx===x&&cy===y&&path.length>2)) break;
     }
@@ -3544,6 +7869,29 @@ function vecSimplify(pts,eps) {
     return[...dp(pts,s,mi),...dp(pts,mi,e).slice(1)];
   }
   return dp(pts,0,pts.length-1);
+}
+
+// ── Chaikin corner-cutting smooth (quadratic B-spline approx) ────
+// closed=true: wrap last→first segment (contour); closed=false: open stroke (skeleton)
+// iterations=2 is standard — each iter doubles point count and halves angle deviation
+function chaikinSmooth(pts, closed, iterations) {
+  if (!pts || pts.length < 3) return pts;
+  let p = pts.slice(); // don't mutate original
+  const N = Math.max(1, iterations || 2);
+  for (let iter = 0; iter < N; iter++) {
+    const out = [];
+    const n = p.length;
+    const limit = closed ? n : n - 1;
+    for (let i = 0; i < limit; i++) {
+      const [x0, y0] = p[i];
+      const [x1, y1] = p[(i + 1) % n];
+      out.push([x0 * 0.75 + x1 * 0.25, y0 * 0.75 + y1 * 0.25]);
+      out.push([x0 * 0.25 + x1 * 0.75, y0 * 0.25 + y1 * 0.75]);
+    }
+    if (!closed) { out.unshift(p[0]); out.push(p[n - 1]); } // preserve endpoints
+    p = out;
+  }
+  return p;
 }
 
 // ── Cubic bezier path (Catmull-Rom tangents) ─────────────────
@@ -3625,11 +7973,28 @@ function runVectorTrace() {
       const isPattern = VEC.mode==='pattern';
       const thresh  = parseInt(isPattern?$('vecPThresh2').value:$('vecThresh2').value)||128;
       const invert  = isPattern?$('vecInvert2').checked:$('vecInvert').checked;
-      const blurSig = isPattern?1:(parseInt($('vecBlur2').value)/10||0);
-      const closeR  = isPattern?1:(parseInt($('vecClose').value)||0);
-      const smooth  = parseInt($('vecSmooth2').value)||5;
+
+      // Gaussian Blur — boosted by Anti-aliasing setting
+      let blurRaw = isPattern ? 1.0 : (parseInt($('vecBlur2').value)/10||0);
+      if(!isPattern){
+        if(VEC.antiAlias==='smart') blurRaw = Math.max(0.5, blurRaw + 0.3);
+        else if(VEC.antiAlias==='mid') blurRaw = Math.max(0.8, blurRaw + 0.6);
+      }
+      const blurSig = blurRaw;
+
+      // Close gaps — boosted by Noise Reduction setting
+      let closeRaw = isPattern ? 1 : (parseInt($('vecClose').value)||0);
+      if(!isPattern){
+        if(VEC.noiseReduce==='low')  closeRaw = Math.max(closeRaw, 1);
+        else if(VEC.noiseReduce==='high') closeRaw = Math.max(closeRaw, 3);
+      }
+      const closeR = closeRaw;
+
       const minLen  = parseInt($('vecMinLen2').value)||15;
       const eps     = (parseInt($('vecEps2').value)/10)||0.8;
+
+      // Roundness → Chaikin iterations + bezier tension
+      const [chaikinIter, tension] = vecRoundnessParams(VEC.roundness);
 
       const res=vecGetGray(1200);
       if(!res){$('vecInfo').textContent='❌ อ่านรูปไม่ได้';return;}
@@ -3661,8 +8026,13 @@ function runVectorTrace() {
       }
 
       const rawN=paths.length;
+      // Simplify → Chaikin smooth → Bezier path
       VEC.contours=paths.map(p=>vecSimplify(p,eps));
-      VEC.svgPaths=VEC.contours.map(p=>vecSmoothPath(p,smooth)).filter(d=>d.length>4);
+      const isClosed = VEC.mode==='outline';
+      VEC.svgPaths=VEC.contours.map(p=>{
+        const smoothed = chaikinIter>0 ? chaikinSmooth(p, isClosed, chaikinIter) : p;
+        return vecSmoothPath(smoothed, tension);
+      }).filter(d=>d.length>4);
 
       vecDrawPreview(bin,w,h);
       VEC.showMain=true;
@@ -3678,9 +8048,13 @@ function runVectorTrace() {
 // ── Export SVG ────────────────────────────────────────────────
 function exportVectorSVG() {
   if(!VEC.svgPaths.length){alert('กรุณาตรวจจับเส้นก่อน');return;}
-  const wMm=S.workW||100, hMm=S.workH||100;
+  const wMm=parseFloat($('workW').value)||100;
+  const hMm=parseFloat($('workH').value)||100;
   const sx=wMm/VEC.imgW, sy=hMm/VEC.imgH;
-  const sw=Math.max(0.05,(0.25/sx)).toFixed(3);
+  // stroke-width from Advanced slider (default 1.5mm), clamped for small work areas
+  const swSlider = (parseInt(($('vecStrokeW')||{value:'15'}).value)/10) || 1.5;
+  const sw = swSlider.toFixed(2);
+  const gAttrs = `fill="none" stroke="#000000" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"`;
   let body='';
   if(VEC.mode==='pattern'&&VEC.tileW>0&&VEC.tileH>0){
     const twMm=(VEC.tileW*sx).toFixed(4), thMm=(VEC.tileH*sy).toFixed(4);
@@ -3690,16 +8064,19 @@ function exportVectorSVG() {
         tp+='        <path d="'+VEC.svgPaths[i]+'"/>\n';
     });
     body='  <defs>\n    <pattern id="vt" x="0" y="0" width="'+twMm+'" height="'+thMm+'" patternUnits="userSpaceOnUse">\n';
-    body+='      <g transform="scale('+sx.toFixed(6)+','+sy.toFixed(6)+')" fill="none" stroke="#000" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round">\n';
+    body+='      <g transform="scale('+sx.toFixed(6)+','+sy.toFixed(6)+')" '+gAttrs+'>\n';
     body+=tp;
     body+='      </g>\n    </pattern>\n  </defs>\n';
     body+='  <rect width="'+wMm+'" height="'+hMm+'" fill="url(#vt)"/>\n';
   } else {
-    body='  <g fill="none" stroke="#000" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round" transform="scale('+sx.toFixed(6)+','+sy.toFixed(6)+')">\n';
+    body='  <g '+gAttrs+' transform="scale('+sx.toFixed(6)+','+sy.toFixed(6)+')">\n';
     VEC.svgPaths.forEach(d=>{body+='    <path d="'+d+'"/>\n';});
     body+='  </g>\n';
   }
-  const svg='<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="'+wMm+'mm" height="'+hMm+'mm" viewBox="0 0 '+wMm+' '+hMm+'">\n'+body+'</svg>';
+  const svg='<?xml version="1.0" encoding="UTF-8"?>\n'
+    +'<!-- Generated by AI Vectorizer Engines — stroke="#000000" stroke-width="'+sw+'" -->\n'
+    +'<svg xmlns="http://www.w3.org/2000/svg" width="'+wMm+'mm" height="'+hMm+'mm" viewBox="0 0 '+wMm+' '+hMm+'">\n'
+    +body+'</svg>';
   const blob=new Blob([svg],{type:'image/svg+xml'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download='vector_trace.svg'; a.click();
