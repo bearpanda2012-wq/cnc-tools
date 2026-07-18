@@ -70,6 +70,7 @@
   .brush{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft)}
   .brush input{width:90px}
   .brush span{font-family:var(--mono);min-width:34px}
+  .brush input[type=color]{width:36px;height:27px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer}
   .meta{position:absolute;bottom:10px;right:12px;z-index:3;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);background:var(--panel);border:1px solid var(--line);padding:4px 10px;border-radius:20px;pointer-events:none}
 
   .stage{flex:1;position:relative;border:1px solid var(--line);border-radius:var(--radius);
@@ -80,6 +81,7 @@
   .scroller::-webkit-scrollbar{display:none;width:0;height:0}
   .scroller:active{cursor:grabbing}
   .stage canvas{margin:auto;flex:none;box-shadow:0 4px 24px rgba(27,36,48,.14);background:#fff}
+  .stage canvas.alpha{background:transparent;box-shadow:none}
   .stage.no-grid{background-image:none}
   .minimap{position:absolute;left:12px;bottom:12px;z-index:4;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 14px rgba(27,36,48,.18);padding:4px;display:none;cursor:crosshair;touch-action:none}
   .minimap canvas{display:block;background:#fff;border-radius:4px}
@@ -275,6 +277,13 @@
         <button id="zIn" title="ซูมเข้า">＋</button>
         <button id="zFit" title="ซูมพอดีขนาดภาพ">⛶ พอดีภาพ</button>
         <button id="zGrid" title="เปิด/ปิดกริดพื้นหลัง" class="active">▦</button>
+      </div>
+      <div class="brush" title="เปลี่ยนสีพื้นหลังพื้นที่ทำงาน — ลองวางงานตัดบนสีต่างๆ">
+        <label for="bgColor">พื้น</label>
+        <input type="color" id="bgColor" value="#F4F6F9">
+      </div>
+      <div class="tools">
+        <button id="bgReset" title="กลับพื้นกริดเริ่มต้น">คืนกริด</button>
       </div>
     </div>
     <div class="stage" id="stage">
@@ -800,14 +809,12 @@ function addQuadPath(p2, pts, closed){
 function drawResult(){
   ctx.clearRect(0, 0, W, H);
   if(mode === 'photo'){
-    // โหมดรูปถ่าย: แสดงรูปที่ปรับแต่งแล้วบนลายหมากรุก
-    drawChecker();
+    // โหมดรูปถ่าย: ส่วนโปร่งใสแสดงเป็นพื้นขาวเรียบ (ไฟล์ที่ export ยังโปร่งใสจริง)
     ctx.drawImage(srcCanvas, 0, 0);
     return;
   }
   if(mode === 'color'){
     if(!labelMap) return;
-    if(bgMask) drawChecker();
     const img = ctx.createImageData(W,H);
     const d = img.data;
     for(let i=0,p=0;i<labelMap.length;i++,p+=4){
@@ -923,7 +930,16 @@ $('zIn').onclick = () => setZoom(zoom * 1.25);
 $('zOut').onclick = () => setZoom(zoom / 1.25);
 $('zPct').onclick = () => setZoom(1);   // กลับขนาดจริง 100% (ตามสเกล mm)
 $('zFit').onclick = fitZoom;            // ซูมพอดีขนาดภาพเต็มพื้นที่แสดง
+$('bgColor').addEventListener('input', e => {
+  stage.style.background = e.target.value;   // ทับกริดด้วยสีล้วน
+});
+$('bgReset').onclick = () => {
+  stage.style.background = '';               // กลับ CSS เดิม (กริด)
+  stage.classList.remove('no-grid');
+  $('zGrid').classList.add('active');
+};
 $('zGrid').onclick = () => {
+  stage.style.background = '';               // เปิด/ปิดกริดได้ ต้องล้างสีล้วนก่อน
   stage.classList.toggle('no-grid');
   $('zGrid').classList.toggle('active');
 };
@@ -1060,18 +1076,6 @@ scroller.addEventListener('pointermove', e => {
 window.addEventListener('resize', updateDims);
 
 let checkerPat = null;
-function drawChecker(){
-  if(!checkerPat){
-    const t = document.createElement('canvas');
-    t.width = t.height = 16;
-    const tc = t.getContext('2d');
-    tc.fillStyle = '#F5F7FA'; tc.fillRect(0,0,16,16);
-    tc.fillStyle = '#E1E6ED'; tc.fillRect(0,0,8,8); tc.fillRect(8,8,8,8);
-    checkerPat = ctx.createPattern(t, 'repeat');
-  }
-  ctx.fillStyle = checkerPat;
-  ctx.fillRect(0, 0, W, H);
-}
 
 function blitPixels(img){
   // putImageData ข้าม transform — ต้องวาดผ่าน canvas กลางเพื่อ scale ตาม RS
@@ -1087,13 +1091,14 @@ function blitPixels(img){
 
 function render(){
   if(!srcCanvas) return;
+  // สไตล์ Photoshop: มีส่วนโปร่งใสเมื่อไหร่ ให้ทะลุเห็นพื้นที่ทำงานด้านหลัง เหลือแต่ตัววัตถุ
+  canvas.classList.toggle('alpha', mode === 'photo' || !!bgMask);
   ctx.setTransform(RS, 0, 0, RS, 0, 0);
   if(viewing === 'original'){
     ctx.clearRect(0,0,W,H);
     if(mode === 'photo' && origCanvas){
       ctx.drawImage(origCanvas, 0, 0);   // ภาพแท้ก่อนปรับแต่ง
     } else {
-      if(bgMask) drawChecker();
       ctx.drawImage(srcCanvas,0,0);
     }
     if(hlAny){ ctx.globalAlpha = 0.4; ctx.drawImage(hlCanvas,0,0); ctx.globalAlpha = 1; }
@@ -1110,7 +1115,6 @@ function render(){
     if(mode === 'photo' && origCanvas){
       ctx.drawImage(origCanvas, 0, 0);
     } else {
-      if(bgMask) drawChecker();
       ctx.drawImage(srcCanvas,0,0);
     }
     ctx.restore();
