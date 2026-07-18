@@ -8,13 +8,14 @@
 |---|---|---|
 | 🖼️ **CNC Pattern Generator** | แปลงรูปภาพเป็น Tool Path สำหรับงาน CNC | [`/pattern-generator/`](pattern-generator/) |
 | 📐 **SheetCNC Pro** | ถอดแผ่นและจัดวางชิ้นงานบนแผ่นวัสดุ (Nesting) พร้อม export Excel | [`/sheetcnc/`](sheetcnc/) |
+| ✒️ **LineTracer Pro** | คัดลอกลายเส้นจากรูปภาพเป็นเส้นเวกเตอร์ สำหรับงาน CNC | [`/line-tracer/`](line-tracer/) |
 
 ## วิธีใช้งาน
 
 เปิดผ่าน GitHub Pages ได้เลย:
 
 ```
-https://<username>.github.io/cnc-tools/
+https://bearpanda2012-wq.github.io/cnc-tools/
 ```
 
 หรือดาวน์โหลด repo แล้วเปิดไฟล์ `index.html` ในเบราว์เซอร์โดยตรงก็ได้ (ต้องต่ออินเทอร์เน็ต เพราะโหลด library จาก CDN)
@@ -29,11 +30,13 @@ https://<username>.github.io/cnc-tools/
 
 ```
 cnc-tools/
-├── index.html              ← หน้าแรก (รวมลิงก์ทั้งสองแอป)
+├── index.html              ← หน้าแรก (รวมลิงก์ทุกแอป)
 ├── pattern-generator/
 │   └── index.html          ← CNC Pattern Generator
 ├── sheetcnc/
 │   └── index.html          ← SheetCNC Pro
+├── line-tracer/
+│   └── index.html          ← LineTracer Pro
 └── README.md
 ```
 
