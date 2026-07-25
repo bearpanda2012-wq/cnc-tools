@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SheetCNC Pro — ถอดแผ่นและจัดวาง CNC</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Excel export helper: loaded async so the app ALWAYS renders even when this
+     CDN is unreachable (offline / sandboxed preview). Excel export degrades to CSV. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer onerror="window.__noXLSX=true"></script>
 <style>
 :root {
   --bg:#0f1117; --surface:#1a1d2e; --card:#232640; --border:#2d3154;
@@ -229,6 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g31</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="exportExcel()">📊 Excel</button>
   <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ Print</button>
@@ -265,8 +268,12 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
         </select>
       </div>
       <div class="field">
-        <label data-i18n="kerf">Kerf / ช่องใบเลื่อย (mm)</label>
+        <label data-i18n="edgeMargin">ระยะห่างขอบแผ่นวัสดุ (mm)</label>
         <input type="number" id="kerf" value="3" min="0" step="0.5" onchange="saveSettings()">
+      </div>
+      <div class="field">
+        <label data-i18n="pieceGap">ระยะห่างชิ้นงาน (mm)</label>
+        <input type="number" id="pieceGap" value="3" min="0" step="0.5" onchange="saveSettings()">
       </div>
       <div class="field">
         <label data-i18n="stlUnitLbl">หน่วยของไฟล์ STL / OBJ</label>
@@ -292,6 +299,15 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
           <option value="rot90" selected data-i18n="rot90Opt">หมุน 90°</option>
           <option value="rot45" data-i18n="rot45Opt">หมุน 45° & 90°</option>
           <option value="free" data-i18n="rotFree">อิสระ (ทุก 15°)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-i18n="startCorner">จุดเริ่มจัดเรียงชิ้นงาน</label>
+        <select id="startCorner" onchange="saveSettings()" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:.82rem;">
+          <option value="TL" selected data-i18n="cornerTL">มุมซ้ายบน ↖</option>
+          <option value="TR" data-i18n="cornerTR">มุมขวาบน ↗</option>
+          <option value="BL" data-i18n="cornerBL">มุมซ้ายล่าง ↙</option>
+          <option value="BR" data-i18n="cornerBR">มุมขวาล่าง ↘</option>
         </select>
       </div>
     </div>
@@ -358,7 +374,17 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
           <button class="btn btn-success btn-sm" onclick="exportDXF()" data-i18n="exportAllBtn">⬇️ Export DXF รวมทุก Layout</button>
         </div>
       </div>
-      <div class="legend" id="legend" style="margin-bottom:10px;"></div>
+      <!-- Piece legend (collapsible dropdown) -->
+      <div style="font-size:.78rem;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px;">
+        <div onclick="toggleCalcLegend()" style="background:var(--surface);padding:6px 10px;font-weight:700;
+          color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;">
+          <span>🎨 รายการชิ้นงาน (สี / ขนาด)</span>
+          <span id="calcLegChevron" style="transition:transform .15s;">▾</span>
+        </div>
+        <div id="calcLegBody" style="padding:8px 10px;">
+          <div class="legend" id="legend"></div>
+        </div>
+      </div>
       <div id="layoutOverview" style="display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;margin-bottom:8px;"></div>
     </div>
 
@@ -371,7 +397,17 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
           <button class="btn btn-ghost btn-sm" onclick="document.getElementById('sheetDetailCard').style.display='none'" data-i18n="closeBtn">✕ ปิด</button>
         </div>
       </div>
-      <div class="cv-wrap"><canvas id="nestCanvas"></canvas></div>
+      <!-- Zoom + measure toolbar -->
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem;">
+        <button class="btn btn-ghost btn-sm" onclick="nestZoomBy(1.4)">🔍+</button>
+        <button class="btn btn-ghost btn-sm" onclick="nestZoomBy(1/1.4)">🔍−</button>
+        <button class="btn btn-ghost btn-sm" onclick="nestZoomFit()">⤢ พอดีจอ</button>
+        <span id="nestZoomLbl" style="color:var(--muted);min-width:52px;">100%</span>
+        <button class="btn btn-ghost btn-sm" id="nestMeasBtn" onclick="toggleMeasure()">📏 วัดระยะ</button>
+        <span id="nestMeasOut" style="color:#fbbf24;font-weight:700;"></span>
+        <span style="color:var(--muted);">— ลูกกลิ้ง=ซูม · ลาก=เลื่อน · โหมดวัด: คลิก 2 จุด</span>
+      </div>
+      <div class="cv-wrap" style="position:relative;"><canvas id="nestCanvas"></canvas></div>
     </div>
 
     <div class="card">
@@ -404,10 +440,23 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 </div>
 
 <script>
+// Show any startup error ON the page instead of failing silently (blank screen).
+window.addEventListener('error', function(ev){
+  if(document.getElementById('__errBox')) return;
+  const d=document.createElement('div'); d.id='__errBox';
+  d.style.cssText='position:fixed;left:0;right:0;top:0;z-index:99999;background:#7f1d1d;color:#fff;'+
+    'font:12px/1.5 monospace;padding:8px 12px;white-space:pre-wrap;';
+  d.textContent='⚠️ JS error: '+(ev.message||'')+'  @line '+(ev.lineno||'?');
+  (document.body||document.documentElement).appendChild(d);
+});
 // ═══════════════════════════════════════════════════════
 //  i18n — LANGUAGE SYSTEM
 // ═══════════════════════════════════════════════════════
-let lang = localStorage.getItem('sheetcnc_lang') || 'th';
+// Storage helpers — sandboxed/embedded viewers can BLOCK localStorage and throw a
+// SecurityError. Guarding here keeps the whole app from dying on load.
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+let lang = lsGet('sheetcnc_lang') || 'th';
 
 const TR = {
   th: {
@@ -417,12 +466,14 @@ const TR = {
     p1:'1200×2400 (มาตรฐาน)', p4:'600×1200 (ครึ่งแผ่น)',
     p5:'2000×4000 (แผ่นใหญ่)', p6:'3000×6000 (แผ่น XL)',
     kerf:'Kerf / ช่องใบเลื่อย (mm)',
+    edgeMargin:'ระยะห่างขอบแผ่นวัสดุ (mm)', pieceGap:'ระยะห่างชิ้นงาน (mm)',
     stlUnitLbl:'หน่วยของไฟล์ STL / OBJ',
     unitMm:'มิลลิเมตร (mm)', unitCm:'เซนติเมตร (cm)', unitM:'เมตร (m)', unitIn:'นิ้ว (inch)',
     pricePerSheet:'ราคาต่อแผ่น (บาท)',
     laborLbl:'ค่าแรง CNC (บาท/m²)',
     allowRot:'อนุญาตหมุนชิ้น 90°',
     rotMode:'การหมุนชิ้นงาน', rotNone:'ไม่หมุน', rot90Opt:'หมุน 90°', rot45Opt:'หมุน 45° & 90°', rotFree:'อิสระ (ทุก 15°)',
+    startCorner:'จุดเริ่มจัดเรียงชิ้นงาน', cornerTL:'มุมซ้ายบน ↖', cornerTR:'มุมขวาบน ↗', cornerBL:'มุมซ้ายล่าง ↙', cornerBR:'มุมขวาล่าง ↘',
     dxfImportTitle:'📂 นำเข้า DXF หลายชิ้นงาน',
     dxfImportNotice:'🔍 อัปโหลด <b>DXF 1 ไฟล์ที่มีหลายชิ้นงาน</b> — แอปจะ<b>อ่านเฉพาะกรอบนอกสุด</b>ของแต่ละชิ้น และ<b>ตัด inner object (รู, ช่องเปิด, detail ภายใน) ออกอัตโนมัติ</b> แสดง preview พร้อมขนาด/พื้นที่ แล้วเลือกเพิ่มเข้าลิสต์ได้เลย',
     dxfDropHint:'คลิกหรือลากไฟล์ <b>.DXF</b> มาวาง',
@@ -456,8 +507,11 @@ const TR = {
     inspStep1:'① ตรวจสอบ DXF', inspStep2:'② ตั้งชื่อ & จำนวน',
     inspInfo:'💡 แอปจัด classify อัตโนมัติแล้ว — ถ้าไม่ถูกต้อง กด badge ในตารางเพื่อสลับ <b>(กรอบนอก → รู/ช่อง → ข้าม)</b>',
     inspReauto:'🔄 Auto-classify ใหม่', inspNext:'ต่อไป → ตั้งชื่อและจำนวน',
+    inspAutoHoles:'🕳️ ตรวจรูอัตโนมัติ',
+    sheetDetected:'ยึดขอบนอกสุดเป็นกรอบแผ่น', sheetDetectedNote:'ใช้คำนวนพื้นที่แผ่น — ภายในทั้งหมดถูกเก็บไว้ (ไม่หักพื้นที่)',
+    openBoundaryWarn:'พบเส้นที่อาจไม่ต่อ/ไม่ปิดเป็นกรอบ {n} เส้น — ตรวจสอบว่ากรอบนอกของชิ้นงานปิดครบ (เส้นเปิดจะเก็บเป็นลายภายใน ไม่ถูกใช้เป็นกรอบนอก)',
     inspBack:'← กลับตรวจสอบ', inspAdd:'➕ เพิ่มชิ้นงานที่เลือกเข้าลิสต์',
-    inspSelAll:'เลือกทั้งหมด', inspDesel:'ยกเลิก', totalSel:'รวมที่เลือก',
+    inspSelAll:'เลือกทั้งหมด', inspDesel:'ยกเลิก', totalSel:'รวมที่เลือก', groupSummary:'สรุปกลุ่มชิ้น',
     hoverHighlight:'วางเมาส์เหนือแถวเพื่อ highlight ชิ้นทั้งกลุ่ม',
     col_type:'ประเภท', col_layer:'Layer', col_cx:'Center X', col_cy:'Center Y',
     col_w:'กว้าง (mm)', col_h:'สูง (mm)', col_aream2:'พื้นที่ (m²)', col_cls:'Classify',
@@ -478,12 +532,14 @@ const TR = {
     p1:'1200×2400 (Standard)', p4:'600×1200 (Half sheet)',
     p5:'2000×4000 (Large)', p6:'3000×6000 (XL)',
     kerf:'Kerf / Blade gap (mm)',
+    edgeMargin:'Edge margin from sheet (mm)', pieceGap:'Piece-to-piece gap (mm)',
     stlUnitLbl:'STL / OBJ file unit',
     unitMm:'Millimeter (mm)', unitCm:'Centimeter (cm)', unitM:'Meter (m)', unitIn:'Inch',
     pricePerSheet:'Price per sheet (THB)',
     laborLbl:'CNC labor (THB/m²)',
     allowRot:'Allow 90° rotation',
     rotMode:'Piece Rotation', rotNone:'No rotation', rot90Opt:'Rotate 90°', rot45Opt:'Rotate 45° & 90°', rotFree:'Free (every 15°)',
+    startCorner:'Start corner', cornerTL:'Top-left ↖', cornerTR:'Top-right ↗', cornerBL:'Bottom-left ↙', cornerBR:'Bottom-right ↘',
     dxfImportTitle:'📂 Import Multi-piece DXF',
     dxfImportNotice:'🔍 Upload a <b>single DXF file with multiple pieces</b> — the app reads only <b>outer contours</b>, automatically <b>excludes inner objects (holes, openings)</b>, shows a preview with dimensions/area, then lets you add selected pieces to the list.',
     dxfDropHint:'Click or drag a <b>.DXF</b> file here',
@@ -517,8 +573,11 @@ const TR = {
     inspStep1:'① Inspect DXF', inspStep2:'② Name & Quantity',
     inspInfo:'💡 Auto-classified — if incorrect, click a badge to cycle <b>(Outer → Hole → Skip)</b>',
     inspReauto:'🔄 Re-classify', inspNext:'Next → Name & Quantity',
+    inspAutoHoles:'🕳️ Auto-detect holes',
+    sheetDetected:'Outer boundary = sheet frame', sheetDetectedNote:'used for sheet area — everything inside is kept (not subtracted)',
+    openBoundaryWarn:'{n} line(s) may be disconnected / not closed into a frame — check that each piece outer boundary is closed (open lines are kept as internal line work, not used as an outer boundary)',
     inspBack:'← Back to Inspect', inspAdd:'➕ Add Selected to List',
-    inspSelAll:'Select All', inspDesel:'Deselect', totalSel:'Total selected',
+    inspSelAll:'Select All', inspDesel:'Deselect', totalSel:'Total selected', groupSummary:'Piece group summary',
     hoverHighlight:'Hover over a row to highlight the whole group',
     col_type:'Type', col_layer:'Layer', col_cx:'Center X', col_cy:'Center Y',
     col_w:'Width (mm)', col_h:'Height (mm)', col_aream2:'Area (m²)', col_cls:'Classify',
@@ -552,7 +611,7 @@ function saveSettings() {
 
 function toggleLang() {
   lang = lang === 'th' ? 'en' : 'th';
-  localStorage.setItem('sheetcnc_lang', lang);
+  lsSet('sheetcnc_lang', lang);
   applyLang();
 }
 
@@ -756,10 +815,49 @@ function circleVerts(cx,cy,r,startDeg,endDeg,segs=36) {
 }
 
 /** Full DXF parser — returns array of shape objects */
+/** Build a circle shape (smooth 4-bulge rawV so it exports as a true circle). */
+function _mkCircle(cx,cy,r,layer){
+  const {xs,ys}=circleVerts(cx,cy,r,0,360,48); xs.pop(); ys.pop();
+  const Q=Math.tan(Math.PI/8);
+  const rawV=[{x:cx+r,y:cy,b:Q},{x:cx,y:cy+r,b:Q},{x:cx-r,y:cy,b:Q},{x:cx,y:cy-r,b:Q}];
+  return { type:'circle', layer, r, vertices:xs.map((x,j)=>[x,ys[j]]), rawV,
+    area:Math.PI*r*r, w:r*2, h:r*2, minX:cx-r, minY:cy-r, cx, cy };
+}
+/** Parse the BLOCKS section into { blockName: [primitive,…] } (local coords). */
+function _parseBlocks(pairs){
+  const blocks={}; let i=0;
+  while(i<pairs.length && !(pairs[i][0]==='2'&&pairs[i][1]==='BLOCKS')) i++;
+  for(; i<pairs.length; i++){
+    if(pairs[i][0]==='0'&&pairs[i][1]==='ENDSEC') break;
+    if(!(pairs[i][0]==='0'&&pairs[i][1]==='BLOCK')) continue;
+    let name='', j=i+1;
+    while(j<pairs.length && pairs[j][0]!=='0'){ if(pairs[j][0]==='2') name=pairs[j][1]; j++; }
+    const prims=[];
+    while(j<pairs.length && !(pairs[j][0]==='0'&&pairs[j][1]==='ENDBLK')){
+      const [c,v]=pairs[j];
+      if(c==='0'&&v==='CIRCLE'){ j++; let cx=0,cy=0,r=0;
+        while(j<pairs.length&&pairs[j][0]!=='0'){const a=pairs[j][0],b=pairs[j][1];if(a==='10')cx=+b;if(a==='20')cy=+b;if(a==='40')r=+b;j++;}
+        prims.push({k:'circle',cx,cy,r}); continue; }
+      if(c==='0'&&v==='LINE'){ j++; let x1=0,y1=0,x2=0,y2=0;
+        while(j<pairs.length&&pairs[j][0]!=='0'){const a=pairs[j][0],b=pairs[j][1];if(a==='10')x1=+b;if(a==='20')y1=+b;if(a==='11')x2=+b;if(a==='21')y2=+b;j++;}
+        prims.push({k:'line',x1,y1,x2,y2}); continue; }
+      if(c==='0'&&v==='LWPOLYLINE'){ j++; const pts=[]; let closed=false,cur=null;
+        while(j<pairs.length&&pairs[j][0]!=='0'){const a=pairs[j][0],b=pairs[j][1];if(a==='70')closed=(+b&1)===1;if(a==='10'){if(cur)pts.push(cur);cur=[+b,0];}if(a==='20'&&cur)cur[1]=+b;j++;}
+        if(cur)pts.push(cur); prims.push({k:'lwpoly',pts,closed}); continue; }
+      j++;
+    }
+    blocks[name]=prims; i=j;
+  }
+  return blocks;
+}
 function parseDXFFull(text) {
   const pairs = dxfPairs(text);
+  const blocks = _parseBlocks(pairs);   // block defs for INSERT expansion
   const shapes = [];
   let i = 0;
+  // Start scanning at the ENTITIES section so BLOCK-definition entities aren't
+  // parsed as stray shapes (they're placed via INSERT instead).
+  for(let k=0;k<pairs.length;k++){ if(pairs[k][0]==='2'&&pairs[k][1]==='ENTITIES'){ i=k+1; break; } }
 
   // Helper: read entity block starting after the entity-type pair
   const readBlock = (startI) => {
@@ -779,10 +877,58 @@ function parseDXFFull(text) {
     return { block, nextI: j };
   };
 
+  const segs = [];   // raw LINE / straight open segments — joined into loops afterwards
+
   while (i < pairs.length) {
     const [code, val] = pairs[i];
 
     if (code === '0') {
+      // ── LINE (single segment) → collect for boundary joining ──
+      if (val === 'LINE') {
+        i++;
+        let x1=0,y1=0,x2=0,y2=0,layer='0';
+        while (i < pairs.length && pairs[i][0]!=='0') {
+          const [c,v]=pairs[i];
+          if (c==='8') layer=v;
+          if (c==='10') x1=+v; if (c==='20') y1=+v;
+          if (c==='11') x2=+v; if (c==='21') y2=+v;
+          i++;
+        }
+        if (Math.hypot(x2-x1,y2-y1)>1e-6) segs.push({a:[x1,y1], b:[x2,y2], layer});
+        continue;
+      }
+      // ── INSERT (block reference) → expand the block's geometry in place ──
+      if (val === 'INSERT') {
+        i++;
+        let name='', ix=0, iy=0, sx=1, sy=1, rot=0, layer='0';
+        while (i < pairs.length && pairs[i][0]!=='0') {
+          const [c,v]=pairs[i];
+          if (c==='2') name=v; if (c==='8') layer=v;
+          if (c==='10') ix=+v; if (c==='20') iy=+v;
+          if (c==='41') sx=+v; if (c==='42') sy=+v; if (c==='50') rot=+v;
+          i++;
+        }
+        const prims=blocks[name]||[];
+        const ra=rot*Math.PI/180, ca=Math.cos(ra), sa=Math.sin(ra);
+        const tf=(px,py)=>{ const X=px*sx, Y=py*sy; return [ix+X*ca-Y*sa, iy+X*sa+Y*ca]; };
+        prims.forEach(pr=>{
+          if (pr.k==='circle'){
+            const [ccx,ccy]=tf(pr.cx,pr.cy); const rr=pr.r*Math.abs(sx);
+            if (rr>0) shapes.push(_mkCircle(ccx,ccy,rr,layer));
+          } else if (pr.k==='line'){
+            const A=tf(pr.x1,pr.y1), B=tf(pr.x2,pr.y2);
+            if (Math.hypot(B[0]-A[0],B[1]-A[1])>1e-6) segs.push({a:A,b:B,layer});
+          } else if (pr.k==='lwpoly'){
+            const tp=pr.pts.map(([x,y])=>tf(x,y));
+            if (tp.length>=3 && pr.closed){
+              const xs=tp.map(p=>p[0]), ys=tp.map(p=>p[1]);
+              shapes.push({ type:'polyline', layer, closed:true, rawV:null, ...polyStats(xs,ys) });
+            } else { // open → keep as raw segments (never auto-closed)
+              for(let q=0;q<tp.length-1;q++) segs.push({a:tp[q],b:tp[q+1],layer}); }
+          }
+        });
+        continue;
+      }
       // ── LWPOLYLINE ──────────────────────────────────
       if (val === 'LWPOLYLINE') {
         i++;
@@ -817,7 +963,15 @@ function parseDXFFull(text) {
             if(Math.sqrt(dx*dx+dy*dy)<0.5){xs.pop();ys.pop();}else break;
           }
           if(xs.length>=3){
-            shapes.push({ type:'polyline', layer, closed:true, rawV, ...polyStats(xs,ys) });
+            // RESPECT the DXF closed flag (code 70). An UNCLOSED polyline must stay
+            // open — closing it silently turned open outlines into filled shapes.
+            if(closed){
+              shapes.push({ type:'polyline', layer, closed:true, rawV, ...polyStats(xs,ys) });
+            } else {
+              const st=polyStats(xs,ys);
+              shapes.push({ type:'polyline', layer, closed:false, open:true, rawV,
+                ...st, area:Math.max(st.area,0.5) });   // keep a footprint so it still imports
+            }
           }
         } else if(rawV.length===2){
           const v0=rawV[0], v1=rawV[1];
@@ -844,10 +998,8 @@ function parseDXFFull(text) {
               vertices:pts, rawV:[{x:v0.x,y:v0.y,b:v0.b},{x:v1.x,y:v1.y,b:0}],
               area:arcArea, w:mxX-mnX, h:mxY-mnY, minX:mnX, minY:mnY, cx:(mnX+mxX)/2, cy:(mnY+mxY)/2 });
           } else {
-            const xs=rawV.map(v=>v.x), ys=rawV.map(v=>v.y);
-            shapes.push({ type:'line', layer, vertices:[[xs[0],ys[0]],[xs[1],ys[1]]],
-              area:0, w:Math.abs(xs[1]-xs[0]), h:Math.abs(ys[1]-ys[0]),
-              minX:Math.min(...xs), minY:Math.min(...ys), cx:0, cy:0 });
+            // straight open segment → collect for boundary joining
+            segs.push({a:[rawV[0].x,rawV[0].y], b:[rawV[1].x,rawV[1].y], layer});
           }
         }
         continue;
@@ -959,6 +1111,62 @@ function parseDXFFull(text) {
         continue;
       }
 
+      // ── TEXT / MTEXT ───────────────────────────────────
+      // Kept exactly as-is (string, height, angle preserved) and re-exported.
+      if (val === 'TEXT' || val === 'MTEXT') {
+        const isM = (val==='MTEXT');
+        i++;
+        let tx=0, ty=0, tx2=null, ty2=null, th=10, ang=0, layer='0', str='', extra='', hj=0, vj=0;
+        let style=null, widthF=null, obliq=null, gen71=null, refW=null;   // preserve text STYLE exactly
+        while (i < pairs.length && pairs[i][0]!=='0') {
+          const [c,v]=pairs[i];
+          if (c==='8') layer=v;
+          if (c==='10') tx=+v;   if (c==='20') ty=+v;
+          if (c==='11') tx2=+v;  if (c==='21') ty2=+v;   // alignment point (justified text)
+          if (c==='40') th=+v;
+          if (c==='50') ang=+v;
+          if (c==='7')  style=v;                          // text STYLE (font) name
+          if (c==='41') { if(isM) refW=+v; else widthF=+v; } // width factor (TEXT) / ref width (MTEXT)
+          if (c==='51') obliq=+v;                         // oblique angle
+          if (c==='71') gen71=+v;                         // TEXT gen flags / MTEXT attachment point
+          if (c==='72') hj=+v;   if (c==='73') vj=+v;     // horiz / vert justification
+          if (c==='1') str+=v;
+          if (c==='3') extra+=v;   // MTEXT long-text continuation (precedes code 1)
+          i++;
+        }
+        const rawStr = extra + str;                       // ORIGINAL string (MTEXT fmt codes intact)
+        str = rawStr;
+        if (isM) str = str.replace(/\\P/g,' ').replace(/\{[^}]*\}/g,'').replace(/\\[A-Za-z][^;]*;/g,''); // strip MTEXT fmt codes for display only
+        if (isM) {
+          // MTEXT: codes 72/73 are NOT justification. The insertion point (10/20)
+          // sits at the attachment corner given by code 71. Derive TEXT-style hj/vj
+          // from it so the anchor + baseline land EXACTLY where the file has them.
+          const att = gen71 || 1;                    // 1=TL 2=TC 3=TR 4=ML 5=MC 6=MR 7=BL 8=BC 9=BR
+          hj = (att%3===1)?0 : (att%3===2)?1 : 2;     // left / center / right
+          const row = Math.ceil(att/3);               // 1=top 2=middle 3=bottom
+          vj = row===1?3 : row===2?2 : 1;             // top / middle / bottom
+          tx2=null; ty2=null;                         // MTEXT has no separate 11/21 alignment point
+        }
+        if (str && th>0) {
+          // For justified text the REAL position is the alignment point (11/21).
+          const useAlign = (hj!==0 || vj!==0) && (tx2!==null || ty2!==null);
+          const ax = useAlign ? (tx2!==null?tx2:tx) : tx;
+          const ay = useAlign ? (ty2!==null?ty2:ty) : ty;
+          const tw = str.length * th * 0.62;   // rough width for bbox/containment
+          // bbox around the anchor per justification (hj:0/1/2 = L/C/R, vj:0/2/3 = base/mid/top)
+          const x0 = ax - (hj===1?tw/2 : hj===2?tw : 0);
+          const y0 = ay - (vj===3?th : vj===2?th/2 : 0);  // baseline: text sits above → box [ay, ay+th]
+          // verts[0] = the anchor (carried through all transforms); rest = bbox corners
+          const verts=[[ax,ay],[x0,y0],[x0+tw,y0],[x0+tw,y0+th],[x0,y0+th]];
+          shapes.push({ type:'text', layer, isText:true,
+            text:{ str, raw:rawStr, h:th, angle:ang, hj, vj,
+                   ent:isM?'MTEXT':'TEXT', style, widthF, oblique:obliq, gen71, refW },
+            vertices:verts, area:Math.max(tw*th,1),
+            w:tw, h:th, minX:x0, minY:y0, cx:x0+tw/2, cy:y0+th/2 });
+        }
+        continue;
+      }
+
       // ── SPLINE ──────────────────────────────────────
       if (val === 'SPLINE') {
         i++;
@@ -979,7 +1187,64 @@ function parseDXFFull(text) {
     }
     i++;
   }
+
+  // ── Boundary line check: join loose LINE segments into closed frames ──
+  // Many DXFs draw a piece's outer boundary as separate line segments. Connect
+  // segments that share endpoints; a chain that returns to its start = a CLOSED
+  // frame (becomes a real contour). Chains that don't close = open line work,
+  // flagged so the app can warn "outer boundary may be open".
+  if (segs.length) {
+    const jr = joinSegments(segs);
+    lastOpenBoundaries = 0;
+    jr.loops.forEach(v=>{
+      const xs=v.map(p=>p[0]), ys=v.map(p=>p[1]);
+      if (v.length>=3) shapes.push({ type:'polyline', layer:'0', closed:true, joined:true, ...polyStats(xs,ys) });
+    });
+    jr.chains.forEach(v=>{
+      if (v.length<2) return;
+      const xs=v.map(p=>p[0]), ys=v.map(p=>p[1]);
+      const w=Math.max(...xs)-Math.min(...xs), h=Math.max(...ys)-Math.min(...ys);
+      // keep as open line work (internal); flag large ones as possible open boundaries
+      if (Math.max(w,h) > 20) lastOpenBoundaries++;
+      shapes.push({ type:'line', layer:'0', open:true, openChain:true, vertices:v,
+        area:Math.max(w+h,1), w, h, minX:Math.min(...xs), minY:Math.min(...ys), cx:Math.min(...xs)+w/2, cy:Math.min(...ys)+h/2 });
+    });
+  }
   return shapes;
+}
+
+/** Connect segments sharing endpoints (within tol) into polyline chains.
+ *  Returns { loops:[closed vertex rings], chains:[open vertex paths] }. */
+let lastOpenBoundaries = 0;
+function joinSegments(segs, tol=0.6){
+  const key = p => `${Math.round(p[0]/tol)}|${Math.round(p[1]/tol)}`;
+  const used = new Array(segs.length).fill(false);
+  const adj = new Map();
+  segs.forEach((s,si)=>{ [['a',s.a],['b',s.b]].forEach(([e,p])=>{
+    const k=key(p); if(!adj.has(k)) adj.set(k,[]); adj.get(k).push({si,e}); }); });
+  const nextFrom = (p) => (adj.get(key(p))||[]).find(x=>!used[x.si]);
+  const loops=[], chains=[];
+  for (let start=0; start<segs.length; start++){
+    if (used[start]) continue;
+    used[start]=true;
+    const chain=[segs[start].a.slice(), segs[start].b.slice()];
+    // extend forward
+    for (let guard=0; guard<segs.length+2; guard++){
+      const c=nextFrom(chain[chain.length-1]); if(!c) break;
+      used[c.si]=true; const s=segs[c.si];
+      chain.push((c.e==='a'? s.b : s.a).slice());
+    }
+    // extend backward
+    for (let guard=0; guard<segs.length+2; guard++){
+      const c=nextFrom(chain[0]); if(!c) break;
+      used[c.si]=true; const s=segs[c.si];
+      chain.unshift((c.e==='a'? s.b : s.a).slice());
+    }
+    const d=Math.hypot(chain[0][0]-chain[chain.length-1][0], chain[0][1]-chain[chain.length-1][1]);
+    if (d<=tol && chain.length>=4){ chain.pop(); loops.push(chain); }
+    else chains.push(chain);
+  }
+  return {loops, chains};
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1112,14 +1377,42 @@ function vertsMatch(v1, v2, tol=0.008) {
 }
 
 /** True if s1 and s2 are the same shape (size + contour pattern) */
+/** Signature of a piece's INTERNAL line work (holes/shapes, NOT text), relative to
+ *  the piece origin — position-exact (to 1mm). Two pieces with any different internal
+ *  line are NOT the same piece. */
+function internalSig(s){
+  return (s.holes||[]).filter(h=>!h.isText).map(h=>{
+    const relCx=Math.round((h.minX+h.w/2)-s.minX);
+    const relCy=Math.round((h.minY+h.h/2)-s.minY);
+    return `${h.type}:${Math.round(h.w)}x${Math.round(h.h)}@${relCx},${relCy}:${(h.vertices||[]).length}`;
+  }).sort().join('#');
+}
+/** Signature of TEXT inside a piece — string + height (size) only. Position is NOT
+ *  compared, so the same label placed differently is still the SAME piece (grouped).
+ *  Each placed copy still keeps its OWN text position (see textSets in mdxfAddSelected). */
+function textSig(s){
+  return (s.holes||[]).filter(h=>h.isText&&h.text).map(h=>`${h.text.str}|${Math.round(h.text.h)}`).sort().join('#');
+}
+
+/** Two pieces are the SAME only if: outer frame same size + same outline pattern AND
+ *  identical internal line work AND identical text (string + size). */
 function shapeSimilar(s1, s2) {
   if (s1.type !== s2.type) return false;
-  if (Math.abs(s1.w-s2.w)>1.5 || Math.abs(s1.h-s2.h)>1.5) return false;
+  // Size must match TIGHTLY (0.1mm). A loose tolerance let different sizes chain
+  // together (5.1→5.26→6.45mm circles ended up in one group).
+  if (Math.abs(s1.w-s2.w)>0.1 || Math.abs(s1.h-s2.h)>0.1) return false;   // outer size
+  // Area must match too — normalizeVerts scales shapes to a unit box, so without
+  // this every circle/ellipse looks identical regardless of its real size.
+  const a1=s1.area||0, a2=s2.area||0;
+  if (Math.abs(a1-a2) > Math.max(0.5, Math.max(a1,a2)*0.003)) return false;
   if (!s1.vertices || !s2.vertices) return false;
   if (Math.abs(s1.vertices.length-s2.vertices.length)>2) return false;
   const n1 = normalizeVerts(s1.vertices, s1.w, s1.h);
   const n2 = normalizeVerts(s2.vertices, s2.w, s2.h);
-  return vertsMatch(n1, n2);
+  if (!vertsMatch(n1, n2)) return false;                                   // outer pattern
+  if (internalSig(s1) !== internalSig(s2)) return false;                   // internal lines exact
+  if (textSig(s1) !== textSig(s2)) return false;                          // text string + size
+  return true;
 }
 
 /** Group mdxfShapes by identical contour — returns [{shape, count, indices}] */
@@ -1168,7 +1461,9 @@ function handleMdxfFile(file) {
         showInspErr(`ไม่รองรับไฟล์ .${ext} — รองรับเฉพาะ DXF, SVG, EPS, AI`);
         return;
       }
-      inspRaw = all.filter(s => s.vertices && s.vertices.length >= 3 && s.area >= 0.1)
+      // Keep closed contours (area) AND open line work (arcs / loose lines, even
+      // 2-point segments) so nothing from the drawing is dropped.
+      inspRaw = all.filter(s => s.vertices && ((s.vertices.length>=3 && s.area>=0.1) || (s.open && s.vertices.length>=2)))
                    .sort((a,b) => b.area - a.area);
       if (!inspRaw.length) {
         showInspErr(lang==='en'
@@ -1178,6 +1473,9 @@ function handleMdxfFile(file) {
       }
       autoClassify();
       renderInspector();
+      // Report drawing problems right away (only when there ARE problems)
+      setTimeout(()=>{ computeDiag(); const c=diagCounts();
+        if(c.dup+c.open>0) showDiagPopup(); }, 120);
     } catch(err) {
       showInspErr('อ่านไฟล์ไม่ได้: ' + err.message);
     }
@@ -1391,17 +1689,89 @@ function showInspErr(msg) {
 }
 
 /** Auto-classify ด้วย buildContourTree */
+let inspSheetInfo = null;   // {idx,w,h} when a sheet boundary is auto-detected
+
 function autoClassify() {
-  inspCls = inspRaw.map(() => 'skip');
-  const tree = buildContourTree(inspRaw);
+  inspCls = inspRaw.map(s => (s.vertices && s.vertices.length>=2) ? 'outer' : 'skip');
+  inspSheetInfo = null;
+
+  // Closed contours that can be a real piece boundary.
+  const closed = [];
+  inspRaw.forEach((s,i)=>{ if (s.vertices && s.vertices.length>=3 && s.area>=1 && !s.open && !s.isText) closed.push(i); });
+
+  // ── OUTER-BOUNDARY-FIRST RULE ──────────────────────────────────────────────
+  // A closed contour is a TOP-LEVEL OUTER piece UNLESS it lies inside a LARGER
+  // closed contour → then it is INTERNAL (kept with that piece). This gives exactly
+  // ONE outer per real piece — for a plain shape, a framed panel, a sheet, or many
+  // separate pieces — and everything inside (frame inner edge, holes, line work,
+  // text) is kept, never re-promoted to a piece (no even-odd flip).
+  closed.forEach(i=>{
+    const c=inspRaw[i], cx=c.minX+c.w/2, cy=c.minY+c.h/2;
+    const inside = closed.some(j=> j!==i && inspRaw[j].area>c.area+1 && pointInPolygon(cx,cy,inspRaw[j].vertices));
+    if (inside && inspCls[i]!=='skip') inspCls[i]='hole';
+  });
+
+  // Open geometry (lines/arcs/dots) and TEXT:
+  //  • INSIDE a piece  → kept INTERNAL (hole) exactly as imported — never moved.
+  //  • OUTSIDE every frame → stray mark (loose line, dot, dangling text) → SKIP,
+  //    so it is NOT counted or nested. (User can re-enable via the badge.)
+  const outerPolys = closed.filter(i=>inspCls[i]==='outer').map(i=>inspRaw[i]);
+  inspRaw.forEach((s,i)=>{
+    if (inspCls[i]!=='outer') return;
+    if (!(s.open || s.isText)) return;
+    const cx=s.minX+s.w/2, cy=s.minY+s.h/2;
+    const inside = outerPolys.some(o=>o!==s && pointInPolygon(cx,cy,o.vertices));
+    inspCls[i] = inside ? 'hole' : 'skip';
+  });
+
+  // ── TINY-NOISE FILTER ──────────────────────────────────────────────────────
+  // ONLY degenerate micro shapes (≈0.1–0.5mm — stray dots / dimension ticks /
+  // artefacts) are skipped. EVERYTHING ELSE (incl. thin strips ≥1mm) is counted.
+  inspRaw.forEach((s,i)=>{
+    if (Math.max(s.w||0, s.h||0) < 1.0) inspCls[i]='skip';
+  });
+
+  // Note an all-enclosing frame for the info banner only (does NOT change sheet size).
+  const si = detectSheetBoundary();
+  if (si>=0){ const s=inspRaw[si]; inspSheetInfo={idx:si, w:Math.round(s.w), h:Math.round(s.h)}; }
+}
+
+/** Largest closed contour whose polygon contains the centre of every smaller contour.
+ *  Returns its index in inspRaw, or -1 if no single contour contains all others. */
+function detectSheetBoundary() {
+  const cand = inspRaw.filter(s => s.vertices && s.vertices.length>=3 && s.area>=1 && !s.open && !s.isText);
+  if (cand.length < 2) return -1;
+  let best=-1, bestArea=-1;
+  for (let i=0;i<cand.length;i++){
+    const s=cand[i];
+    let containsAll=true;
+    for (let j=0;j<cand.length;j++){
+      if (i===j) continue;
+      const t=cand[j];
+      // s must contain EVERY other contour. A shape as large/larger than s cannot be
+      // inside it → s is not the all-enclosing sheet.
+      if (t.area >= s.area) { containsAll=false; break; }
+      const cx=t.minX+t.w/2, cy=t.minY+t.h/2;
+      if (!pointInPolygon(cx,cy,s.vertices)) { containsAll=false; break; }
+    }
+    if (containsAll && s.area>bestArea){ bestArea=s.area; best=i; }
+  }
+  return best<0 ? -1 : inspRaw.indexOf(cand[best]);
+}
+
+/** OPTIONAL helper (user-triggered): mark nested inner loops as holes using the
+ *  even-odd rule. The detected sheet is excluded so its direct children stay pieces. */
+function autoDetectHoles() {
+  const input = (inspSheetInfo && inspSheetInfo.idx>=0)
+    ? inspRaw.filter((_,i)=>i!==inspSheetInfo.idx) : inspRaw;
+  const tree = buildContourTree(input);
   tree.forEach(outer => {
-    const oi = matchRaw(outer);
-    if (oi >= 0) inspCls[oi] = 'outer';
     (outer.holes||[]).forEach(hole => {
       const hi = matchRaw(hole);
-      if (hi >= 0) inspCls[hi] = 'hole';
+      if (hi >= 0 && inspCls[hi] !== 'skip') inspCls[hi] = 'hole';
     });
   });
+  renderInspector();
 }
 
 function matchRaw(s) {
@@ -1451,12 +1821,20 @@ function renderInspector() {
       <span style="font-size:.74rem;color:var(--muted);">Layer: ${layers.join(', ')}</span>
     </div>
 
+    ${inspSheetInfo ? `<div class="info-box" style="background:#0d2b1a;border-color:#10b98155;color:#6ee7b7;">
+      📐 ${t('sheetDetected')} <b>${inspSheetInfo.w}×${inspSheetInfo.h} mm</b> — ${t('sheetDetectedNote')}
+    </div>` : ''}
+
+    ${lastOpenBoundaries>0 ? `<div class="info-box" style="background:#2a1f00;border-color:#f59e0b66;color:#fbbf24;">
+      ⚠️ ${t('openBoundaryWarn').replace('{n}', lastOpenBoundaries)}
+    </div>` : ''}
+
     <div class="info-box">${t('inspInfo')}</div>
 
-    <!-- Inspector map + legend -->
-    <div class="insp-map-wrap">
+    <!-- Inspector map (full width) + legend/summary below -->
+    <div class="insp-map-wrap" style="grid-template-columns:1fr;">
       <div class="insp-canvas-box" style="position:relative;">
-        <canvas id="inspCanvas" style="display:block;width:100%;height:260px;"></canvas>
+        <canvas id="inspCanvas" style="display:block;width:100%;height:460px;"></canvas>
         <div style="position:absolute;top:6px;left:8px;font-size:.7rem;color:#64748b;">
           พิกัดจริงในไฟล์ DXF (mm)
         </div>
@@ -1471,10 +1849,27 @@ function renderInspector() {
           🖱️ วางเมาส์บนแถว = highlight บนแผนที่<br>
           🔄 กด badge = เปลี่ยน classification
         </div>
-        <!-- Group summary -->
+        <!-- Geometry diagnostics: overlapping / open lines highlighted in colour -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+          <button class="btn btn-ghost btn-sm" id="diagBtn" onclick="toggleDiag()"
+            style="background:#ef4444;color:#fff;">🔎 ไฮไลต์ปัญหาเส้น</button>
+          <span id="diagOut" style="font-size:.74rem;font-weight:700;">${(()=>{
+            computeDiag(); const c=diagCounts(); const tot=c.dup+c.open;
+            if(!tot) return `<span style="color:#10b981">✓ ไม่พบปัญหาเส้น</span>`;
+            return `<button class="btn btn-sm" onclick="showDiagPopup()"
+                style="background:#f87171;color:#111;font-weight:800;">⚠️ ดูปัญหา ${tot} รายการ</button>
+              <span style="margin-left:8px;color:${DIAG_COLOR.dup}">■ ทับซ้อน ${c.dup}</span>
+              <span style="margin-left:6px;color:${DIAG_COLOR.open}">■ เส้นเปิด ${c.open}</span>`;
+          })()}</span>
+        </div>
+        <!-- Group summary (collapsible) -->
         <div style="font-size:.75rem;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-          <div style="background:var(--surface);padding:5px 10px;font-weight:700;color:var(--muted);">สรุปกลุ่มชิ้น</div>
-          ${groupInspSummary()}
+          <div onclick="toggleGroupSummary()" style="background:var(--surface);padding:5px 10px;font-weight:700;
+            color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;">
+            <span>${t('groupSummary')}</span>
+            <span id="grpSumChevron" style="transition:transform .15s;transform:rotate(${grpSummaryOpen?'0':'-90'}deg);">▾</span>
+          </div>
+          <div id="grpSumBody" style="display:${grpSummaryOpen?'block':'none'};">${groupInspSummary()}</div>
         </div>
       </div>
     </div>
@@ -1518,6 +1913,32 @@ function renderInspector() {
   setTimeout(drawInspCanvas, 60);
 }
 
+let grpSummaryOpen = true;   // collapse/expand state for the group-summary panel
+function toggleGroupSummary() {
+  grpSummaryOpen = !grpSummaryOpen;
+  const body = document.getElementById('grpSumBody');
+  const chev = document.getElementById('grpSumChevron');
+  if (body) body.style.display = grpSummaryOpen ? 'block' : 'none';
+  if (chev) chev.style.transform = `rotate(${grpSummaryOpen?'0':'-90'}deg)`;
+}
+
+let calcLegendOpen = true;   // collapse/expand state for the calc-page piece legend
+function toggleCalcLegend() {
+  calcLegendOpen = !calcLegendOpen;
+  const b=document.getElementById('calcLegBody'), c=document.getElementById('calcLegChevron');
+  if (b) b.style.display = calcLegendOpen ? 'block' : 'none';
+  if (c) c.style.transform = `rotate(${calcLegendOpen?'0':'-90'}deg)`;
+}
+
+let step2GrpOpen = true;   // collapse/expand state for the step-2 group list
+function toggleStep2Grp() {
+  step2GrpOpen = !step2GrpOpen;
+  const body = document.getElementById('step2GrpBody');
+  const chev = document.getElementById('step2GrpChevron');
+  if (body) body.style.display = step2GrpOpen ? 'block' : 'none';
+  if (chev) chev.style.transform = `rotate(${step2GrpOpen?'0':'-90'}deg)`;
+}
+
 function groupInspSummary() {
   const groups = {};
   inspRaw.forEach((s,i)=>{
@@ -1536,11 +1957,429 @@ function groupInspSummary() {
   `).join('');
 }
 
+// ── GEOMETRY DIAGNOSTICS ──────────────────────────────────────────────────────
+// Flags per imported entity so drawing problems are visible before nesting:
+//   dup  = duplicate / overlapping line (same geometry drawn twice)
+//   open = unclosed contour (won't cut as a closed part)
+let inspDiag=[], diagOn=true;         // colours ON by default so problems are obvious
+let dupSets=[];                       // [[i,j,…], …] groups of identical (overlapping) entities
+const DIAG_COLOR={dup:'#ef4444', open:'#f59e0b'};
+
+function computeDiag(){
+  const n=inspRaw.length;
+  inspDiag=new Array(n).fill(null).map(()=>({dup:false,open:false,dupSet:-1}));
+  const key=s=>`${Math.round(s.minX*20)}|${Math.round(s.minY*20)}|${Math.round(s.w*20)}|${Math.round(s.h*20)}|${Math.round((s.area||0)*20)}`;
+  const byKey={};
+  for(let i=0;i<n;i++){
+    const s=inspRaw[i]; if(!s||!s.vertices||!s.vertices.length) continue;
+    if(s.isText) continue;
+    const k=key(s);
+    (byKey[k]=byKey[k]||[]).push(i);
+    if(s.open) inspDiag[i].open=true;     // open contour
+  }
+  // duplicate / overlapping groups (same footprint within 0.05mm)
+  dupSets=[];
+  Object.values(byKey).forEach(arr=>{
+    if(arr.length<2) return;
+    const gi=dupSets.length; dupSets.push(arr);
+    arr.forEach(i=>{ inspDiag[i].dup=true; inspDiag[i].dupSet=gi; });
+  });
+  return inspDiag;
+}
+function diagCounts(){
+  const c={dup:0,open:0,dupGroups:dupSets.length};
+  inspDiag.forEach(d=>{ if(!d) return; if(d.dup)c.dup++; if(d.open)c.open++; });
+  return c;
+}
+
+/** Prominent problem report — auto-opens after import when issues are found. */
+function showDiagPopup(){
+  computeDiag();
+  const c=diagCounts();
+  const total=c.dup+c.open;
+  const sizeOf=i=>{ const s=inspRaw[i]; return s?`${s.w.toFixed(1)}×${s.h.toFixed(1)}mm`:''; };
+  let body='';
+  if(!total){
+    body=`<div style="font-size:.95rem;color:#10b981;font-weight:700;padding:6px 0;">
+        ✓ ไม่พบปัญหา — เส้นทุกเส้นปิดสนิทและไม่มีเส้นทับซ้อน</div>`;
+  } else {
+    body=`<div style="font-size:.82rem;color:var(--muted);margin-bottom:12px;">
+        ตรวจไฟล์ <b style="color:var(--text)">${inspFileName||'DXF'}</b> — พบ
+        <b style="color:#f87171">${total}</b> รายการที่ควรตรวจก่อนตัด</div>`;
+    // Overlapping lines card
+    if(c.dupGroups){
+      body+=`<div style="border:1px solid ${DIAG_COLOR.dup}55;background:${DIAG_COLOR.dup}14;border-radius:10px;padding:12px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="width:12px;height:12px;border-radius:3px;background:${DIAG_COLOR.dup};display:inline-block;"></span>
+          <b style="font-size:.92rem;">เส้นทับซ้อน — ${c.dupGroups} กลุ่ม (${c.dup} เส้น)</b>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted);margin:6px 0 8px;">
+          เส้นเดียวกันถูกวาดซ้ำที่เดิม → เครื่องจะตัดซ้ำรอบเดิม เสียเวลาและกัดวัสดุ</div>
+        <div style="max-height:130px;overflow:auto;font-size:.76rem;margin-bottom:10px;">
+          ${dupSets.map((g,k)=>`<div style="padding:3px 0;border-bottom:1px solid var(--border);">
+              กลุ่ม ${k+1}: <b>${g.length} เส้น</b> ${sizeOf(g[0])}
+              <span style="color:var(--muted)">— #${g.map(x=>x+1).join(', #')}</span>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="resolveAllDups(true)">🧹 เก็บกลุ่มละ 1 เส้น (แนะนำ)</button>
+      </div>`;
+    }
+    // Open contours card
+    if(c.open){
+      const list=inspRaw.map((s,i)=>({s,i})).filter(x=>inspDiag[x.i]&&inspDiag[x.i].open);
+      body+=`<div style="border:1px solid ${DIAG_COLOR.open}55;background:${DIAG_COLOR.open}14;border-radius:10px;padding:12px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="width:12px;height:12px;border-radius:3px;background:${DIAG_COLOR.open};display:inline-block;"></span>
+          <b style="font-size:.92rem;">เส้นเปิด — ${c.open} เส้น</b>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted);margin:6px 0 8px;">
+          เส้นที่ไม่ปิดเป็นวง ตัดออกมาไม่เป็นชิ้นงาน (มักเป็นเศษเส้น/ขีดบอกระยะ)
+          — ถ้าเป็นลายภายในชิ้นงานให้คงไว้ได้</div>
+        <div style="max-height:110px;overflow:auto;font-size:.76rem;margin-bottom:10px;">
+          ${list.map(x=>`<div style="padding:2px 0;">#${x.i+1} ${x.s.type} ${sizeOf(x.i)}</div>`).join('')}
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="skipAllOpen()">✖ ข้ามเส้นเปิดทั้งหมด</button>
+      </div>`;
+    }
+    body+=`<div style="font-size:.76rem;color:var(--muted);">
+        💡 เส้นที่มีปัญหาถูกไฮไลต์สีบนแผนที่แล้ว — คลิกที่เส้นเพื่อเลือกเก็บ/ข้ามทีละเส้น</div>`;
+  }
+  body+=`<div style="margin-top:14px;display:flex;justify-content:flex-end;">
+      <button class="btn btn-ghost btn-sm" onclick="closeEditPopup()">ปิด</button></div>`;
+  showEditPopup(total?`⚠️ ตรวจพบปัญหาในไฟล์ (${total})`:'🔎 ผลตรวจคุณภาพเส้น', body);
+}
+/** Skip every open contour in one action. */
+function skipAllOpen(){
+  let n=0;
+  inspRaw.forEach((s,i)=>{ if(inspDiag[i]&&inspDiag[i].open&&inspCls[i]!=='skip'){ inspCls[i]='skip'; n++; } });
+  closeEditPopup(); renderInspector();
+  alert(`ข้ามเส้นเปิด ${n} เส้นแล้ว`);
+}
+/** Keep ONE line from each overlapping group and skip the rest (whole file at once). */
+function resolveAllDups(){
+  computeDiag();
+  if(!dupSets.length){ alert('ไม่พบเส้นทับซ้อน'); return; }
+  let skipped=0;
+  dupSets.forEach(arr=>{
+    // keep the first entity that is not already skipped, skip its twins
+    let keptFound=false;
+    arr.forEach(i=>{
+      if(!keptFound && inspCls[i]!=='skip'){ keptFound=true; return; }
+      if(inspCls[i]!=='skip'){ inspCls[i]='skip'; skipped++; }
+    });
+  });
+  renderInspector();
+  alert(`เก็บเส้นละ 1 เส้นจาก ${dupSets.length} กลุ่มที่ทับซ้อน — ข้ามไป ${skipped} เส้น`);
+}
+/** Keep entity `keep` from its overlap group, skip the others. */
+function dupKeepOnly(keep){
+  const g=inspDiag[keep]?.dupSet; if(g===undefined||g<0) return;
+  dupSets[g].forEach(i=>{ inspCls[i] = (i===keep) ? (inspCls[i]==='skip'?'outer':inspCls[i]) : 'skip'; });
+  closeEditPopup(); renderInspector();
+}
+/** Skip just this one entity (use when you prefer its twin). */
+function dupSkipThis(i){ inspCls[i]='skip'; closeEditPopup(); renderInspector(); }
+
+function toggleDiag(){
+  diagOn=!diagOn;
+  if(diagOn) computeDiag();
+  const b=document.getElementById('diagBtn');
+  if(b){ b.style.background=diagOn?'#ef4444':''; b.style.color=diagOn?'#fff':''; }
+  const b2=document.getElementById('diagBtn');
+  if(b2) b2.textContent = diagOn ? '🔎 ไฮไลต์ปัญหาเส้น' : '🔎 ปิดไฮไลต์อยู่';
+  drawInspCanvas();
+}
+
+/** Attach wheel-zoom, drag-pan and on-screen zoom buttons to the preview (once). */
+function wireInspZoom(canvas){
+  if(canvas._zoomWired) return;
+  canvas._zoomWired = true;
+  const rel = e => { const r=canvas.getBoundingClientRect();
+    return [ (e.clientX-r.left)*(canvas.width/r.width), (e.clientY-r.top)*(canvas.height/r.height) ]; };
+
+  // Mouse-wheel zoom, centered on the cursor
+  canvas.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const [cx,cy]=rel(e);
+    inspZoomBy(e.deltaY<0 ? 1.15 : 1/1.15, cx, cy);
+  }, {passive:false});
+
+  // Drag to pan
+  let dragging=false, lx=0, ly=0;
+  canvas.addEventListener('mousedown', e=>{ dragging=true; lx=e.clientX; ly=e.clientY; canvas.style.cursor='grabbing'; });
+  window.addEventListener('mousemove', e=>{ if(!dragging) return;
+    const r=canvas.getBoundingClientRect();
+    inspPanX += (e.clientX-lx)*(canvas.width/r.width);
+    inspPanY += (e.clientY-ly)*(canvas.height/r.height);
+    lx=e.clientX; ly=e.clientY; drawInspCanvas();
+  });
+  window.addEventListener('mouseup', ()=>{ dragging=false; canvas.style.cursor='grab'; });
+  canvas.addEventListener('dblclick', ()=>inspZoomReset());
+  canvas.style.cursor='grab';
+
+  // On-screen zoom buttons (top-right of the preview box)
+  const wrap = canvas.parentElement;
+  if(wrap && !wrap.querySelector('.insp-zoom-ctrl')){
+    if(getComputedStyle(wrap).position==='static') wrap.style.position='relative';
+    const bar=document.createElement('div');
+    bar.className='insp-zoom-ctrl';
+    bar.style.cssText='position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:5;';
+    const mk=(txt,fn,title)=>{ const b=document.createElement('button');
+      b.textContent=txt; b.title=title||'';
+      b.style.cssText='width:26px;height:26px;border-radius:6px;border:1px solid #ffffff22;background:#1e293bcc;color:#e2e8f0;font-size:15px;line-height:1;cursor:pointer;';
+      b.onclick=(ev)=>{ ev.stopPropagation(); fn(); }; return b; };
+    bar.appendChild(mk('+',()=>inspZoomBy(1.3),'ซูมเข้า'));
+    bar.appendChild(mk('−',()=>inspZoomBy(1/1.3),'ซูมออก'));
+    bar.appendChild(mk('⤢',()=>inspZoomReset(),'รีเซ็ต / พอดีจอ'));
+    wrap.appendChild(bar);
+  }
+}
+
+/** Generic pan/zoom wiring — state lives on the canvas element (canvas._zoom/_panX/_panY).
+ *  Used by any preview canvas (step-2 group preview, etc.). */
+function wireZoom(canvas, redraw, opts){
+  opts=opts||{};
+  if(canvas._zoom===undefined){ canvas._zoom=1; canvas._panX=0; canvas._panY=0; }
+  canvas._opts=opts;
+  canvas._zoomBy=(f,cx,cy)=>{ if(cx===undefined){cx=canvas.width/2;cy=canvas.height/2;}
+    const z0=canvas._zoom, z1=Math.max(1,Math.min(20,z0*f)); if(z1===z0) return;
+    canvas._panX=cx-(cx-canvas._panX)*(z1/z0); canvas._panY=cy-(cy-canvas._panY)*(z1/z0);
+    canvas._zoom=z1; redraw(); };
+  canvas._zoomReset=()=>{ canvas._zoom=1; canvas._panX=0; canvas._panY=0; redraw(); };
+  if(canvas._zoomWired) return;
+  canvas._zoomWired=true;
+  const rel=e=>{const r=canvas.getBoundingClientRect();
+    return [(e.clientX-r.left)*(canvas.width/r.width),(e.clientY-r.top)*(canvas.height/r.height)];};
+  canvas.addEventListener('wheel',e=>{e.preventDefault();const [cx,cy]=rel(e);
+    canvas._zoomBy(e.deltaY<0?1.15:1/1.15,cx,cy);},{passive:false});
+  let dr=false,lx=0,ly=0,dnX=0,dnY=0,moved=false;
+  canvas.addEventListener('mousedown',e=>{dr=true;moved=false;lx=e.clientX;ly=e.clientY;dnX=e.clientX;dnY=e.clientY;canvas.style.cursor='grabbing';});
+  window.addEventListener('mousemove',e=>{if(!dr)return;
+    if(Math.abs(e.clientX-dnX)+Math.abs(e.clientY-dnY)>3) moved=true;
+    const r=canvas.getBoundingClientRect();
+    canvas._panX+=(e.clientX-lx)*(canvas.width/r.width); canvas._panY+=(e.clientY-ly)*(canvas.height/r.height);
+    lx=e.clientX; ly=e.clientY; redraw();});
+  window.addEventListener('mouseup',()=>{dr=false;canvas.style.cursor='grab';});
+  // Hover highlight (when not dragging)
+  canvas.addEventListener('mousemove',e=>{ if(dr) return; if(canvas._opts.onHover){ const [px,py]=rel(e); canvas._opts.onHover(px,py); } });
+  canvas.addEventListener('mouseleave',()=>{ if(canvas._opts.onHover) canvas._opts.onHover(-1,-1); });
+  // Click-to-edit (ignored if the mouse was dragging/panning)
+  canvas.addEventListener('click',e=>{ if(moved) return; if(canvas._opts.onClick){ const [px,py]=rel(e); canvas._opts.onClick(px,py); } });
+  canvas.addEventListener('dblclick',()=>canvas._zoomReset());
+  canvas.style.cursor='grab';
+  const wrap=canvas.parentElement;
+  if(wrap && !wrap.querySelector('.cnc-zoom-ctrl')){
+    if(getComputedStyle(wrap).position==='static') wrap.style.position='relative';
+    const bar=document.createElement('div'); bar.className='cnc-zoom-ctrl';
+    bar.style.cssText='position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:5;';
+    const mk=(txt,fn,title)=>{const b=document.createElement('button');b.textContent=txt;b.title=title||'';
+      b.style.cssText='width:26px;height:26px;border-radius:6px;border:1px solid #ffffff22;background:#1e293bcc;color:#e2e8f0;font-size:15px;line-height:1;cursor:pointer;';
+      b.onclick=ev=>{ev.stopPropagation();fn();};return b;};
+    bar.appendChild(mk('+',()=>canvas._zoomBy(1.3),'ซูมเข้า'));
+    bar.appendChild(mk('−',()=>canvas._zoomBy(1/1.3),'ซูมออก'));
+    bar.appendChild(mk('⤢',()=>canvas._zoomReset(),'รีเซ็ต'));
+    wrap.appendChild(bar);
+  }
+}
+
+// ── Canvas interaction: hover highlight + click-to-edit popup ────────────────
+let inspView=null, mdxfView=null;   // stored draw transforms for inverse mapping
+let inspHlIdx=-1;                    // current hover highlight on the inspector canvas
+
+/** Screen (canvas px) → world (DXF mm) using a stored view + canvas zoom/pan. */
+function invMap(view, canvas, px, py){
+  if(!view) return [0,0];
+  const z=canvas._zoom||1, pX=canvas._panX||0, pY=canvas._panY||0;
+  const bx=(px-pX)/z, by=(py-pY)/z;
+  return [ view.mnX + (bx-view.bOx)/view.baseSc,
+           view.mxY - (by-view.bOy)/view.baseSc ];
+}
+/** Index of the shape under (vx,vy). Prefers the SMALLEST match so holes/text/
+ *  lines inside a piece win over the big outer frame. */
+function hitShape(shapes, vx, vy){
+  let best=-1, bestArea=Infinity;
+  shapes.forEach((s,i)=>{
+    if(!s.vertices||!s.vertices.length) return;
+    let inside=false;
+    if(!s.open && !s.isText && s.vertices.length>=3) inside=pointInPolygon(vx,vy,s.vertices);
+    else { const m=1.5; inside = vx>=s.minX-m && vx<=s.minX+s.w+m && vy>=s.minY-m && vy<=s.minY+s.h+m; }
+    const a = s.area||0.001;
+    if(inside && a<bestArea){ bestArea=a; best=i; }
+  });
+  return best;
+}
+
+/** Generic modal popup */
+function showEditPopup(title, bodyHTML){
+  closeEditPopup();
+  const ov=document.createElement('div'); ov.id='shapeEditOverlay';
+  ov.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999;display:flex;align-items:center;justify-content:center;';
+  ov.addEventListener('mousedown',e=>{ if(e.target===ov) closeEditPopup(); });
+  const box=document.createElement('div');
+  box.style.cssText='background:var(--card,#141824);border:1px solid var(--border,#2a3350);border-radius:12px;padding:16px 18px;min-width:290px;max-width:92vw;max-height:85vh;overflow:auto;box-shadow:0 12px 44px #000b;';
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <b style="color:var(--text,#e2e8f0);font-size:1rem;">${title}</b>
+      <button onclick="closeEditPopup()" style="background:none;border:none;color:#94a3b8;font-size:1.4rem;cursor:pointer;line-height:1;">×</button>
+    </div>${bodyHTML}`;
+  ov.appendChild(box); document.body.appendChild(ov);
+}
+function closeEditPopup(){ document.getElementById('shapeEditOverlay')?.remove(); }
+
+// ---- Inspector (step-1) canvas interaction ----
+function inspCanvasHover(px,py){
+  const canvas=document.getElementById('inspCanvas'); if(!canvas) return;
+  if(px<0){ if(inspHlIdx!==-1) drawInspCanvas(-1); canvas.style.cursor='grab'; return; }
+  const [vx,vy]=invMap(inspView,canvas,px,py);
+  const idx=hitShape(inspRaw,vx,vy);
+  canvas.style.cursor = idx>=0 ? 'pointer' : 'grab';
+  if(idx!==inspHlIdx) drawInspCanvas(idx);
+}
+function inspCanvasClick(px,py){
+  const canvas=document.getElementById('inspCanvas'); if(!canvas) return;
+  const [vx,vy]=invMap(inspView,canvas,px,py);
+  const idx=hitShape(inspRaw,vx,vy);
+  if(idx>=0) openInspShapePopup(idx);
+}
+function openInspShapePopup(i){
+  const s=inspRaw[i]; if(!s) return;
+  if(!inspDiag.length || inspDiag.length!==inspRaw.length) computeDiag();
+  const cls=inspCls[i];
+  const cx=(s.minX+s.w/2).toFixed(1), cy=(s.minY+s.h/2).toFixed(1);
+  let body=`<div style="font-size:.85rem;color:var(--muted,#94a3b8);line-height:1.85;">
+      ${t('col_type')}: <b style="color:var(--text)">${s.type}</b> &nbsp;|&nbsp; Layer: <b style="color:var(--text)">${s.layer||'0'}</b><br>
+      ${t('col_cx')},${t('col_cy')}: <b style="color:var(--text)">${cx}, ${cy}</b> mm<br>
+      ${t('col_w')}×${t('col_h')}: <b style="color:var(--text)">${s.w.toFixed(1)} × ${s.h.toFixed(1)}</b> mm<br>
+      ${t('col_aream2')}: <b style="color:var(--text)">${(s.area/1e6).toFixed(5)}</b> m²
+    </div>`;
+  if(s.isText && s.text){
+    body+=`<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+      <label style="font-size:.8rem;color:var(--muted);">ข้อความ</label>
+      <input id="popTxtStr" value="${(s.text.str||'').replace(/"/g,'&quot;')}" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);margin-top:3px;">
+      <label style="font-size:.8rem;color:var(--muted);margin-top:8px;display:block;">ความสูงตัวอักษร (mm)</label>
+      <input id="popTxtH" type="number" step="0.1" value="${s.text.h}" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);margin-top:3px;">
+    </div>`;
+  }
+  // Geometry problem panel — incl. keep/skip choice for overlapping duplicates
+  const dg=inspDiag[i];
+  if(dg && (dg.dup||dg.open)){
+    const tags=[];
+    if(dg.dup)  tags.push(`<span style="color:${DIAG_COLOR.dup}">■ เส้นทับซ้อน</span>`);
+    if(dg.open) tags.push(`<span style="color:${DIAG_COLOR.open}">■ เส้นเปิด</span>`);
+    body+=`<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+      <div style="font-size:.82rem;font-weight:700;margin-bottom:6px;">⚠️ ปัญหาที่ตรวจพบ: ${tags.join(' ')}</div>`;
+    if(dg.dup && dg.dupSet>=0){
+      const grp=dupSets[dg.dupSet]||[];
+      body+=`<div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">
+          ทับซ้อนกัน ${grp.length} เส้น (#${grp.map(k=>k+1).join(', #')}) — เลือกเส้นที่จะเก็บ
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="dupKeepOnly(${i})">✔ เก็บเส้นนี้ (ข้ามที่เหลือ)</button>
+          <button class="btn btn-ghost btn-sm" onclick="dupSkipThis(${i})">✖ ข้ามเส้นนี้</button>
+        </div>`;
+    }
+    body+=`</div>`;
+  }
+  body+=`<div style="margin-top:12px;">
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:5px;">${t('col_cls')}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button onclick="setInspClsFromPopup(${i},'outer')" class="cls-badge cls-outer" style="cursor:pointer;border:none;${cls==='outer'?'outline:2px solid #fff;':''}">${CLS_LABEL.outer}</button>
+        <button onclick="setInspClsFromPopup(${i},'hole')" class="cls-badge cls-hole" style="cursor:pointer;border:none;${cls==='hole'?'outline:2px solid #fff;':''}">${CLS_LABEL.hole}</button>
+        <button onclick="setInspClsFromPopup(${i},'skip')" class="cls-badge cls-skip" style="cursor:pointer;border:none;${cls==='skip'?'outline:2px solid #fff;':''}">${CLS_LABEL.skip}</button>
+      </div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
+      ${s.isText?`<button class="btn btn-primary btn-sm" onclick="saveInspTextEdit(${i})">💾 บันทึก</button>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="closeEditPopup()">ปิด</button>
+    </div>`;
+  showEditPopup(`${t('col_found')||'ชิ้น'} #${i+1}`, body);
+}
+function setInspClsFromPopup(i,c){
+  inspCls[i]=c;
+  const row=document.getElementById('inspRow'+i), btn=document.getElementById('inspCls'+i);
+  if(row) row.className='insp-row-'+c;
+  if(btn){ btn.className='cls-badge cls-'+c; btn.textContent=CLS_LABEL[c]; }
+  drawInspCanvas(i);
+  openInspShapePopup(i);   // refresh popup so the active outline updates
+}
+function saveInspTextEdit(i){
+  const s=inspRaw[i]; if(!s||!s.text){ closeEditPopup(); return; }
+  const str=document.getElementById('popTxtStr'), hh=document.getElementById('popTxtH');
+  if(str) s.text.str=str.value;
+  if(hh && +hh.value>0) s.text.h=+hh.value;
+  closeEditPopup(); drawInspCanvas(i);
+}
+
+// ---- Step-2 group preview canvas interaction ----
+function mdxfCanvasHover(px,py){
+  const canvas=document.getElementById('mdxfPreview'); if(!canvas) return;
+  if(px<0){ drawMdxfPreviewGroup(-1); canvas.style.cursor='grab'; return; }
+  const [vx,vy]=invMap(mdxfView,canvas,px,py);
+  const si=hitShape(mdxfShapes,vx,vy);
+  const gi = si>=0 ? mdxfGroups.findIndex(g=>g.indices.includes(si)) : -1;
+  canvas.style.cursor = gi>=0 ? 'pointer' : 'grab';
+  if(gi!==mdxfHlGi) drawMdxfPreviewGroup(gi);
+}
+function mdxfCanvasClick(px,py){
+  const canvas=document.getElementById('mdxfPreview'); if(!canvas) return;
+  const [vx,vy]=invMap(mdxfView,canvas,px,py);
+  const si=hitShape(mdxfShapes,vx,vy);
+  if(si<0) return;
+  const gi=mdxfGroups.findIndex(g=>g.indices.includes(si));
+  if(gi>=0) openMdxfGroupPopup(gi);
+}
+function openMdxfGroupPopup(gi){
+  const g=mdxfGroups[gi]; if(!g) return;
+  const s=g.shape;
+  const nameEl=document.getElementById('mdxfName'+gi), qtyEl=document.getElementById('mdxfQty'+gi);
+  const curName=nameEl?nameEl.value:`${s.w.toFixed(0)}×${s.h.toFixed(0)} mm`;
+  const curQty =qtyEl?qtyEl.value:g.count;
+  const body=`<div style="font-size:.85rem;color:var(--muted);line-height:1.85;">
+      ${t('col_w')}×${t('col_h')}: <b style="color:var(--text)">${s.w.toFixed(1)} × ${s.h.toFixed(1)}</b> mm<br>
+      ${t('col_aream2')}: <b style="color:var(--text)">${(s.area/1e6).toFixed(5)}</b> m² &nbsp;|&nbsp;
+      🕳️ ${s.holes?.length||0} &nbsp;|&nbsp; ${g.count} ${t('pieces_lbl')}
+    </div>
+    <div style="margin-top:12px;">
+      <label style="font-size:.8rem;color:var(--muted);">${t('col_name')}</label>
+      <input id="popGrpName" value="${curName.replace(/"/g,'&quot;')}" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);margin-top:3px;">
+      <label style="font-size:.8rem;color:var(--muted);margin-top:8px;display:block;">${t('qty_lbl')}</label>
+      <input id="popGrpQty" type="number" min="1" value="${curQty}" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);margin-top:3px;">
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-primary btn-sm" onclick="saveMdxfGroupEdit(${gi})">💾 บันทึก</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeEditPopup()">ปิด</button>
+    </div>`;
+  showEditPopup(`${t('col_cls')||'กลุ่ม'} #${gi+1}`, body);
+}
+function saveMdxfGroupEdit(gi){
+  const nameEl=document.getElementById('mdxfName'+gi), qtyEl=document.getElementById('mdxfQty'+gi);
+  const nv=document.getElementById('popGrpName'), qv=document.getElementById('popGrpQty');
+  if(nameEl && nv) nameEl.value=nv.value;
+  if(qtyEl && qv && +qv.value>=1) qtyEl.value=Math.round(+qv.value);
+  updateMdxfTotal();
+  closeEditPopup();
+}
+
+/** Pan/zoom state for the inspector preview */
+let inspZoom=1, inspPanX=0, inspPanY=0;
+function inspZoomReset(){ inspZoom=1; inspPanX=0; inspPanY=0; drawInspCanvas(); }
+function inspZoomBy(factor, cx, cy){
+  const canvas=document.getElementById('inspCanvas'); if(!canvas) return;
+  if(cx===undefined){ cx=canvas.offsetWidth/2; cy=canvas.offsetHeight/2; }
+  const z0=inspZoom, z1=Math.max(1, Math.min(20, z0*factor));
+  if(z1===z0) return;
+  inspPanX = cx-(cx-inspPanX)*(z1/z0);
+  inspPanY = cy-(cy-inspPanY)*(z1/z0);
+  inspZoom = z1;
+  drawInspCanvas();
+}
+
 /** Draw inspector canvas — แสดงพิกัดจริง */
-function drawInspCanvas(highlightIdx=-1) {
+function drawInspCanvas(highlightIdx) {
   const canvas = document.getElementById('inspCanvas');
   if (!canvas || !inspRaw.length) return;
+  if(highlightIdx===undefined) highlightIdx=inspHlIdx; else inspHlIdx=highlightIdx;
   const ctx = canvas.getContext('2d');
+  wireZoom(canvas, ()=>drawInspCanvas(), { onHover:inspCanvasHover, onClick:inspCanvasClick });
   const W = canvas.offsetWidth || 500;
   const H = canvas.offsetHeight || 260;
   canvas.width = W; canvas.height = H;
@@ -1556,10 +2395,15 @@ function drawInspCanvas(highlightIdx=-1) {
   });
   const PAD=18;
   const rX=mxX-mnX||1, rY=mxY-mnY||1;
-  const sc=Math.min((W-PAD*2)/rX,(H-PAD*2)/rY);
-  const ox=PAD+(W-PAD*2-rX*sc)/2;
-  const oy=PAD+(H-PAD*2-rY*sc)/2;
-  const toC=(vx,vy)=>[ox+(vx-mnX)*sc, oy+(mxY-vy)*sc]; // Y-flip: DXF Y-up→canvas Y-down
+  // Base fit (zoom=1, pan=0), then apply zoom+pan (state on the canvas element).
+  const baseSc=Math.min((W-PAD*2)/rX,(H-PAD*2)/rY);
+  const bOx=PAD+(W-PAD*2-rX*baseSc)/2;
+  const bOy=PAD+(H-PAD*2-rY*baseSc)/2;
+  const z=canvas._zoom||1, pX=canvas._panX||0, pY=canvas._panY||0;
+  const sc=baseSc*z;
+  inspView={mnX,mxY,bOx,bOy,baseSc};   // for cursor→world hit-testing
+  const toC=(vx,vy)=>[(bOx+(vx-mnX)*baseSc)*z+pX,
+                      (bOy+(mxY-vy)*baseSc)*z+pY]; // Y-flip + zoom/pan
 
   // Grid lines (light)
   ctx.strokeStyle='#ffffff08'; ctx.lineWidth=0.5;
@@ -1573,20 +2417,41 @@ function drawInspCanvas(highlightIdx=-1) {
   inspRaw.forEach((s,i)=>{
     if(!s.vertices.length) return;
     const cls=inspCls[i];
-    const col=clsColor[cls]||'#666';
+    let col=clsColor[cls]||'#666';
+    // Diagnostics mode: recolour problem geometry (priority: overlap > open)
+    if(diagOn && inspDiag[i]){
+      const d=inspDiag[i];
+      if(d.dup) col=DIAG_COLOR.dup;
+      else if(d.open) col=DIAG_COLOR.open;
+    }
     const isHl=(i===highlightIdx);
+
+    // TEXT: draw the ACTUAL string at its imported anchor (position never moved).
+    if(s.isText && s.text){
+      const [ax,ay]=toC(s.vertices[0][0], s.vertices[0][1]);
+      ctx.fillStyle = cls==='skip' ? 'rgba(255,255,255,0.25)' : (isHl?'#fff':'#c4b5fd');
+      const fh=Math.max(7,(s.text.h||10)*sc);
+      ctx.font=`${fh}px Segoe UI,sans-serif`;
+      ctx.textAlign = s.text.hj===1?'center' : s.text.hj===2?'right' : 'left';
+      ctx.textBaseline = s.text.vj===3?'top' : s.text.vj===2?'middle' : s.text.vj===1?'bottom' : 'alphabetic';
+      ctx.fillText(s.text.str||'', ax, ay);
+      ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+      return;
+    }
 
     ctx.beginPath();
     s.vertices.forEach(([vx,vy],j)=>{
       const [px,py]=toC(vx,vy);
       j===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
     });
-    ctx.closePath();
-    ctx.fillStyle = cls==='skip' ? '#ffffff08' : (isHl ? col+'dd' : col+'44');
-    ctx.fill();
+    if(!s.open){                                   // open line work stays open (no chord/fill)
+      ctx.closePath();
+      ctx.fillStyle = cls==='skip' ? '#ffffff08' : (isHl ? col+'dd' : col+'44');
+      ctx.fill();
+    }
     ctx.strokeStyle = isHl ? '#fff' : col;
     ctx.lineWidth = isHl ? 2 : (cls==='outer'?1.5:0.8);
-    ctx.setLineDash(cls==='hole'?[3,2]:[]);
+    ctx.setLineDash(cls==='hole'&&!s.open?[3,2]:[]);
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -1678,19 +2543,33 @@ function renderStep2HTML(outers) {
         </div>
       </div>
 
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
-        <canvas id="mdxfPreview" class="mdxf-canvas" style="flex:1;min-width:200px;max-width:380px;height:200px;"></canvas>
-        <div style="flex:1;min-width:180px;font-size:.76rem;color:var(--muted);">
-          🔍 ${t('hoverHighlight')}<br>
-          <div style="margin-top:6px;">
-            ${groups.map((g,gi)=>`
-              <div style="display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid var(--border)">
-                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS[gi%COLORS.length]};flex-shrink:0;display:inline-block;"></span>
-                <b style="color:var(--text);">${g.count}×</b>
-                <span>${g.shape.w.toFixed(0)}×${g.shape.h.toFixed(0)} mm</span>
-                <span class="shape-pill ${g.shape.type==='circle'?'shape-free':'shape-rect'}">${g.shape.type==='circle'?'⭕':'⬛'}</span>
-                ${g.shape.holes?.length?`<span style="color:#a78bfa;">🕳️${g.shape.holes.length}</span>`:''}
-              </div>`).join('')}
+      <!-- Full-width preview (zoomable) + group list below — matches step-1 design -->
+      <div style="margin-bottom:12px;">
+        <div class="insp-canvas-box" style="position:relative;">
+          <canvas id="mdxfPreview" style="display:block;width:100%;height:460px;"></canvas>
+          <div style="position:absolute;top:6px;left:8px;font-size:.7rem;color:#64748b;">
+            พิกัดจริงในไฟล์ DXF (mm)
+          </div>
+        </div>
+        <!-- Group list (collapsible dropdown) -->
+        <div style="font-size:.75rem;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:8px;">
+          <div onclick="toggleStep2Grp()" style="background:var(--surface);padding:5px 10px;font-weight:700;
+            color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;">
+            <span>🔍 ${t('hoverHighlight')}</span>
+            <span id="step2GrpChevron" style="transition:transform .15s;transform:rotate(${step2GrpOpen?'0':'-90'}deg);">▾</span>
+          </div>
+          <div id="step2GrpBody" style="display:${step2GrpOpen?'block':'none'};padding:8px 10px;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px 12px;">
+              ${groups.map((g,gi)=>`
+                <div style="display:flex;align-items:center;gap:5px;font-size:.76rem;padding:3px 9px;
+                  border:1px solid var(--border);border-radius:8px;background:var(--card);">
+                  <span style="width:9px;height:9px;border-radius:50%;background:${COLORS[gi%COLORS.length]};flex-shrink:0;display:inline-block;"></span>
+                  <b style="color:var(--text);">${g.count}×</b>
+                  <span style="color:var(--muted);">${g.shape.w.toFixed(0)}×${g.shape.h.toFixed(0)} mm</span>
+                  <span class="shape-pill ${g.shape.type==='circle'?'shape-free':'shape-rect'}">${g.shape.type==='circle'?'⭕':'⬛'}</span>
+                  ${g.shape.holes?.length?`<span style="color:#a78bfa;">🕳️${g.shape.holes.length}</span>`:''}
+                </div>`).join('')}
+            </div>
           </div>
         </div>
       </div>
@@ -1909,9 +2788,12 @@ function mdxfGroupHighlight(gi, on) {
   });
 }
 
+let mdxfHlGi=-1;
 function drawMdxfPreviewGroup(highlightGi) {
+  if(highlightGi!==undefined) mdxfHlGi=highlightGi; else highlightGi=mdxfHlGi;
   const canvas = document.getElementById('mdxfPreview');
   if (!canvas || !mdxfShapes.length) return;
+  wireZoom(canvas, ()=>drawMdxfPreviewGroup(), { onHover:mdxfCanvasHover, onClick:mdxfCanvasClick });
   const ctx = canvas.getContext('2d');
   const W = canvas.offsetWidth || 380;
   const H = canvas.offsetHeight || 200;
@@ -1926,10 +2808,13 @@ function drawMdxfPreviewGroup(highlightGi) {
     });
   });
   const rangeX=mxX-mnX||1, rangeY=mxY-mnY||1;
-  const PAD=12, sc=Math.min((W-PAD*2)/rangeX,(H-PAD*2)/rangeY);
-  const ox=PAD+(W-PAD*2-rangeX*sc)/2;
-  const oy=PAD+(H-PAD*2-rangeY*sc)/2;
-  const toC=(vx,vy)=>([ox+(vx-mnX)*sc, oy+(mxY-vy)*sc]); // Y-flip
+  const PAD=12;
+  const baseSc=Math.min((W-PAD*2)/rangeX,(H-PAD*2)/rangeY);
+  const bOx=PAD+(W-PAD*2-rangeX*baseSc)/2;
+  const bOy=PAD+(H-PAD*2-rangeY*baseSc)/2;
+  const z=canvas._zoom||1, pX=canvas._panX||0, pY=canvas._panY||0;
+  mdxfView={mnX,mxY,bOx,bOy,baseSc};   // for cursor→world hit-testing
+  const toC=(vx,vy)=>([(bOx+(vx-mnX)*baseSc)*z+pX, (bOy+(mxY-vy)*baseSc)*z+pY]); // Y-flip + zoom/pan
 
   // Build set of highlighted shape indices
   const hlSet = new Set(highlightGi>=0 ? (mdxfGroups[highlightGi]?.indices||[]) : []);
@@ -1950,6 +2835,7 @@ function drawMdxfPreviewGroup(highlightGi) {
     if (s.holes && s.holes.length) {
       s.holes.forEach(hole=>{
         if(!hole.vertices||!hole.vertices.length) return;
+        if(hole.isText || hole.open) return;         // text & open line work drawn separately
         ctx.moveTo(...toC(hole.vertices[0][0],hole.vertices[0][1]));
         hole.vertices.forEach(([vx,vy],j)=>{ if(j>0) ctx.lineTo(...toC(vx,vy)); });
         ctx.closePath();
@@ -1960,6 +2846,27 @@ function drawMdxfPreviewGroup(highlightGi) {
     ctx.strokeStyle = isHl ? '#fff' : col;
     ctx.lineWidth = isHl ? 2 : 0.8;
     ctx.stroke();
+
+    // Open internal line work (e.g. X marks) — stroke, no fill
+    (s.holes||[]).forEach(hole=>{
+      if(!hole.open || hole.isText || !hole.vertices?.length) return;
+      ctx.beginPath();
+      hole.vertices.forEach(([vx,vy],j)=>{ const [px,py]=toC(vx,vy); j===0?ctx.moveTo(px,py):ctx.lineTo(px,py); });
+      ctx.strokeStyle = isHl ? '#fff' : col; ctx.lineWidth = isHl?2:0.8; ctx.stroke();
+    });
+
+    // TEXT holes — draw the ACTUAL string at its imported anchor (position never moved)
+    (s.holes||[]).forEach(hole=>{
+      if(!hole.isText || !hole.text || !hole.vertices?.length) return;
+      const [ax,ay]=toC(hole.vertices[0][0], hole.vertices[0][1]);
+      ctx.fillStyle = isHl ? '#fff' : '#c4b5fd';
+      const fh=Math.max(7,(hole.text.h||10)*baseSc*z);
+      ctx.font=`${fh}px Segoe UI,sans-serif`;
+      ctx.textAlign = hole.text.hj===1?'center' : hole.text.hj===2?'right' : 'left';
+      ctx.textBaseline = hole.text.vj===3?'top' : hole.text.vj===2?'middle' : hole.text.vj===1?'bottom' : 'alphabetic';
+      ctx.fillText(hole.text.str||'', ax, ay);
+    });
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 
     // Label with group number
     const [lx,ly]=toC(s.minX+s.w/2, s.minY+s.h/2);
@@ -2062,36 +2969,46 @@ function mdxfAddSelected() {
       const s = g.shape;
       const name = document.getElementById('mdxfName'+gi)?.value || `${s.w.toFixed(0)}×${s.h.toFixed(0)} mm`;
       const qty = +document.getElementById('mdxfQty'+gi)?.value || g.count;
-      selected.push({s, name, qty, gi});
+      selected.push({s, name, qty, gi, indices: g.indices||[]});
     }
   });
 
   if (!selected.length) { alert(lang==='en'?'Please select at least 1 piece':'กรุณาเลือกชิ้นงานอย่างน้อย 1 ชิ้น'); return; }
 
-  selected.forEach(({s, name, qty})=>{
+  const flip = /\.(dxf|eps|ai)$/i.test(inspFileName);
+  // Normalize a hole to a piece's local (0,0) frame (Y-flip for Y-up sources).
+  const normHole = (h, ref) => ({
+    ...h,
+    vertices: h.vertices ? h.vertices.map(([x,y])=>[x-ref.minX, flip ? ref.h-(y-ref.minY) : y-ref.minY]) : [],
+    rawV: h.rawV && /\.(dxf)$/i.test(inspFileName) ? h.rawV.map(v=>({x:v.x-ref.minX, y:ref.h-(v.y-ref.minY), b:-v.b})) : null
+  });
+
+  selected.forEach(({s, name, qty, indices})=>{
     const id = uid();
     const color = COLORS[pieces.length % COLORS.length];
+    // Each grouped instance keeps its OWN text position. Non-text line work is
+    // identical across the group (that's why they grouped), so it comes from the
+    // representative; only the TEXT differs, captured per instance in textSets.
+    const instShapes = (indices||[]).map(idx=>mdxfShapes[idx]).filter(Boolean);
+    const textSets = instShapes.map(sh =>
+      (sh.holes||[]).filter(h=>h.isText&&h.text).map(h=>normHole(h, sh)));
     pieces.push({
       id, name, qty,
       source: 'dxf',
-      w: Math.max(1,Math.round(s.w)),
-      h: Math.max(1,Math.round(s.h)),
+      // EXACT size (no rounding). Rounding 37.5→38 made every spacing calculation
+      // 0.5mm wrong (gaps came out 10.5 / 9.5 instead of 10).
+      w: Math.max(0.01, Math.round(s.w*1000)/1000),
+      h: Math.max(0.01, Math.round(s.h*1000)/1000),
       area: s.area,
       open: s.open || false,
       stlData: null,
       dxfData: s,
       color,
       // Normalize to (0,0) and apply Y-flip for Y-up sources (DXF, EPS, AI).
-      // SVG is already Y-down so no flip needed.
-      // Both outer and holes use the outer shape's h as the flip reference.
-      // Y-flip also negates bulge (flipping Y reverses arc handedness).
-      vertices: s.vertices.map(([x,y])=>[x-s.minX, /\.(dxf|eps|ai)$/i.test(inspFileName) ? s.h-(y-s.minY) : y-s.minY]),
+      vertices: s.vertices.map(([x,y])=>[x-s.minX, flip ? s.h-(y-s.minY) : y-s.minY]),
       rawV: s.rawV && /\.(dxf)$/i.test(inspFileName) ? s.rawV.map(v=>({x:v.x-s.minX, y:s.h-(v.y-s.minY), b:-v.b})) : null,
-      holes: (s.holes||[]).map(h=>({
-        ...h,
-        vertices: h.vertices ? h.vertices.map(([x,y])=>[x-s.minX, /\.(dxf|eps|ai)$/i.test(inspFileName) ? s.h-(y-s.minY) : y-s.minY]) : [],
-        rawV: h.rawV && /\.(dxf)$/i.test(inspFileName) ? h.rawV.map(v=>({x:v.x-s.minX, y:s.h-(v.y-s.minY), b:-v.b})) : null
-      })),
+      holes: (s.holes||[]).map(h=>normHole(h, s)),
+      textSets: (textSets.length && textSets.some(t=>t.length)) ? textSets : null,
       fileName: 'multi-dxf'
     });
   });
@@ -2434,14 +3351,15 @@ function runNesting() {
 
   const sw=+document.getElementById('sw').value;
   const sh=+document.getElementById('sh').value;
-  const kerf=+document.getElementById('kerf').value;
+  const edgeMargin=+document.getElementById('kerf').value;               // ระยะห่างขอบแผ่นวัสดุ
+  const pieceGap=+(document.getElementById('pieceGap')?.value ?? edgeMargin); // ระยะห่างชิ้นงาน
   const rotMode=document.getElementById('rotMode').value;
 
-  // Validate pieces fit sheet
+  // Validate pieces fit sheet (needs edge margin on both sides)
   for(const p of pieces){
     const pw=Math.round(p.w*10)/10, ph=Math.round(p.h*10)/10;
     const orients=getOrientations({w:pw,h:ph,vertices:p.vertices||null}, rotMode);
-    const fits=orients.some(o=>o.w+kerf*2<=sw && o.h+kerf*2<=sh);
+    const fits=orients.some(o=>o.w+edgeMargin*2<=sw && o.h+edgeMargin*2<=sh);
     if(!fits){
       const ans=confirm(lang==='en'?
         `⚠️ "${p.name}" (${pw}×${ph}mm) cannot fit in sheet (${sw}×${sh}mm)\nContinue and skip this piece?`:
@@ -2453,9 +3371,17 @@ function runNesting() {
   // Expand all pieces by qty, sort largest first
   const items=[];
   pieces.forEach(p=>{
+    const nonText = (p.holes||[]).filter(h=>!h.isText);   // shared line work
     for(let i=0;i<p.qty;i++){
+      // Each copy uses its OWN imported text position when the group has per-instance
+      // text variants; line work is shared. Falls back to p.holes when no variants.
+      let holes = p.holes||null;
+      if(p.textSets && p.textSets.length){
+        const tset = p.textSets[i % p.textSets.length] || [];
+        holes = [...nonText, ...tset];
+      }
       items.push({pieceId:p.id, name:p.name, color:p.color,
-        w:p.w, h:p.h, vertices:p.vertices||null, holes:p.holes||null, rawV:p.rawV||null, open:p.open||false});
+        w:p.w, h:p.h, vertices:p.vertices||null, holes, rawV:p.rawV||null, open:p.open||false});
     }
   });
   items.sort((a,b)=>(b.w*b.h)-(a.w*a.h));
@@ -2464,13 +3390,27 @@ function runNesting() {
   for(const item of items){
     let placed=false;
     for(const sheet of sheets){
-      if(place(item,sheet,sw,sh,kerf,rotMode)){ placed=true; break; }
+      if(place(item,sheet,sw,sh,edgeMargin,pieceGap,rotMode)){ placed=true; break; }
     }
     if(!placed){
       const ns={ items:[] };
       sheets.push(ns);
-      if(!place(item,ns,sw,sh,kerf,rotMode)) sheets.pop(); // too large
+      if(!place(item,ns,sw,sh,edgeMargin,pieceGap,rotMode)) sheets.pop(); // too large
     }
+  }
+
+  // ── START CORNER ──────────────────────────────────────────────────────────
+  // Nesting always packs from the top-left internally; mirror each piece's POSITION
+  // (not its geometry) so the whole layout originates from the chosen corner. Gaps
+  // and collisions are preserved exactly (reflection keeps distances).
+  const startCorner=document.getElementById('startCorner')?.value || 'TL';
+  const flipX = (startCorner==='TR'||startCorner==='BR');
+  const flipY = (startCorner==='BL'||startCorner==='BR');
+  if(flipX||flipY){
+    sheets.forEach(sheet=>sheet.items.forEach(it=>{
+      if(flipX) it.x = sw - it.x - it.w;
+      if(flipY) it.y = sh - it.y - it.h;
+    }));
   }
 
   const sheetGroups=deduplicateSheets(sheets);
@@ -2478,7 +3418,7 @@ function runNesting() {
   const totalSheetArea=sheets.length*sw*sh;
   const eff=totalSheetArea>0?totalPieceArea/totalSheetArea*100:0;
 
-  nestResult={sheets,sheetGroups,eff,totalPieceArea,sw,sh,kerf};
+  nestResult={sheets,sheetGroups,eff,totalPieceArea,sw,sh,edgeMargin,pieceGap};
   activeSheet=0;
   renderResults();
   document.getElementById('resSection').style.display='';
@@ -2490,22 +3430,25 @@ function runNesting() {
 // (expanded by kerf) onto the grid, enabling true shape-to-shape nesting.
 
 // 1mm grid → spacing is exact to the millimetre. Coarser only for very large sheets
-// to bound memory. (Resolution is independent of kerf; kerf is the gap, set via kc.)
+// to bound memory. Two independent gaps:
+//   edgeMargin = distance from the sheet edge to any piece (border)
+//   pieceGap   = distance between pieces (stamp halo = g.kc)
 function _gridMM(kerf){ return 1; }
 
-function _gridInit(sw, sh, kerf){
+function _gridInit(sw, sh, edgeMargin, pieceGap){
   const mm=Math.max(1, Math.ceil(Math.max(sw,sh)/3000)); // 1mm for normal sheets
   const gw=Math.ceil(sw/mm)+4, gh=Math.ceil(sh/mm)+4;
   const data=new Uint8Array(gw*gh);
-  // Halo = kerf rounded UP to whole cells → piece-to-piece & edge gap is never LESS
-  // than the specified kerf.
-  const kc=Math.max(0,Math.ceil(kerf/mm));
+  // kcGap = piece-to-piece halo; kcEdge = border margin. Both rounded UP so the real
+  // gap is never LESS than the specified value.
+  const kc=Math.max(0,Math.ceil(pieceGap/mm));
+  const kcEdge=Math.max(0,Math.ceil(edgeMargin/mm));
   const ex=Math.floor(sw/mm), ey=Math.floor(sh/mm);
   for(let gy=0;gy<gh;gy++) for(let gx=0;gx<gw;gx++){
-    if(gx<kc||gy<kc||gx>=ex-kc||gy>=ey-kc||gx>=gw||gy>=gh)
+    if(gx<kcEdge||gy<kcEdge||gx>=ex-kcEdge||gy>=ey-kcEdge||gx>=gw||gy>=gh)
       data[gy*gw+gx]=1;
   }
-  return {gw,gh,data,mm,kc};
+  return {gw,gh,data,mm,kc,kcEdge};
 }
 
 /** Precompute scanline spans for a polygon in local (0,0) grid coords */
@@ -2533,47 +3476,126 @@ function _gridCheck(g, spans, gox, goy){
   for(const [dgy,xa,xb] of spans){
     const gy=goy+dgy;
     if(gy<0||gy>=gh) return true; // out of bounds = collision
-    const gx0=Math.max(0,gox+Math.floor(xa));
-    const gx1=Math.min(gw-1,gox+Math.ceil(xb));
-    for(let gx=gx0;gx<=gx1;gx++) if(data[gy*gw+gx]) return true;
+    const gx0=Math.max(0,gox+Math.floor(xa+1e-6));
+    const gx1=Math.min(gw,gox+Math.ceil(xb-1e-6));   // ε: don't let 500.0000001 round to 501
+    for(let gx=gx0;gx<gx1;gx++) if(data[gy*gw+gx]) return true;
   }
   return false;
 }
 
-/** Stamp piece onto grid with kerf expansion */
-function _gridStamp(g, spans, gox, goy){
-  const {gw,gh,data,kc}=g;
+/** Stamp piece onto grid with kerf expansion (+ex extra cells for sub-cell shifts) */
+function _gridStamp(g, spans, gox, goy, ex){
+  const {gw,gh,data}=g; const kc=g.kc+(ex||0);
   for(const [dgy,xa,xb] of spans){
     const r0=Math.max(0,goy+dgy-kc), r1=Math.min(gh-1,goy+dgy+kc);
     for(let r=r0;r<=r1;r++){
-      const gx0=Math.max(0,gox+Math.floor(xa)-kc);
-      const gx1=Math.min(gw-1,gox+Math.ceil(xb)+kc);
-      for(let gx=gx0;gx<=gx1;gx++) data[r*gw+gx]=1;
+      const gx0=Math.max(0,gox+Math.floor(xa+1e-6)-kc);
+      const gx1=Math.min(gw,gox+Math.ceil(xb-1e-6)+kc);   // ε: FP-safe, keeps gap == pieceGap
+      for(let gx=gx0;gx<gx1;gx++) data[r*gw+gx]=1;
     }
   }
 }
 
-function place(item, sheet, sw, sh, kerf, rotMode){
+function place(item, sheet, sw, sh, edgeMargin, pieceGap, rotMode){
   // Init grid for this sheet on first use
-  if(!sheet.grid) sheet.grid=_gridInit(sw,sh,kerf);
+  if(!sheet.grid) sheet.grid=_gridInit(sw,sh,edgeMargin,pieceGap);
   const g=sheet.grid;
 
   for(const ori of getOrientations(item, rotMode)){
-    const {w,h,angle,rotatedVerts}=ori;
+    let {w,h,angle,rotatedVerts}=ori;
     // Use actual polygon vertices (or rect corners for manual pieces)
     const verts=rotatedVerts||[[0,0],[w,0],[w,h],[0,h]];
+    // TRUE extent of the real outline — never trust a rounded w/h, or every gap
+    // would be off by the rounding error (e.g. 37.5 stored as 38 → gaps 10.5).
+    if(verts&&verts.length){
+      let mx=-Infinity,my=-Infinity;
+      for(const v of verts){ if(v[0]>mx)mx=v[0]; if(v[1]>my)my=v[1]; }
+      if(isFinite(mx)&&mx>0) w=mx;
+      if(isFinite(my)&&my>0) h=my;
+    }
     const spans=_polySpans(verts,g.mm);
+    // Coarse span subset (≤12 evenly spaced rows) for a FAST reject while scanning.
+    // Rows are real, so a coarse hit is a real collision; a coarse pass is then
+    // verified against the full span list. This keeps big sheets fast.
+    let spansCoarse = spans;
+    if(spans.length>16){
+      const stepC=Math.ceil(spans.length/12); spansCoarse=[];
+      for(let k=0;k<spans.length;k+=stepC) spansCoarse.push(spans[k]);
+      spansCoarse.push(spans[spans.length-1]);
+    }
+    // 9 probe cells (3 rows × left/middle/right) — an O(9) reject before any span
+    // scan. A probe hit is always a real collision, so this only skips dead spots.
+    const probes=[];
+    if(spans.length){
+      [0, spans.length>>1, spans.length-1].forEach(k=>{
+        const [dgy,xa,xb]=spans[k];
+        const l=Math.floor(xa+1e-6), r=Math.ceil(xb-1e-6)-1;
+        [l, (l+r)>>1, r].forEach(dx=>{ if(dx>=l&&dx>=0) probes.push([dgy,dx]); });
+      });
+    }
 
     // Bottom-left scan. Collision/spacing stay exact at 1mm; the scan steps in
     // ~3mm increments so a fine grid stays fast (placement snaps to ~3mm).
     const ST=Math.max(1, Math.round(3/g.mm));
-    const start=Math.ceil(kerf/g.mm);
-    for(let gy=start; gy*g.mm+h+kerf<=sh; gy+=ST){
-      for(let gx=start; gx*g.mm+w+kerf<=sw; gx+=ST){
+    const start=Math.ceil(edgeMargin/g.mm);   // keep pieces edgeMargin away from the sheet edge
+    for(let gy=start; gy*g.mm+h+edgeMargin<=sh; gy+=ST){
+      for(let gx=start; gx*g.mm+w+edgeMargin<=sw; gx+=ST){
+        let hit=false;                                   // O(9) probe reject
+        for(let k=0;k<probes.length;k++){
+          const py=gy+probes[k][0], px=gx+probes[k][1];
+          if(py<0||py>=g.gh||px<0||px>=g.gw){ hit=true; break; }
+          if(g.data[py*g.gw+px]){ hit=true; break; }
+        }
+        if(hit) continue;
+        if(_gridCheck(g,spansCoarse,gx,gy)) continue;   // medium reject
         if(!_gridCheck(g,spans,gx,gy)){
-          // Valid position found — stamp & record
-          _gridStamp(g,spans,gx,gy);
-          const x=gx*g.mm, y=gy*g.mm;
+          // Tighten to the EXACT gap: the coarse scan (ST≈3mm) only guarantees the
+          // gap is ≥ pieceGap; slide the piece down/left by 1 cell while still valid
+          // so it rests exactly pieceGap away from its neighbours (halo = pieceGap).
+          while(gy-1>=start && !_gridCheck(g,spans,gx,gy-1)) gy--;
+          while(gx-1>=start && !_gridCheck(g,spans,gx-1,gy)) gx--;
+          while(gy-1>=start && !_gridCheck(g,spans,gx,gy-1)) gy--;
+          // ── SUB-CELL REFINEMENT ────────────────────────────────────────────
+          // The 1mm grid quantises positions, so a piece with a fractional width
+          // would leave a gap of pieceGap + (0…1mm). Snap the piece in CONTINUOUS
+          // space so its real edge sits EXACTLY pieceGap from the nearest already-
+          // placed neighbour (which was itself refined) → all gaps == pieceGap.
+          const gX=gx*g.mm, gY=gy*g.mm;             // safe grid position (collision-free)
+          let x=gX, y=gY;
+          {
+            const EPS=1e-6;
+            // Verify a candidate: every already-placed piece must be either clear in X
+            // or clear in Y by AT LEAST pieceGap (never less → no 9.5 when 10 is set).
+            const ok=(cx,cy)=>{
+              if(cx<edgeMargin-EPS||cy<edgeMargin-EPS) return false;
+              if(cx+w>sw-edgeMargin+EPS||cy+h>sh-edgeMargin+EPS) return false;
+              return sheet.items.every(o=>{
+                const dx=Math.max(o.x-(cx+w), cx-(o.x+o.w));   // >0 = horizontal clearance
+                const dy=Math.max(o.y-(cy+h), cy-(o.y+o.h));   // >0 = vertical clearance
+                return Math.max(dx,dy) >= pieceGap-1e-4;
+              });
+            };
+            // Snap Y first (row), then X within that row — order matters because the
+            // X neighbours depend on the final Y band.
+            let cy=gY;
+            let maxT=-Infinity;
+            for(const o of sheet.items)
+              if(Math.min(x+w,o.x+o.w)-Math.max(x,o.x) > 0.5 && o.y+o.h <= cy+0.5)
+                maxT=Math.max(maxT, o.y+o.h);
+            if(maxT>-Infinity && ok(x, maxT+pieceGap)) cy=maxT+pieceGap;
+            let cx=x;
+            let maxR=-Infinity;
+            for(const o of sheet.items)
+              if(Math.min(cy+h,o.y+o.h)-Math.max(cy,o.y) > 0.5 && o.x+o.w <= cx+0.5)
+                maxR=Math.max(maxR, o.x+o.w);
+            if(maxR>-Infinity && ok(maxR+pieceGap, cy)) cx=maxR+pieceGap;
+            // Accept the refined spot when it satisfies the gap rule; otherwise keep
+            // the grid spot (the stamp below is conservative, so it is always ≥ gap).
+            if(ok(cx,cy)){ x=cx; y=cy; }
+          }
+          // Stamp at the FINAL position (keeps the grid in sync with reality; +1 cell
+          // covers the sub-cell shift) — stamping the old grid spot caused wrong gaps.
+          _gridStamp(g,spans,Math.floor(x/g.mm),Math.floor(y/g.mm),1);
           // Pre-rotate holes using the same transform as rotatedVerts so they
           // stay in the correct relative position after rotation.
           const placedHoles = angle
@@ -2623,6 +3645,28 @@ function deduplicateSheets(sheets) {
 // ═══════════════════════════════════════════════════════
 //  RENDER RESULTS
 // ═══════════════════════════════════════════════════════
+/** Smallest real edge-to-edge gap between any two placed pieces (for verification). */
+/** Min & max edge-to-edge gap between each piece and its NEAREST neighbour (right/top).
+ *  Returns {min,max} so any inconsistency (e.g. 10.0 vs 10.5) is visible, not hidden. */
+function measuredMinGap(sheets){
+  let mn=Infinity, mx=-Infinity;
+  sheets.forEach(sh=>{
+    const it=sh.items||[];
+    it.forEach(A=>{
+      let bestR=Infinity, bestT=Infinity;
+      it.forEach(B=>{ if(B===A) return;
+        if(Math.min(A.y+A.h,B.y+B.h)-Math.max(A.y,B.y)>0.5 && B.x>=A.x+A.w-0.5)
+          bestR=Math.min(bestR, B.x-(A.x+A.w));
+        if(Math.min(A.x+A.w,B.x+B.w)-Math.max(A.x,B.x)>0.5 && B.y>=A.y+A.h-0.5)
+          bestT=Math.min(bestT, B.y-(A.y+A.h));
+      });
+      if(isFinite(bestR)&&bestR>=-0.5){ mn=Math.min(mn,bestR); mx=Math.max(mx,bestR); }
+      if(isFinite(bestT)&&bestT>=-0.5){ mn=Math.min(mn,bestT); mx=Math.max(mx,bestT); }
+    });
+  });
+  return isFinite(mn)?{min:mn,max:mx}:null;
+}
+
 function renderResults(){
   if(!nestResult) return;
   const {sheets,sheetGroups,eff,totalPieceArea,sw,sh}=nestResult;
@@ -2641,6 +3685,12 @@ function renderResults(){
     <div class="stat"><div class="sv">${eff.toFixed(1)}%</div><div class="sl">${t('stat_eff')}</div></div>
     <div class="stat"><div class="sv">${pieces.reduce((s,p)=>s+p.qty,0)}</div><div class="sl">${t('stat_pieces')}</div></div>
     <div class="stat"><div class="sv">${((sw/1000)*(sh/1000)).toFixed(3)}</div><div class="sl">${t('stat_sheetSz')}</div></div>
+    ${(()=>{ const g=measuredMinGap(sheets); const set=nestResult.pieceGap;
+      if(g===null) return '';
+      const ok=Math.abs(g.min-set)<0.3 && Math.abs(g.max-set)<0.3;
+      const lbl=(g.max-g.min<0.05)?g.min.toFixed(1):`${g.min.toFixed(1)}–${g.max.toFixed(1)}`;
+      return `<div class="stat"><div class="sv" style="color:${ok?'#10b981':'#ef4444'};font-size:${lbl.length>4?'1.1rem':''}">${lbl}<span style="font-size:.6em;color:var(--muted)"> / ${set}mm</span></div>
+        <div class="sl">ระยะห่างจริง ${ok?'✓':'✗'}</div></div>`; })()}
   `;
 
   const fillEl=document.getElementById('effFill');
@@ -2759,14 +3809,15 @@ function renderLegend(){
  * group = {sheet, count, label}   sw/sh = sheet dimensions in mm
  * PAD, maxH = optional layout hints (thumbnail vs full)
  */
-function drawSheetOnCanvas(canvas, sheet, sw, sh, {pad=4, maxW=null, maxH=null, showLabels=false, group=null}={}) {
+function drawSheetOnCanvas(canvas, sheet, sw, sh, {pad=4, maxW=null, maxH=null, showLabels=false, group=null, noClear=false}={}) {
   const PAD=pad;
   const W = canvas.width, H = canvas.height;
   const scale = Math.min((W-PAD*2)/sw, (H-PAD*2)/sh);
   const ox = PAD + (W-PAD*2-sw*scale)/2;
   const oy = PAD + (H-PAD*2-sh*scale)/2;
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
+  // noClear: the caller already set a zoom/pan transform and cleared the canvas.
+  if(!noClear) ctx.clearRect(0,0,W,H);
 
   // Sheet bg
   ctx.fillStyle='#1a1d30';
@@ -2797,7 +3848,7 @@ function drawSheetOnCanvas(canvas, sheet, sw, sh, {pad=4, maxW=null, maxH=null, 
       if(!item.open) ctx.closePath();   // open shapes (arcs) stay open — no chord
       if(!item.open && item.holes?.length){
         item.holes.forEach(hole=>{
-          if(!hole.vertices?.length) return;
+          if(!hole.vertices?.length || hole.isText || hole.open) return;   // text & open lines drawn separately
           hole.vertices.forEach(([vx,vy],i)=>{
             const [cx,cy]=toCnv(vx,vy);
             i===0?ctx.moveTo(cx,cy):ctx.lineTo(cx,cy);
@@ -2809,9 +3860,31 @@ function drawSheetOnCanvas(canvas, sheet, sw, sh, {pad=4, maxW=null, maxH=null, 
       ctx.strokeStyle=item.open?baseColor:'rgba(255,255,255,0.6)'; ctx.lineWidth=showLabels?1.5:1; ctx.stroke();
       // Inner colored border
       ctx.strokeStyle=baseColor; ctx.lineWidth=showLabels?1:0.5; ctx.stroke();
+      // Draw OPEN internal line work (loose lines, X marks, open arcs) as-is
+      if(item.holes?.length){
+        item.holes.forEach(hole=>{
+          if(!hole.open || hole.isText || !hole.vertices?.length) return;
+          ctx.beginPath();
+          hole.vertices.forEach(([vx,vy],i)=>{ const [cx,cy]=toCnv(vx,vy); i===0?ctx.moveTo(cx,cy):ctx.lineTo(cx,cy); });
+          ctx.strokeStyle='#c4b5fd'; ctx.lineWidth=showLabels?1.2:0.8; ctx.stroke();
+        });
+      }
+      // Draw TEXT internals (kept from the DXF) as actual text at their real anchor
+      if(item.holes?.length){
+        item.holes.forEach(hole=>{
+          if(!hole.isText || !hole.vertices?.length) return;
+          const [ax,ay]=toCnv(hole.vertices[0][0], hole.vertices[0][1]);   // anchor
+          const fh=Math.max(6,(hole.text?.h||10)*scale);
+          ctx.fillStyle='#fff';
+          ctx.textAlign = hole.text?.hj===1?'center' : hole.text?.hj===2?'right' : 'left';
+          ctx.textBaseline = hole.text?.vj===3?'top' : hole.text?.vj===2?'middle' : hole.text?.vj===1?'bottom' : 'alphabetic';
+          ctx.font=`${fh}px 'Segoe UI',sans-serif`;
+          ctx.fillText(hole.text?.str||'', ax, ay);
+        });
+      }
       if(showLabels && item.holes?.length){
         item.holes.forEach(hole=>{
-          if(!hole.vertices?.length) return;
+          if(!hole.vertices?.length || hole.isText) return;
           ctx.beginPath();
           hole.vertices.forEach(([vx,vy],i)=>{
             const [cx,cy]=toCnv(vx,vy);
@@ -2869,17 +3942,114 @@ function drawSheetOnCanvas(canvas, sheet, sw, sh, {pad=4, maxW=null, maxH=null, 
   }
 }
 
+// ── Layout preview: zoom / pan / measure ──────────────────────────────────────
+let nestZoom=1, nestPanX=0, nestPanY=0;      // pan in canvas px
+let measOn=false, measA=null, measB=null;    // measure tool state
+let nestView=null;                           // {sc,ox,oy} for px↔mm mapping
+
+function nestZoomBy(f, cx, cy){
+  const c=document.getElementById('nestCanvas'); if(!c) return;
+  if(cx===undefined){ cx=c.width/2; cy=c.height/2; }
+  const z0=nestZoom, z1=Math.max(1, Math.min(40, z0*f));
+  if(z1===z0) return;
+  nestPanX = cx-(cx-nestPanX)*(z1/z0);
+  nestPanY = cy-(cy-nestPanY)*(z1/z0);
+  nestZoom = z1;
+  drawSheet(activeSheet);
+}
+function nestZoomFit(){ nestZoom=1; nestPanX=0; nestPanY=0; measA=measB=null; drawSheet(activeSheet); }
+function toggleMeasure(){
+  measOn=!measOn; measA=measB=null;
+  const b=document.getElementById('nestMeasBtn');
+  if(b){ b.style.background = measOn?'#f59e0b':''; b.style.color = measOn?'#111':''; }
+  const o=document.getElementById('nestMeasOut'); if(o) o.textContent = measOn?'คลิกจุดแรก…':'';
+  drawSheet(activeSheet);
+}
+/** canvas px → sheet mm (uses the stored view of the last draw) */
+function nestPxToMm(px,py){
+  if(!nestView) return [0,0];
+  return [ (px-nestView.ox)/nestView.sc, (py-nestView.oy)/nestView.sc ];
+}
+function _wireNest(canvas){
+  if(canvas._wired) return; canvas._wired=true;
+  const rel=e=>{ const r=canvas.getBoundingClientRect();
+    return [(e.clientX-r.left)*(canvas.width/r.width), (e.clientY-r.top)*(canvas.height/r.height)]; };
+  canvas.addEventListener('wheel',e=>{ e.preventDefault(); const [x,y]=rel(e);
+    nestZoomBy(e.deltaY<0?1.15:1/1.15, x, y); },{passive:false});
+  let dr=false,lx=0,ly=0,moved=false;
+  canvas.addEventListener('mousedown',e=>{ dr=true; moved=false; lx=e.clientX; ly=e.clientY; });
+  window.addEventListener('mousemove',e=>{ if(!dr) return;
+    if(Math.abs(e.clientX-lx)+Math.abs(e.clientY-ly)>3) moved=true;
+    if(measOn) return;                               // in measure mode don't pan
+    const r=canvas.getBoundingClientRect();
+    nestPanX+=(e.clientX-lx)*(canvas.width/r.width);
+    nestPanY+=(e.clientY-ly)*(canvas.height/r.height);
+    lx=e.clientX; ly=e.clientY; drawSheet(activeSheet); });
+  window.addEventListener('mouseup',()=>{ dr=false; });
+  canvas.addEventListener('click',e=>{
+    if(!measOn || moved) return;
+    const [px,py]=rel(e); const p=nestPxToMm(px,py);
+    if(!measA || measB){ measA=p; measB=null; }
+    else measB=p;
+    const o=document.getElementById('nestMeasOut');
+    if(o){
+      if(measA&&measB){
+        const dx=measB[0]-measA[0], dy=measB[1]-measA[1];
+        o.textContent=`ระยะ ${Math.hypot(dx,dy).toFixed(2)} mm  (ΔX ${Math.abs(dx).toFixed(2)} · ΔY ${Math.abs(dy).toFixed(2)})`;
+      } else o.textContent='คลิกจุดที่สอง…';
+    }
+    drawSheet(activeSheet);
+  });
+  canvas.addEventListener('dblclick',()=>nestZoomFit());
+}
+
 function drawSheet(idx){
   if(!nestResult) return;
   const {sheetGroups,sw,sh}=nestResult;
   const group=sheetGroups[idx]; if(!group) return;
   const canvas=document.getElementById('nestCanvas');
+  _wireNest(canvas);
   const PAD=16;
   const maxW=Math.max(200, canvas.parentElement.clientWidth-PAD*2);
-  const scale=Math.min(maxW/sw, 620/sh);
-  canvas.width=Math.round(sw*scale+PAD*2);
-  canvas.height=Math.round(sh*scale+PAD*2);
-  drawSheetOnCanvas(canvas, group.sheet, sw, sh, {pad:PAD, showLabels:true, group});
+  const baseSc=Math.min(maxW/sw, 620/sh);
+  // Canvas grows with zoom so the wrapper can scroll; pan shifts the drawing.
+  const sc=baseSc*nestZoom;
+  canvas.width=Math.round(sw*baseSc+PAD*2);
+  canvas.height=Math.round(sh*baseSc+PAD*2);
+  const ctx=canvas.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.translate(nestPanX, nestPanY); ctx.scale(nestZoom, nestZoom);
+  drawSheetOnCanvas(canvas, group.sheet, sw, sh, {pad:PAD, showLabels:true, group, noClear:true});
+  ctx.restore();
+  // Mapping used by the measure tool: sheet mm → canvas px
+  const ox=PAD+(canvas.width-PAD*2-sw*baseSc)/2, oy=PAD+(canvas.height-PAD*2-sh*baseSc)/2;
+  nestView={ sc:sc, ox:ox*nestZoom+nestPanX, oy:oy*nestZoom+nestPanY };
+  const zl=document.getElementById('nestZoomLbl'); if(zl) zl.textContent=Math.round(nestZoom*100)+'%';
+  // Measure overlay (drawn in screen space, on top)
+  if(measA){
+    const toPx=p=>[nestView.ox+p[0]*nestView.sc, nestView.oy+p[1]*nestView.sc];
+    const A=toPx(measA);
+    ctx.save();
+    ctx.fillStyle='#fbbf24';
+    ctx.beginPath(); ctx.arc(A[0],A[1],4,0,7); ctx.fill();
+    if(measB){
+      const B=toPx(measB);
+      ctx.strokeStyle='#fbbf24'; ctx.lineWidth=1.5; ctx.setLineDash([5,3]);
+      ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(B[0],B[1],4,0,7); ctx.fill();
+      const d=Math.hypot(measB[0]-measA[0], measB[1]-measA[1]);
+      const mx=(A[0]+B[0])/2, my=(A[1]+B[1])/2;
+      const txt=d.toFixed(2)+' mm';
+      ctx.font='bold 13px Segoe UI,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+      const w=ctx.measureText(txt).width+10;
+      ctx.fillStyle='#111827dd'; ctx.fillRect(mx-w/2, my-20, w, 18);
+      ctx.fillStyle='#fbbf24'; ctx.fillText(txt, mx, my-4);
+    }
+    ctx.restore();
+  }
 }
 
 function projName(){
@@ -2908,6 +4078,11 @@ function resetAll(){
 
 function exportExcel(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
+  if(typeof XLSX==='undefined'){
+    alert(lang==='en'?'Excel library not loaded (offline). Use Print instead.'
+                     :'ไลบรารี Excel โหลดไม่ได้ (ออฟไลน์) — ใช้ปุ่ม Print แทนได้ครับ');
+    return;
+  }
   const {sheetGroups,sw,sh}=nestResult;
   const wb=XLSX.utils.book_new();
   const th=lang==='en';
@@ -2978,6 +4153,10 @@ function dxfHeader(layers){
   s+='0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nContinuous\n';
   names.forEach(n=>{ s+=`0\nLAYER\n2\n${n}\n70\n0\n62\n${layers[n]}\n6\nContinuous\n`; });
   s+='0\nENDTAB\n';
+  // STYLE table — define STANDARD so TEXT style references resolve cleanly
+  s+='0\nTABLE\n2\nSTYLE\n70\n1\n';
+  s+='0\nSTYLE\n2\nSTANDARD\n70\n0\n40\n0.0\n41\n1.0\n50\n0.0\n71\n0\n42\n2.5\n3\ntxt\n4\n\n';
+  s+='0\nENDTAB\n';
   s+='0\nENDSEC\n';
   return s;
 }
@@ -3007,14 +4186,39 @@ function dxfItemPaths(item, offX, offY, sh){
     if(item.holes?.length){
       item.holes.forEach(hole=>{
         if(!hole.vertices?.length) return;
+        if(hole.isText && hole.text){
+          // Re-emit the original TEXT unchanged (string, height, angle, justification)
+          // at the piece's placed position, on its own TEXT layer.
+          const tx=hole.text;
+          const a=hole.vertices[0];               // real anchor point
+          const ax=(ix+a[0]).toFixed(4), ay=(iyTop-a[1]).toFixed(4);
+          const ang=(tx.angle||0)+(item.angle||0);
+          const hj=tx.hj||0, vj=tx.vj||0;
+          // Re-emit as R12 TEXT preserving the ORIGINAL style: font (7), width
+          // factor (41), oblique (51), gen flags (71). Height/angle/justification
+          // and position are carried through unchanged.
+          let out=`0\nTEXT\n8\nTEXT\n10\n${ax}\n20\n${ay}\n40\n${(+tx.h).toFixed(4)}\n1\n${tx.str}\n`;
+          if(ang) out+=`50\n${(+ang).toFixed(4)}\n`;
+          if(tx.widthF!=null)  out+=`41\n${(+tx.widthF).toFixed(4)}\n`;
+          if(tx.oblique!=null) out+=`51\n${(+tx.oblique).toFixed(4)}\n`;
+          if(tx.style)         out+=`7\n${tx.style}\n`;
+          if(tx.ent!=='MTEXT' && tx.gen71!=null) out+=`71\n${tx.gen71}\n`;
+          if(hj) out+=`72\n${hj}\n`;
+          if(hj||vj) out+=`11\n${ax}\n21\n${ay}\n`;   // alignment point for justified text
+          if(vj) out+=`73\n${vj}\n`;
+          s+=out;
+          return;
+        }
+        const hClosed=!hole.open;            // open internal line work exports open (no chord)
+        const hLayer=hole.open?'CUT':'CUT_HOLE';
         const hRawV=hole.rawV||null;
         if(hRawV&&hRawV.length>=3){
           const hpts=hRawV.map(v=>[ix+v.x, iyTop-v.y]);
           const hbulges=hRawV.map(v=>-v.b);
-          s+=dxfPolyline(hpts,'CUT_HOLE',true,hbulges);
+          s+=dxfPolyline(hpts,hLayer,hClosed,hbulges);
         } else {
           const hpts=hole.vertices.map(([vx,vy])=>[ix+vx, iyTop-vy]);
-          s+=dxfPolyline(hpts,'CUT_HOLE',true,null);
+          s+=dxfPolyline(hpts,hLayer,hClosed,null);
         }
       });
     }
@@ -3024,52 +4228,81 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
+const BUILD_TAG='25Jul-g31';   // embedded in exports so a file's origin build is verifiable
+/** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
+ *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
+function _lbl(x, y, h, str, align, color){
+  let s=`0\nTEXT\n8\nSHEET\n`;
+  if(color) s+=`62\n${color}\n`;
+  s+=`10\n${(+x).toFixed(3)}\n20\n${(+y).toFixed(3)}\n40\n${h}\n1\n${str}\n`;
+  if(align){ s+=`72\n${align}\n11\n${(+x).toFixed(3)}\n21\n${(+y).toFixed(3)}\n`; }
+  return s;
+}
+/** Title line below one sheet: "Layout A | size |" (normal) + big emphasised "xN sheet".
+ *  The qty turns RED when a layout needs more than one sheet. Auto-shrinks to fit width
+ *  and sits with a comfortable gap below the sheet frame. */
+function _sheetTitle(offX, sw, sh, g){
+  const p1=`Layout ${g.label}   |   ${sw} x ${sh} mm`;   // left
+  const p2=`x${g.count} sheet${g.count>1?'s':''}`;        // right, emphasised
+  const k=0.62, margin=20;
+  let h1=24, h2=40;                                       // qty (h2) noticeably bigger
+  // shrink both if the left text and the right qty would collide (keep ≥50mm apart)
+  const need=()=> p1.length*h1*k + p2.length*h2*k + 50;
+  if(need()>sw-margin*2){ const f=(sw-margin*2)/need(); h1*=f; h2*=f; }
+  const baseY=-(h2+30);                                   // ~30mm gap below the frame
+  const col=g.count>1 ? 1 : 3;                            // red if >1 sheet, else green
+  return _lbl(offX+margin,      baseY, h1, p1, 0)          // left-aligned
+       + _lbl(offX+sw-margin,   baseY, h2, p2, 2, col);    // right-aligned to sheet edge
+}
 function buildDXFSingle(groupIdx){
   if(!nestResult) return null;
   const {sheetGroups,sw,sh}=nestResult;
   const g=sheetGroups[groupIdx]; if(!g) return null;
-  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6};
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2};
+  const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
   entities+=dxfRectShape(0,0,sw,sh,'SHEET');
-  // Label as TEXT entity (R12 format)
-  const lbl=`Layout ${g.label}${g.count>1?' x'+g.count:''}`;
-  entities+=`0\nTEXT\n8\nSHEET\n10\n${(sw/2).toFixed(3)}\n20\n${(-40).toFixed(3)}\n40\n25\n1\n${lbl}\n`;
+  entities+=_sheetTitle(0, sw, sh, g);
+  // Summary line (left-aligned, further below so it never overlaps the titles)
+  entities+=_lbl(20, -150, 40, `TOTAL: ${totalSheets} sheet${totalSheets>1?'s':''}`, 0);
   g.sheet.items.forEach(item=>{ entities+=dxfItemPaths(item,0,0,sh); });
-  return dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
+  return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
 }
 function buildDXF(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return null; }
   const {sheetGroups,sw,sh}=nestResult;
   const GAP=150;
-  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6};
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2};
+  const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
   sheetGroups.forEach((g,li)=>{
     const offX=li*(sw+GAP), offY=0;
     entities+=dxfRectShape(offX,offY,sw,sh,'SHEET');
-    const lbl=`Layout ${g.label}${g.count>1?' x'+g.count:''}`;
-    entities+=`0\nTEXT\n8\nSHEET\n10\n${(offX+sw/2).toFixed(3)}\n20\n${(-40).toFixed(3)}\n40\n25\n1\n${lbl}\n`;
+    entities+=_sheetTitle(offX, sw, sh, g);
     g.sheet.items.forEach(item=>{ entities+=dxfItemPaths(item,offX,offY,sh); });
   });
-  return dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
+  // One overall summary, left-aligned below the first sheet
+  entities+=_lbl(20, -150, 40, `TOTAL: ${totalSheets} sheet${totalSheets>1?'s':''}`, 0);
+  return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
 }
 function exportDXF(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
   const dxf=buildDXF(); if(!dxf) return;
-  dlText(dxf,(nestResult.sheetGroups.length===1?'layout_A':'all_layouts')+'.dxf');
+  dlText(dxf,(nestResult.sheetGroups.length===1?'layout_A':'all_layouts')+'_'+BUILD_TAG+'.dxf');
 }
 function exportDXFCurrent(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
   const idx = (typeof activeSheet==='number') ? activeSheet : 0;
   const dxf=buildDXFSingle(idx); if(!dxf) return;
   const g=nestResult.sheetGroups[idx];
-  dlText(dxf,`layout_${g.label}.dxf`);
+  dlText(dxf,`layout_${g.label}_${BUILD_TAG}.dxf`);
 }
 function exportDXFAll(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
   const {sheetGroups}=nestResult;
   sheetGroups.forEach((g,i)=>{
     const dxf=buildDXFSingle(i); if(!dxf) return;
-    dlText(dxf,`layout_${g.label}.dxf`);
+    dlText(dxf,`layout_${g.label}_${BUILD_TAG}.dxf`);
   });
 }
 function dlText(content,filename,type='text/plain'){
