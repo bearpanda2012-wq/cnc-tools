@@ -24,8 +24,39 @@ header {
   border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px;
 }
 .header-title { font-size: 15px; font-weight: 700; color: #fff; }
-.header-sub   { font-size: 11px; color: #666; margin-left: auto; }
+.header-sub   { font-size: 11px; color: #8a8a90; margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .app-body { flex: 1; display: flex; overflow: hidden; }
+
+/* ── Inline SVG icons (replaces emoji) ── */
+.ic {
+  width: 15px; height: 15px; flex-shrink: 0;
+  fill: none; stroke: currentColor; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round;
+  vertical-align: -2px;
+}
+.ic-lg { width: 26px; height: 26px; stroke-width: 1.6; }
+
+/* ── Header action buttons ── */
+.hdr-actions { display: flex; align-items: center; gap: 3px; margin-left: 14px; }
+.hdr-btn {
+  background: transparent; border: 1px solid transparent; color: #8a8a8e;
+  width: 28px; height: 28px; border-radius: 7px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.hdr-btn:hover:not(:disabled) { background: #2a2a2e; color: #fff; border-color: #37373c; }
+.hdr-btn:disabled { opacity: .3; cursor: default; }
+.hdr-btn.active { background: rgba(10,122,255,.18); color: #4da3ff; border-color: rgba(10,122,255,.4); }
+.hdr-div { width: 1px; height: 18px; background: #333; margin: 0 5px; }
+#btnSidebarToggle { display: none; margin-left: 8px; }
+
+.autosave-ind {
+  font-size: 9px; color: #4a4a4e; border: 1px solid #2c2c30;
+  padding: 2px 7px; border-radius: 20px; white-space: nowrap;
+  transition: color .2s, border-color .2s;
+}
+.autosave-ind.saving { color: #d9a441; border-color: #4a3a1c; }
+.autosave-ind.saved  { color: #3fae72; border-color: #23452f; }
 
 /* ── Sidebar ── */
 .sidebar {
@@ -41,9 +72,12 @@ header {
   padding: 11px 12px; border: 1px solid #2a2a2a;
 }
 .panel-title {
-  font-size: 10px; font-weight: 700; color: #555;
-  text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px;
+  font-size: 11px; font-weight: 700; color: #c4c4ca;
+  text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px; line-height: 1.35;
 }
+.panel-title .ic { width: 14px; height: 14px; color: #6cb6ff; vertical-align: 0; }
+.collap-panel .panel-title:hover { color: #fff; }
 
 /* Upload */
 .upload-area {
@@ -55,7 +89,7 @@ header {
 .upload-area:hover, .upload-area.drag-over { border-color: #0a7aff; background: rgba(10,122,255,0.06); }
 .upload-icon { font-size: 22px; }
 .upload-text { font-size: 11px; color: #777; }
-.upload-hint { font-size: 10px; color: #444; }
+.upload-hint { font-size: 10px; color: #8e8e94; }
 .img-thumb-wrap { position: relative; display: none; margin-top: 6px; cursor: pointer; border-radius: 6px; overflow: hidden; }
 .img-thumb { width: 100%; height: 80px; object-fit: cover; border-radius: 6px; display: block; transition: opacity 0.18s; }
 .img-thumb-wrap:hover .img-thumb { opacity: 0.45; }
@@ -97,7 +131,7 @@ header {
 .inline-num:focus { border-color: #0a7aff; background: #1a2a40; }
 .inline-num::-webkit-inner-spin-button,
 .inline-num::-webkit-outer-spin-button { -webkit-appearance: none; }
-.unit-lbl { font-size: 10px; color: #555; min-width: 14px; }
+.unit-lbl { font-size: 10px; color: #9a9aa0; min-width: 14px; }
 input[type="range"] { --pct: 0%; }
 input[type="range"] {
   width: 100%; height: 3px; -webkit-appearance: none;
@@ -127,7 +161,7 @@ input[type="range"]::-webkit-slider-thumb {
 .num-in:focus { border-color: #0a7aff; }
 .in-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .in-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-.in-grp label { font-size: 10px; color: #666; display: block; margin-bottom: 3px; }
+.in-grp label { font-size: 10px; color: #9a9aa0; display: block; margin-bottom: 3px; }
 select {
   width: 100%; background: #2a2a2a; border: 1px solid #333;
   border-radius: 6px; color: #fff; padding: 5px 8px;
@@ -154,7 +188,7 @@ input[type="color"] { width: 36px; height: 24px; border: none; border-radius: 5p
 
 /* ── Profiling & Area Clearance panels ── */
 .sect-hd {
-  font-size: 9px; font-weight: 700; color: #0a7aff;
+  font-size: 10px; font-weight: 700; color: #4da3ff;
   text-transform: uppercase; letter-spacing: 0.5px;
   padding-top: 7px; margin: 4px 0 7px;
   border-top: 1px solid #2a2a2a;
@@ -171,13 +205,13 @@ input[type="color"] { width: 36px; height: 24px; border: none; border-radius: 5p
 .tool-icon { font-size: 20px; flex-shrink: 0; }
 .tool-info { flex: 1; min-width: 0; }
 .collap-panel .panel-title {
-  cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  cursor: pointer; display: flex; align-items: center;
   user-select: none; margin-bottom: 0;
 }
 .collap-panel .collap-body { padding-top: 10px; }
 .collap-panel.closed .collap-body { display: none; }
 .collap-panel.closed .panel-title { margin-bottom: 0; }
-.collap-arrow { font-size: 12px; color: #0a7aff; transition: transform 0.2s; }
+.collap-arrow { font-size: 12px; color: #6cb6ff; margin-left: auto; transition: transform 0.2s; }
 .collap-panel.closed .collap-arrow { transform: rotate(-90deg); }
 .ac-tool-list {
   background: #1a1a1c; border: 1px solid #2a2a2a; border-radius: 6px;
@@ -222,7 +256,7 @@ input[type="color"] { width: 36px; height: 24px; border: none; border-radius: 5p
 }
 .tab-btn {
   padding: 9px 16px; background: none; border: none;
-  color: #555; font-size: 11px; font-weight: 600;
+  color: #9a9aa0; font-size: 11px; font-weight: 600;
   cursor: pointer; font-family: inherit;
   border-bottom: 2px solid transparent; transition: all 0.15s;
 }
@@ -299,7 +333,7 @@ input[type="color"] { width: 36px; height: 24px; border: none; border-radius: 5p
   background: #1a1a1c; border-top: 1px solid #2a2a2a;
   padding: 8px 14px; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
 }
-.sim-legend { display: flex; gap: 12px; margin-left: auto; font-size: 10px; color: #666; }
+.sim-legend { display: flex; gap: 12px; margin-left: auto; font-size: 10px; color: #9a9aa0; }
 .sim-legend span { display: flex; align-items: center; gap: 4px; }
 .leg-line { display: inline-block; width: 16px; height: 2px; border-radius: 1px; }
 
@@ -329,7 +363,7 @@ input[type="color"] { width: 36px; height: 24px; border: none; border-radius: 5p
 .btn-gray:hover   { background: #333; }
 .btn-red    { background: #ff3b30; color: #fff; }
 .btn-red:hover    { background: #e03020; }
-.status { margin-left: auto; font-size: 11px; color: #555; }
+.status { margin-left: auto; font-size: 11px; color: #a8a8ae; }
 
 /* ── G-code modal ── */
 .gcode-modal {
@@ -343,7 +377,7 @@ input[type="color"] { width: 36px; height: 24px; border: none; border-radius: 5p
 }
 .gcode-header { padding: 14px 16px; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; gap: 10px; }
 .gcode-header h2 { font-size: 14px; flex: 1; }
-.gcode-close { background: none; border: none; color: #666; font-size: 20px; cursor: pointer; line-height: 1; }
+.gcode-close { background: none; border: none; color: #a8a8ae; font-size: 20px; cursor: pointer; line-height: 1; }
 .gcode-close:hover { color: #fff; }
 pre.gcode-content {
   flex: 1; overflow: auto; padding: 14px 16px;
@@ -366,7 +400,7 @@ pre.gcode-content {
 .export-header { padding: 14px 16px; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; }
 .export-header h2 { font-size: 14px; flex: 1; }
 .export-section { padding: 12px 16px; border-bottom: 1px solid #1e1e1e; }
-.export-section-title { font-size: 10px; color: #555; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.export-section-title { font-size: 11px; color: #c4c4ca; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
 .export-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
 .exp-btn {
   background: #2a2a2a; border: 1px solid #333; border-radius: 8px;
@@ -378,7 +412,7 @@ pre.gcode-content {
 .exp-btn:active { transform: scale(0.97); }
 .exp-icon { font-size: 20px; }
 .exp-name { font-size: 11px; font-weight: 700; }
-.exp-desc { font-size: 9px; color: #555; }
+.exp-desc { font-size: 9px; color: #8a8a90; }
 .exp-btn:hover .exp-desc { color: #888; }
 .export-footer { padding: 10px 16px; display: flex; gap: 8px; justify-content: flex-end; }
 
@@ -408,6 +442,83 @@ pre.gcode-content {
 }
 #ltModal .lt-close:hover { background: #3a3a3a; }
 #ltFrame { flex: 1; width: 100%; border: none; background: #fff; }
+#ltError { display: none; flex: 1; overflow-y: auto; padding: 28px 20px; background: #141416; }
+#ltError .lt-err-box {
+  max-width: 560px; margin: 0 auto; text-align: center; color: #c4c4ca;
+}
+#ltError h3 { font-size: 15px; color: #fff; margin: 10px 0 6px; }
+#ltError p  { font-size: 12px; line-height: 1.7; color: #a8a8ae; margin: 0 0 4px; }
+#ltError code {
+  background: #26262a; border: 1px solid #34343a; border-radius: 4px;
+  padding: 1px 5px; font-size: 11px; color: #6cb6ff; font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+#ltError .lt-err-why {
+  text-align: left; background: #1b1b1e; border: 1px solid #2c2c30;
+  border-radius: 8px; padding: 13px 16px; margin-top: 16px;
+}
+#ltError .lt-err-why > b { font-size: 12px; color: #d9a441; display: block; margin-bottom: 8px; }
+#ltError ol { margin: 0; padding-left: 18px; }
+#ltError li { font-size: 12px; line-height: 1.75; color: #a8a8ae; margin-bottom: 7px; }
+#ltError li b { color: #d4d4da; }
+#ltError .lt-err-note {
+  font-size: 11px; color: #86868c; border-top: 1px solid #2c2c30;
+  padding-top: 9px; margin-top: 4px;
+}
+#ltErrDetail {
+  font-size: 10px; color: #6a6a6e; margin-top: 14px; word-break: break-all;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+/* ══ Preset library ══ */
+.preset-row { display: flex; gap: 5px; margin-bottom: 6px; }
+.preset-row select { flex: 1; min-width: 0; font-size: 10px; padding: 4px 6px; }
+.preset-note {
+  font-size: 9px; color: #6a6a6e; line-height: 1.5; margin-top: 5px;
+  background: #151517; border: 1px solid #262629; border-radius: 5px; padding: 6px 8px;
+}
+.preset-note b { color: #9a9a9e; font-weight: 600; }
+.preset-warn { color: #d9a441; }
+
+/* ══ Safety check report ══ */
+.chk-list { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.chk-item {
+  display: flex; gap: 7px; align-items: flex-start;
+  font-size: 10px; line-height: 1.5; padding: 6px 8px; border-radius: 5px;
+  border: 1px solid; background: #151517;
+}
+.chk-item .ic { width: 13px; height: 13px; margin-top: 1px; }
+.chk-ok    { border-color: #23452f; color: #3fae72; }
+.chk-warn  { border-color: #4a3a1c; color: #d9a441; }
+.chk-error { border-color: #4d2222; color: #e05c5c; }
+.chk-item small { display: block; color: #7a7a7e; margin-top: 2px; }
+
+/* ══ Responsive ══ */
+@media (max-width: 1280px) {
+  .sidebar { width: 244px; padding: 10px; }
+  .header-sub { font-size: 10px; }
+}
+@media (max-width: 1024px) {
+  #btnSidebarToggle { display: inline-flex; }
+  .sidebar {
+    position: absolute; top: 0; bottom: 0; left: 0; z-index: 60;
+    width: 268px; box-shadow: 6px 0 24px rgba(0,0,0,.5);
+    transform: translateX(0); transition: transform .18s ease;
+  }
+  .sidebar.hidden { transform: translateX(-100%); }
+  .app-body { position: relative; }
+  .header-sub { display: none; }
+}
+@media (max-width: 720px) {
+  header { padding: 8px 12px; gap: 8px; }
+  .header-title { font-size: 13px; }
+  .logo { width: 28px; height: 28px; }
+  .hdr-actions { margin-left: auto; gap: 1px; }
+  .hdr-btn { width: 30px; height: 30px; }   /* >=30px keeps touch targets usable */
+  .bottom-bar { flex-wrap: wrap; gap: 5px; }
+  .bottom-bar .btn { flex: 1 1 auto; font-size: 10px; padding: 7px 8px; }
+  .bottom-bar .status { flex-basis: 100%; }
+  .tab-btn { font-size: 10px; padding: 7px 8px; }
+}
 </style>
 </head>
 <body>
@@ -420,15 +531,79 @@ pre.gcode-content {
       <button class="lt-close" onclick="closeLineTracer()">✖ ปิด</button>
     </div>
     <iframe id="ltFrame" title="LineTracer Pro"></iframe>
+    <div id="ltError">
+      <div class="lt-err-box">
+        <svg class="ic ic-lg" style="color:#d9a441"><use href="#i-alert"/></svg>
+        <h3>ไม่พบไฟล์ <code>line-tracer.html</code></h3>
+        <p>เครื่องมือนี้เป็นไฟล์แยกที่ต้องวางไว้ <b>โฟลเดอร์เดียวกัน</b> กับหน้านี้</p>
+        <div class="lt-err-why">
+          <b>ถ้าใช้งานบน GitHub Pages มักเกิดจาก 2 สาเหตุนี้</b>
+          <ol>
+            <li><b>ยังไม่ได้อัปโหลดไฟล์</b> — push <code>line-tracer.html</code> ขึ้นไปในโฟลเดอร์เดียวกับ <code>cnc-pattern-generator.html</code></li>
+            <li><b>ชื่อไฟล์ตัวพิมพ์ไม่ตรง</b> — Windows ไม่สนตัวพิมพ์เล็กใหญ่ แต่ GitHub Pages สนใจ
+                ถ้าไฟล์ในรีโปชื่อ <code>Line-Tracer.html</code> หรือ <code>LineTracer.html</code> จะโหลดไม่เจอ
+                ให้เปลี่ยนเป็นตัวพิมพ์เล็กทั้งหมด</li>
+          </ol>
+          <p class="lt-err-note">หมายเหตุ: ต้องเปิดผ่าน GitHub <b>Pages</b> (<code>username.github.io/…</code>)
+             ไม่ใช่หน้าดูโค้ดบน github.com เพราะหน้าดูโค้ดไม่รันสคริปต์</p>
+        </div>
+        <p style="margin-top:14px">หรือเลือกไฟล์จากเครื่องนี้เพื่อใช้งานทันที</p>
+        <button class="btn btn-blue" id="ltPickBtn" style="font-size:12px;padding:7px 16px">
+          <svg class="ic"><use href="#i-folder"/></svg> เลือกไฟล์ line-tracer.html
+        </button>
+        <input type="file" id="ltPickInput" accept=".html,.htm" style="display:none">
+        <div id="ltErrDetail"></div>
+      </div>
+    </div>
   </div>
 </div>
 
+<!-- ══ SVG icon sprite — replaces emoji used as UI icons ══ -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></symbol>
+  <symbol id="i-wand" viewBox="0 0 24 24"><path d="m3 21 9-9M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M15 9h0M17.8 6.2 19 5M12.2 6.2 11 5"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+  <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 9h18v6H3z"/><path d="M7 9v3M11 9v3M15 9v3M19 9v3"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3Z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5Z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></symbol>
+  <symbol id="i-square" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="m6 3 14 9-14 9V3Z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 9 5-5 5 5"/><path d="M12 4v12"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 8"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></symbol>
+  <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.5a3 3 0 0 0-3-1.5c-1.7 0-3 .9-3 2s1.3 2 3 2 3 .9 3 2-1.3 2-3 2a3 3 0 0 1-3-1.5M12 6v12"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="5" r="2.5"/><path d="M7.5 19H14a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8h6.5"/></symbol>
+  <symbol id="i-tiles" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></symbol>
+</svg>
+
 <header>
-  <div class="logo">⚙</div>
+  <div class="logo"><svg class="ic" style="width:19px;height:19px"><use href="#i-cpu"/></svg></div>
   <div>
     <div class="header-title">CNC Pattern Generator</div>
   </div>
-  <div class="header-sub">Image → Halftone Pattern → Tool Path</div>
+  <button class="hdr-btn" id="btnSidebarToggle" title="ซ่อน/แสดงแผงควบคุม" aria-label="Toggle sidebar"><svg class="ic"><use href="#i-menu"/></svg></button>
+  <div class="hdr-actions">
+    <button class="hdr-btn" id="btnUndo" title="ย้อนกลับ (Ctrl+Z)" aria-label="Undo" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
+    <button class="hdr-btn" id="btnRedo" title="ทำซ้ำ (Ctrl+Shift+Z)" aria-label="Redo" disabled><svg class="ic"><use href="#i-redo"/></svg></button>
+    <span class="hdr-div"></span>
+    <button class="hdr-btn" id="btnSaveProj" title="บันทึกโปรเจกต์เป็นไฟล์ .cncproj" aria-label="Save project"><svg class="ic"><use href="#i-save"/></svg></button>
+    <button class="hdr-btn" id="btnLoadProj" title="เปิดโปรเจกต์จากไฟล์" aria-label="Open project"><svg class="ic"><use href="#i-folder"/></svg></button>
+    <input type="file" id="projFileInput" accept=".cncproj,.json" style="display:none">
+  </div>
+  <div class="header-sub">
+    <span id="autosaveInd" class="autosave-ind" title="บันทึกอัตโนมัติในเครื่อง">บันทึกแล้ว</span>
+    Image → Halftone Pattern → Tool Path
+  </div>
 </header>
 
 <div class="app-body">
@@ -438,16 +613,16 @@ pre.gcode-content {
 
     <!-- Image Upload -->
     <div class="panel">
-      <div class="panel-title">📁 รูปภาพ (Image Source)</div>
+      <div class="panel-title"><svg class="ic"><use href="#i-image"/></svg> รูปภาพ (Image Source)</div>
       <div class="upload-area" id="uploadArea">
-        <div class="upload-icon">🖼</div>
+        <div class="upload-icon"><svg class="ic ic-lg"><use href="#i-image"/></svg></div>
         <div class="upload-text">วางรูปหรือคลิกเลือกไฟล์</div>
         <div class="upload-hint">PNG · JPG · BMP · GIF · WebP</div>
       </div>
       <div id="imgThumbWrap" class="img-thumb-wrap">
         <img id="imgThumb" class="img-thumb" alt="preview"/>
         <div class="img-thumb-overlay">
-          <span>🔄</span>
+          <span><svg class="ic"><use href="#i-refresh"/></svg></span>
           <span>เปลี่ยนรูป</span>
         </div>
       </div>
@@ -469,7 +644,7 @@ pre.gcode-content {
 
     <!-- Pattern Type -->
     <div class="panel">
-      <div class="panel-title">🔷 รูปแบบ Pattern</div>
+      <div class="panel-title"><svg class="ic"><use href="#i-grid"/></svg> รูปแบบ Pattern</div>
       <div class="pattern-grid" id="patternGrid">
         <button class="pat-btn active" data-pat="circle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" opacity=".4"/></svg>วงกลม
@@ -509,11 +684,11 @@ pre.gcode-content {
 
     <!-- ImgShape upload (shown only when imgshape pattern selected) -->
     <div class="panel" id="panImgShape" style="display:none">
-      <div class="panel-title">🖼 รูปลาย (Shape Image)</div>
+      <div class="panel-title"><svg class="ic"><use href="#i-pen"/></svg> รูปลาย (Shape Image)</div>
       <div style="padding:8px 10px 10px">
         <div id="shapeUploadArea" class="upload-area" style="padding:10px;min-height:60px"
           onclick="$('shapeFileInput').click()">
-          <div class="upload-icon" style="font-size:20px">🎨</div>
+          <div class="upload-icon"><svg class="ic ic-lg"><use href="#i-pen"/></svg></div>
           <div class="upload-text" style="font-size:11px">คลิกเลือกรูปลาย</div>
           <div class="upload-hint">PNG (มี alpha ดีที่สุด) · SVG · JPG</div>
         </div>
@@ -521,7 +696,7 @@ pre.gcode-content {
           onclick="$('shapeFileInput').click()">
           <img id="shapeThumb" style="width:100%;height:60px;object-fit:contain;background:#111;border-radius:6px;display:block">
           <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .18s;background:rgba(0,0,0,.5)"
-            id="shapeThumbOverlay"><span style="font-size:18px">🔄</span></div>
+            id="shapeThumbOverlay"><span><svg class="ic"><use href="#i-refresh"/></svg></span></div>
         </div>
         <input type="file" id="shapeFileInput" accept="image/*,.svg,.dxf" style="display:none">
         <div id="shapeInfo" style="font-size:10px;color:#888;margin-top:6px"></div>
@@ -584,7 +759,7 @@ pre.gcode-content {
 
     <!-- Line Raster settings (shown when lineraster selected) -->
     <div class="panel" id="panLineRaster" style="display:none">
-      <div class="panel-title">〰 ลายเส้น (Line Raster)</div>
+      <div class="panel-title"><svg class="ic"><use href="#i-route"/></svg> ลายเส้น (Line Raster)</div>
       <div style="padding:8px 10px 10px">
         <div style="margin-bottom:6px">
           <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
@@ -627,7 +802,7 @@ pre.gcode-content {
 
     <!-- Text Raster settings (shown when textraster selected) -->
     <div class="panel" id="panTextRaster" style="display:none">
-      <div class="panel-title">🔤 ลาย Text (Text Raster)</div>
+      <div class="panel-title"><svg class="ic"><use href="#i-grid"/></svg> ลาย Text (Text Raster)</div>
       <div style="padding:8px 10px 10px">
         <div style="margin-bottom:8px">
           <label style="font-size:10px;color:#aaa;display:block;margin-bottom:4px">ข้อความ (Text)</label>
@@ -666,7 +841,7 @@ pre.gcode-content {
 
     <!-- Mix Layer panel -->
     <div class="panel collap-panel closed" id="panMixLayer">
-      <div class="panel-title" onclick="togglePanel('panMixLayer')">🎨 ลายผสม (Mix Layer) <span class="collap-arrow">▾</span></div>
+      <div class="panel-title" onclick="togglePanel('panMixLayer')"><svg class="ic"><use href="#i-layers"/></svg> ลายผสม (Mix Layer) <span class="collap-arrow">▾</span></div>
       <div class="collap-body" style="padding:0 0 4px">
         <div class="tog-row" style="margin-bottom:10px">
           <span class="tog-label">เปิดใช้ Mix Layer</span>
@@ -738,7 +913,7 @@ pre.gcode-content {
 
     <!-- Pattern Settings -->
     <div class="panel">
-      <div class="panel-title">⚙ ตั้งค่า Pattern</div>
+      <div class="panel-title"><svg class="ic"><use href="#i-sliders"/></svg> ตั้งค่า Pattern</div>
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Spacing (ระยะห่าง)</span>
@@ -817,7 +992,7 @@ pre.gcode-content {
 
     <!-- CNC Parameters -->
     <div class="panel">
-      <div class="panel-title">🔩 ตั้งค่า CNC</div>
+      <div class="panel-title"><svg class="ic"><use href="#i-cpu"/></svg> ตั้งค่า CNC</div>
       <div class="ctrl" style="margin-bottom:8px">
         <div class="in-grp">
           <label>หน่วย (Units)</label>
@@ -867,7 +1042,7 @@ pre.gcode-content {
     <!-- ══ Procedural Pattern Generator ══ -->
     <div class="panel collap-panel closed" id="panProcGen">
       <div class="panel-title" onclick="togglePanel('panProcGen')">
-        🎨 สร้างลาย (Procedural) <span class="collap-arrow">▾</span>
+        <svg class="ic"><use href="#i-wand"/></svg> สร้างลาย (Procedural) <span class="collap-arrow">▾</span>
       </div>
       <div class="collap-body">
 
@@ -1019,7 +1194,7 @@ pre.gcode-content {
     <!-- ══ AI Vectorizer (LineTracer Pro, embedded) ══ -->
     <div class="panel collap-panel closed" id="panVec">
       <div class="panel-title" onclick="togglePanel('panVec')">
-        🤖 AI Vectorizer Engines <span class="collap-arrow">▾</span>
+        <svg class="ic"><use href="#i-wand"/></svg> AI Vectorizer Engines <span class="collap-arrow">▾</span>
       </div>
       <div class="collap-body">
         <p style="font-size:11px;color:#999;line-height:1.6;margin-bottom:10px">
@@ -1029,14 +1204,14 @@ pre.gcode-content {
           เครื่องมือปากกา/ยางลบ/ครอบตัด, ซูม+มินิแมพ และ export PNG/SVG/DXF ในตัว
         </p>
         <button style="width:100%;background:#0d2a0d;color:#5dff5d;border:1px solid #1a5a1a;border-radius:5px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:0.3px"
-          onclick="openLineTracer()">🤖 เปิด LineTracer Pro</button>
+          onclick="openLineTracer()"><svg class="ic"><use href="#i-wand"/></svg> เปิด LineTracer Pro</button>
       </div>
     </div>
 
     <!-- ══ Profiling Panel ══ -->
     <div class="panel collap-panel closed" id="panProfiling">
       <div class="panel-title" onclick="togglePanel('panProfiling')">
-        ✂️ Profiling (กินใน / กินนอก) <span class="collap-arrow">▾</span>
+        <svg class="ic"><use href="#i-route"/></svg> Profiling (กินใน / กินนอก) <span class="collap-arrow">▾</span>
       </div>
       <div class="collap-body">
 
@@ -1177,7 +1352,7 @@ pre.gcode-content {
     <!-- ══ 2D Area Clearance Panel ══ -->
     <div class="panel collap-panel closed" id="panAreaClear">
       <div class="panel-title" onclick="togglePanel('panAreaClear')">
-        🗂️ 2D Area Clearance (เซาะงาน) <span class="collap-arrow">▾</span>
+        <svg class="ic"><use href="#i-layers"/></svg> 2D Area Clearance (เซาะงาน) <span class="collap-arrow">▾</span>
       </div>
       <div class="collap-body">
 
@@ -1309,9 +1484,91 @@ pre.gcode-content {
       </div>
     </div>
 
+    <!-- ══ Machine × Material presets ══ -->
+    <div class="panel collap-panel" id="panPresets">
+      <div class="panel-title" onclick="togglePanel('panPresets')">
+        <svg class="ic"><use href="#i-sliders"/></svg> พรีเซ็ต เครื่อง × วัสดุ <span class="collap-arrow">▾</span>
+      </div>
+      <div class="collap-body">
+        <div class="preset-row">
+          <select id="presetMachine" title="เลือกเครื่อง"></select>
+          <select id="presetMaterial" title="เลือกวัสดุ"></select>
+        </div>
+        <div class="preset-row">
+          <select id="presetThick" title="ความหนาวัสดุ" style="flex:0 0 88px"></select>
+          <button class="btn btn-blue" id="btnApplyPreset" style="flex:1;font-size:10px;padding:5px 8px">ใช้ค่านี้</button>
+        </div>
+        <div class="preset-note" id="presetNote">เลือกเครื่องและวัสดุเพื่อตั้งค่า feed / depth / RPM ให้อัตโนมัติ</div>
+        <div style="display:flex;gap:5px;margin-top:7px">
+          <input type="text" id="presetSaveName" placeholder="ชื่อพรีเซ็ตของฉัน"
+                 style="flex:1;min-width:0;font-size:10px;padding:4px 6px;background:#151517;border:1px solid #2c2c30;border-radius:5px;color:#ddd">
+          <button class="btn-outline" id="btnSavePreset" style="font-size:10px;padding:4px 9px">บันทึก</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Cost estimate ══ -->
+    <div class="panel collap-panel closed" id="panCost">
+      <div class="panel-title" onclick="togglePanel('panCost')">
+        <svg class="ic"><use href="#i-coin"/></svg> ประมาณต้นทุนงาน <span class="collap-arrow">▾</span>
+      </div>
+      <div class="collap-body">
+        <div class="in-row" style="margin-bottom:6px">
+          <div class="in-grp"><label>ราคาวัสดุ (บาท/ตร.ม.)</label>
+            <input type="number" class="num-in" id="costMaterial" value="450" min="0" max="1000000" step="10">
+          </div>
+          <div class="in-grp"><label>ค่าไฟ (บาท/ชม.)</label>
+            <input type="number" class="num-in" id="costPower" value="8" min="0" max="10000" step="1">
+          </div>
+        </div>
+        <div class="in-row" style="margin-bottom:6px">
+          <div class="in-grp"><label>ค่าแรง (บาท/ชม.)</label>
+            <input type="number" class="num-in" id="costLabour" value="150" min="0" max="100000" step="10">
+          </div>
+          <div class="in-grp"><label>กำไร (%)</label>
+            <input type="number" class="num-in" id="costMargin" value="40" min="0" max="900" step="5">
+          </div>
+        </div>
+        <div class="preset-note" id="costBreakdown">สร้าง pattern ก่อนเพื่อคำนวณต้นทุน</div>
+      </div>
+    </div>
+
+    <!-- ══ Tiling / panelisation ══ -->
+    <div class="panel collap-panel closed" id="panTiling">
+      <div class="panel-title" onclick="togglePanel('panTiling')">
+        <svg class="ic"><use href="#i-tiles"/></svg> แบ่งงานเป็นแผ่น (Tiling) <span class="collap-arrow">▾</span>
+      </div>
+      <div class="collap-body">
+        <div class="preset-note" style="margin-top:0">ใช้เมื่อลายใหญ่กว่าพื้นที่ทำงานของเครื่อง — จะแบ่งเป็นหลายไฟล์พร้อมหมุดจัดตำแหน่ง</div>
+        <div class="in-row" style="margin:7px 0 6px">
+          <div class="in-grp"><label>เครื่องกว้าง (mm)</label>
+            <input type="number" class="num-in" id="tileMachW" value="300" min="10" max="10000" step="10">
+          </div>
+          <div class="in-grp"><label>เครื่องสูง (mm)</label>
+            <input type="number" class="num-in" id="tileMachH" value="200" min="10" max="10000" step="10">
+          </div>
+        </div>
+        <div class="in-row" style="margin-bottom:7px">
+          <div class="in-grp"><label>ซ้อนทับ (mm)</label>
+            <input type="number" class="num-in" id="tileOverlap" value="5" min="0" max="200" step="1">
+          </div>
+          <div class="in-grp"><label>หมุดจัดตำแหน่ง</label>
+            <select id="tileRegMark" class="num-in" style="color:#e0e0e0">
+              <option value="1">ใส่</option>
+              <option value="0">ไม่ใส่</option>
+            </select>
+          </div>
+        </div>
+        <div class="preset-note" id="tileInfo">—</div>
+        <button class="btn btn-blue" id="btnExportTiles" style="width:100%;font-size:11px;padding:6px 10px;margin-top:7px">
+          <svg class="ic"><use href="#i-tiles"/></svg> ส่งออกทุกแผ่น
+        </button>
+      </div>
+    </div>
+
     <!-- Sheet / Nesting -->
     <div class="panel">
-      <div class="panel-title">📋 แผ่นงาน (Sheet / Nesting)</div>
+      <div class="panel-title"><svg class="ic"><use href="#i-clipboard"/></svg> แผ่นงาน (Sheet / Nesting)</div>
       <div class="in-row" style="margin-bottom:7px">
         <div class="in-grp"><label>แผ่น W (mm)</label>
           <input type="number" class="num-in" id="sheetW" value="600" min="1" max="5000">
@@ -1333,7 +1590,7 @@ pre.gcode-content {
         <input type="number" class="num-in" id="desiredCount" value="0" min="0" max="9999" step="1">
       </div>
       <div id="nestInfo" style="font-size:10px;color:#00d1a0;margin-bottom:7px;font-weight:700">— ชิ้น / แผ่น</div>
-      <button class="btn btn-blue" id="btnViewSheet" style="width:100%;font-size:11px;padding:6px 10px">📋 ดูแผ่นงาน (Sheet Layout)</button>
+      <button class="btn btn-blue" id="btnViewSheet" style="width:100%;font-size:11px;padding:6px 10px"><svg class="ic"><use href="#i-clipboard"/></svg> ดูแผ่นงาน (Sheet Layout)</button>
     </div>
 
   </div><!-- /sidebar -->
@@ -1341,9 +1598,9 @@ pre.gcode-content {
   <!-- ═══ MAIN AREA ═══ -->
   <div class="main-area">
     <div class="main-tabs">
-      <button class="tab-btn active" data-tab="pattern">🎨 Pattern Preview</button>
-      <button class="tab-btn" data-tab="simulation">▶ Toolpath Sim</button>
-      <button class="tab-btn" data-tab="sheet">📋 Sheet Layout</button>
+      <button class="tab-btn active" data-tab="pattern"><svg class="ic"><use href="#i-grid"/></svg> Pattern Preview</button>
+      <button class="tab-btn" data-tab="simulation"><svg class="ic"><use href="#i-play"/></svg> Toolpath Sim</button>
+      <button class="tab-btn" data-tab="sheet"><svg class="ic"><use href="#i-clipboard"/></svg> Sheet Layout</button>
     </div>
 
     <!-- Pattern tab -->
@@ -1361,6 +1618,8 @@ pre.gcode-content {
           <div class="st-row"><span>Grid</span><span class="st-val" id="stGrid">—</span></div>
           <div class="st-row"><span>Real size</span><span class="st-val" id="stSize">—</span></div>
           <div class="st-row"><span>Est. time</span><span class="st-val" id="stTime">—</span></div>
+          <div class="st-row"><span>Travel saved</span><span class="st-val" id="stTravel">—</span></div>
+          <div class="st-row"><span>Est. cost</span><span class="st-val" id="stCost">—</span></div>
         </div>
         <div class="processing-ov" id="procOv"><div class="spinner"></div></div>
         <!-- zoom toolbar -->
@@ -1403,7 +1662,7 @@ pre.gcode-content {
       <div class="sheet-wrap" id="sheetWrap">
         <canvas id="sheetCanvas"></canvas>
         <div class="no-img" id="noImgSheet">
-          <div class="icon">📋</div>
+          <div class="icon"><svg class="ic ic-lg"><use href="#i-clipboard"/></svg></div>
           <p>คลิก "ดูแผ่นงาน" เพื่อแสดง Sheet Layout</p>
         </div>
         <div class="sheet-info-ov" id="sheetInfoOv" style="display:none">
@@ -1418,10 +1677,11 @@ pre.gcode-content {
     </div>
 
     <div class="bottom-bar">
-      <button class="btn btn-gray" id="btnRegen">🔄 Regenerate</button>
-      <button class="btn btn-blue" id="btnExport">📤 Export…</button>
-      <button class="btn btn-green" id="btnGcode">💾 G-code</button>
-      <button class="btn btn-gray" id="btnPreview">👁 Preview G-code</button>
+      <button class="btn btn-gray" id="btnRegen"><svg class="ic"><use href="#i-refresh"/></svg> Regenerate</button>
+      <button class="btn btn-blue" id="btnExport"><svg class="ic"><use href="#i-upload"/></svg> Export…</button>
+      <button class="btn btn-green" id="btnGcode"><svg class="ic"><use href="#i-save"/></svg> G-code</button>
+      <button class="btn btn-gray" id="btnPreview"><svg class="ic"><use href="#i-eye"/></svg> Preview G-code</button>
+      <button class="btn btn-gray" id="btnSafetyCheck" title="ตรวจสอบความปลอดภัยของ G-code"><svg class="ic"><use href="#i-shield"/></svg> ตรวจสอบ</button>
       <span class="status" id="statusTxt">พร้อมใช้งาน</span>
     </div>
   </div>
@@ -1436,8 +1696,11 @@ pre.gcode-content {
       <button class="gcode-close" id="gcodeClose">✕</button>
     </div>
     <pre class="gcode-content" id="gcodeContent"></pre>
+    <div id="gcodeCheckWrap" style="display:none;padding:0 16px 4px;max-height:180px;overflow-y:auto">
+      <div class="chk-list" id="gcodeCheckList"></div>
+    </div>
     <div class="gcode-footer">
-      <button class="btn btn-green" id="btnGcodeDown">💾 Download</button>
+      <button class="btn btn-green" id="btnGcodeDown"><svg class="ic"><use href="#i-save"/></svg> Download</button>
       <span style="font-size:10px;color:#555;flex:1" id="gcodeStats"></span>
       <button class="btn btn-gray" id="gcodeClose2">ปิด</button>
     </div>
@@ -1448,12 +1711,12 @@ pre.gcode-content {
 <div class="export-modal" id="exportModal">
   <div class="export-box">
     <div class="export-header">
-      <h2>📤 Export ไฟล์</h2>
+      <h2><svg class="ic"><use href="#i-upload"/></svg> Export ไฟล์</h2>
       <button class="gcode-close" id="exportClose">✕</button>
     </div>
 
     <div class="export-section">
-      <div class="export-section-title">🖼 Raster Image</div>
+      <div class="export-section-title"><svg class="ic"><use href="#i-image"/></svg> Raster Image</div>
       <div class="export-grid">
         <button class="exp-btn" id="expPNG">
           <span class="exp-icon">🖼</span>
@@ -1474,7 +1737,7 @@ pre.gcode-content {
     </div>
 
     <div class="export-section">
-      <div class="export-section-title">📐 Vector / CAD</div>
+      <div class="export-section-title"><svg class="ic"><use href="#i-ruler"/></svg> Vector / CAD</div>
       <div class="export-grid">
         <button class="exp-btn" id="expSVG">
           <span class="exp-icon">✏</span>
@@ -1495,7 +1758,7 @@ pre.gcode-content {
     </div>
 
     <div class="export-section">
-      <div class="export-section-title">🔩 CNC / Machine</div>
+      <div class="export-section-title"><svg class="ic"><use href="#i-cpu"/></svg> CNC / Machine</div>
       <div class="export-grid">
         <button class="exp-btn" id="expGCODE">
           <span class="exp-icon">⚙</span>
@@ -1629,6 +1892,12 @@ $('workH').addEventListener('input', () => {
 let _prevUnitFactor = unitFactor();
 $('units').addEventListener('change', () => {
   const newFactor = unitFactor();
+  // While restoring a saved project, workW/workH already hold values expressed
+  // in the saved unit — rescaling them here would corrupt the restored size.
+  if (typeof PROJECT !== 'undefined' && PROJECT.restoring) {
+    _prevUnitFactor = newFactor;
+    return;
+  }
   if (newFactor !== _prevUnitFactor) {
     const w = parseFloat($('workW').value) || 100;
     const h = parseFloat($('workH').value) || 100;
@@ -2614,8 +2883,15 @@ function updateStats() {
   const feed = parseFloat($('feedRate').value) || 800;
   const units = $('units').value;
   const avgR_mm = (S.minDmm + S.maxDmm) / 4; // diameter → radius: avg(d/2)
-  const pathLen = S.shapes.length * 2 * Math.PI * avgR_mm;
-  const timeSec = pathLen / feed * 60;
+  const cutLen  = S.shapes.length * 2 * Math.PI * avgR_mm;   // cutting length (mm)
+
+  // Rapid travel between shapes, using the same ordering G-code will use
+  const trav    = TRAVEL.order(S.shapes);
+  const sc      = wW / W;
+  const travMm  = trav.afterMm * sc;
+  const rapid   = 3000;                        // typical G0 rate, mm/min
+  const timeSec = (cutLen / feed + travMm / rapid) * 60;
+
   const mmToPx = W / wW;
   const spacePx = S.spacingMm * mmToPx;
   $('stShapes').textContent = S.shapes.length.toLocaleString();
@@ -2623,6 +2899,9 @@ function updateStats() {
   $('stGrid').textContent   = `${Math.ceil(W/Math.max(1,spacePx))}×${Math.ceil(H/Math.max(1,spacePx))}`;
   $('stSize').textContent   = `${$('workW').value}×${$('workH').value} ${units}`;
   $('stTime').textContent   = timeSec < 60 ? `~${Math.ceil(timeSec)} วิ` : `~${(timeSec/60).toFixed(1)} นาที`;
+  $('stTravel').textContent = trav.saved > 0 ? `−${trav.saved.toFixed(0)}%` : '—';
+
+  COST.update(timeSec, wW, wH);
 }
 function patName(p) {
   return {circle:'Circle',square:'Square',diamond:'Diamond',cross:'Cross',
@@ -3025,8 +3304,18 @@ function buildGcode(offsetX=0, offsetY=0) {
     return g;
   }
 
-  for (let i = 0; i < S.shapes.length; i++) {
-    const s  = S.shapes[i];
+  // ── Travel-path optimisation ──────────────────────────────
+  // Shapes are generated in raster order (row by row), which makes the tool
+  // fly back across the whole workpiece at the end of every row. Re-ordering
+  // them nearest-neighbour first cuts a large slice off the rapid travel.
+  const _ordered = TRAVEL.order(S.shapes);
+  if (_ordered.saved > 0) {
+    g += cm(`Travel optimised: ${_ordered.beforeMm.toFixed(0)}mm → ${_ordered.afterMm.toFixed(0)}mm (-${_ordered.saved.toFixed(0)}%)`);
+    g += '\n';
+  }
+
+  for (let i = 0; i < _ordered.shapes.length; i++) {
+    const s  = _ordered.shapes[i];
     const sx = parseFloat((s.x * sc + offsetX).toFixed(3));
     const sy = parseFloat(((H - s.y) * sc + offsetY).toFixed(3));
     const sr = parseFloat((s.r * sc).toFixed(3));
@@ -6696,26 +6985,23 @@ $('expDXF').addEventListener('click', () => {
 
 $('expPNG').addEventListener('click', () => {
   if (!requireShapes()) return;
-  pCanvas.toBlob(blob => {
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'cnc-pattern.png' });
-    a.click();
-  }, 'image/png');
-  status2('✅ PNG exported');
+  // Blob is produced lazily so the save dialog opens while the click's
+  // user-activation is still valid (canvas encoding is slow enough to lose it)
+  FILESAVE.save('cnc-pattern.png',
+    () => new Promise(res => pCanvas.toBlob(res, 'image/png')), 'image/png');
 });
 
 $('expJPG').addEventListener('click', () => {
   if (!requireShapes()) return;
-  // Draw on white bg first
-  const tmp = document.createElement('canvas');
-  tmp.width = pCanvas.width; tmp.height = pCanvas.height;
-  const tctx = tmp.getContext('2d');
-  tctx.fillStyle = '#ffffff'; tctx.fillRect(0,0,tmp.width,tmp.height);
-  tctx.drawImage(pCanvas, 0, 0);
-  tmp.toBlob(blob => {
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'cnc-pattern.jpg' });
-    a.click();
-  }, 'image/jpeg', 0.92);
-  status2('✅ JPG exported');
+  FILESAVE.save('cnc-pattern.jpg', () => new Promise(res => {
+    // Draw on white bg first — JPEG has no alpha
+    const tmp = document.createElement('canvas');
+    tmp.width = pCanvas.width; tmp.height = pCanvas.height;
+    const tctx = tmp.getContext('2d');
+    tctx.fillStyle = '#ffffff'; tctx.fillRect(0, 0, tmp.width, tmp.height);
+    tctx.drawImage(pCanvas, 0, 0);
+    tmp.toBlob(res, 'image/jpeg', 0.92);
+  }), 'image/jpeg');
 });
 
 $('expPDF').addEventListener('click', () => {
@@ -6727,8 +7013,8 @@ $('expPDF').addEventListener('click', () => {
   const doc = new jsPDF({ orientation: orient, unit: 'mm', format: [wW, wH] });
   const imgData = pCanvas.toDataURL('image/png');
   doc.addImage(imgData, 'PNG', 0, 0, wW, wH);
-  doc.save('cnc-pattern.pdf');
-  status2('✅ PDF exported');
+  // doc.save() writes straight to Downloads — route through the picker instead
+  FILESAVE.save('cnc-pattern.pdf', () => doc.output('blob'), 'application/pdf');
 });
 
 $('expGCODE').addEventListener('click', () => {
@@ -6824,12 +7110,121 @@ function status2(msg) {
   $('statusTxt').textContent = msg;
   $('exportModal').classList.remove('show');
 }
+// ════════════════════════════════════════════════════════════════════════
+// FILESAVE — always ask the user where to put the file
+// ════════════════════════════════════════════════════════════════════════
+// Uses the File System Access API so every export opens a real "Save As"
+// dialog instead of dumping into the Downloads folder. Browsers that don't
+// implement it (Firefox, Safari, and any non-secure origin) fall back to the
+// classic anchor download — the file still saves, the OS just picks where.
+const FILESAVE = {
+  _dirHandle: null,
+
+  supported() {
+    return typeof window.showSaveFilePicker === 'function' && window.isSecureContext;
+  },
+
+  _types(name) {
+    const ext = '.' + (name.split('.').pop() || '').toLowerCase();
+    const map = {
+      '.nc':      ['G-code',            'text/plain',       ['.nc','.tap','.ngc','.mpf','.gcode']],
+      '.tap':     ['G-code',            'text/plain',       ['.tap','.nc','.ngc']],
+      '.ngc':     ['G-code',            'text/plain',       ['.ngc','.nc','.tap']],
+      '.mpf':     ['G-code (Siemens)',  'text/plain',       ['.mpf']],
+      '.gcode':   ['G-code',            'text/plain',       ['.gcode','.nc']],
+      '.svg':     ['SVG vector',        'image/svg+xml',    ['.svg']],
+      '.dxf':     ['DXF drawing',       'application/dxf',  ['.dxf']],
+      '.csv':     ['CSV table',         'text/csv',         ['.csv']],
+      '.png':     ['PNG image',         'image/png',        ['.png']],
+      '.jpg':     ['JPEG image',        'image/jpeg',       ['.jpg','.jpeg']],
+      '.pdf':     ['PDF document',      'application/pdf',  ['.pdf']],
+      '.cncproj': ['CNC project',       'application/json', ['.cncproj','.json']],
+      '.json':    ['JSON file',         'application/json', ['.json']]
+    };
+    const m = map[ext];
+    if (!m) return [];
+    return [{ description: m[0], accept: { [m[1]]: m[2] } }];
+  },
+
+  // `source` may be a Blob, a string, or a function returning Blob/Promise<Blob>.
+  // Passing a function matters for canvas exports: the picker must be opened
+  // while the click's user-activation is still live, before the slow encode.
+  async save(name, source, mime) {
+    const toBlob = async () => {
+      const v = (typeof source === 'function') ? await source() : source;
+      return (v instanceof Blob) ? v : new Blob([v], { type: mime || 'application/octet-stream' });
+    };
+
+    if (this.supported()) {
+      let handle;
+      try {
+        handle = await window.showSaveFilePicker({
+          suggestedName: name,
+          id: 'cncpat',                                   // Chrome remembers the last folder per id
+          startIn: this._dirHandle || 'documents',
+          types: this._types(name)
+        });
+      } catch (e) {
+        if (e && e.name === 'AbortError') { status2('ยกเลิกการบันทึก'); return false; }
+        console.warn('Save picker unavailable, falling back:', e);
+        handle = null;
+      }
+      if (handle) {
+        try {
+          const blob = await toBlob();
+          const w = await handle.createWritable();
+          await w.write(blob);
+          await w.close();
+          status2('✅ บันทึกแล้ว: ' + (handle.name || name));
+          return true;
+        } catch (e) {
+          status2('❌ บันทึกไม่สำเร็จ: ' + e.message);
+          return false;
+        }
+      }
+    }
+
+    // ── Fallback: classic download ──
+    try {
+      const blob = await toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement('a'), { href: url, download: name });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      status2('✅ บันทึกแล้ว: ' + name);
+      return true;
+    } catch (e) {
+      status2('❌ บันทึกไม่สำเร็จ: ' + e.message);
+      return false;
+    }
+  },
+
+  // Ask once for a folder, then write many files into it (used by tiling).
+  // Returns null when unsupported or cancelled.
+  async pickDirectory() {
+    if (typeof window.showDirectoryPicker !== 'function' || !window.isSecureContext) return null;
+    try {
+      const d = await window.showDirectoryPicker({ id: 'cncpat-tiles', mode: 'readwrite', startIn: 'documents' });
+      this._dirHandle = d;
+      return d;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return 'cancelled';
+      return null;
+    }
+  },
+
+  async writeInto(dirHandle, name, content, mime) {
+    const fh = await dirHandle.getFileHandle(name, { create: true });
+    const w  = await fh.createWritable();
+    await w.write(new Blob([content], { type: mime || 'text/plain' }));
+    await w.close();
+  }
+};
+
 function download(name, content, mime) {
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(new Blob([content], {type: mime})),
-    download: name
-  });
-  a.click();
+  return FILESAVE.save(name, content, mime);
 }
 
 window.addEventListener('resize', () => {
@@ -7675,16 +8070,3574 @@ function chaikinSmooth(pts, closed, iterations) {
   return p;
 }
 
-// ── LineTracer Pro modal (embedded via iframe — see #ltModal) ──
-function openLineTracer() {
-  const modal = $('ltModal');
-  const frame = $('ltFrame');
-  if (!frame.src) frame.src = 'line-tracer.html';
-  modal.style.display = 'flex';
+// ════════════════════════════════════════════════════════════════════════
+// TRAVEL — rapid-move path optimisation
+// ════════════════════════════════════════════════════════════════════════
+// Shapes come out of the generator in raster order, so the tool flies all
+// the way back across the workpiece at the end of every row. Re-ordering
+// nearest-neighbour removes most of that. A uniform grid keeps the search
+// near-linear so it stays usable at tens of thousands of shapes.
+const TRAVEL = {
+  _cacheKey: null, _cache: null,
+
+  order(shapes) {
+    if (!shapes || shapes.length < 3) {
+      return { shapes: shapes || [], beforeMm: 0, afterMm: 0, saved: 0 };
+    }
+    // Cheap cache key — avoids re-running for both updateStats() and buildGcode()
+    const key = shapes.length + ':' + shapes[0].x + ',' + shapes[0].y +
+                ':' + shapes[shapes.length-1].x + ',' + shapes[shapes.length-1].y;
+    if (this._cacheKey === key && this._cache) return this._cache;
+
+    const n = shapes.length;
+    const before = this._pathLen(shapes);
+
+    // Guard: nearest-neighbour on a huge set is not worth the wait
+    if (n > 60000) {
+      const r = { shapes, beforeMm: before, afterMm: before, saved: 0 };
+      this._cacheKey = key; this._cache = r; return r;
+    }
+
+    // ── Uniform grid bucketing ──
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const s of shapes) {
+      if (s.x < minX) minX = s.x; if (s.x > maxX) maxX = s.x;
+      if (s.y < minY) minY = s.y; if (s.y > maxY) maxY = s.y;
+    }
+    const w = Math.max(1e-6, maxX - minX), h = Math.max(1e-6, maxY - minY);
+    const cols = Math.max(1, Math.min(300, Math.round(Math.sqrt(n * w / h) / 1.4) || 1));
+    const rows = Math.max(1, Math.min(300, Math.round(n / cols) || 1));
+    const cw = w / cols, ch = h / rows;
+    const cellOf = s => {
+      const cx = Math.min(cols-1, Math.max(0, Math.floor((s.x - minX) / cw)));
+      const cy = Math.min(rows-1, Math.max(0, Math.floor((s.y - minY) / ch)));
+      return cy * cols + cx;
+    };
+    const buckets = new Map();
+    for (let i = 0; i < n; i++) {
+      const c = cellOf(shapes[i]);
+      let b = buckets.get(c); if (!b) { b = []; buckets.set(c, b); }
+      b.push(i);
+    }
+
+    const used = new Uint8Array(n);
+    const out = [];
+    let cur = 0;                       // start from the first shape
+    used[0] = 1; out.push(shapes[0]);
+
+    for (let step = 1; step < n; step++) {
+      const p = shapes[cur];
+      const pcx = Math.min(cols-1, Math.max(0, Math.floor((p.x - minX) / cw)));
+      const pcy = Math.min(rows-1, Math.max(0, Math.floor((p.y - minY) / ch)));
+      let best = -1, bestD = Infinity;
+
+      // Expand rings outward until we find a candidate, then one extra ring
+      // (a closer point can live in the next ring when we hit a corner)
+      for (let ring = 0; ring < Math.max(cols, rows); ring++) {
+        const x0 = pcx - ring, x1 = pcx + ring, y0 = pcy - ring, y1 = pcy + ring;
+        for (let cy = y0; cy <= y1; cy++) {
+          if (cy < 0 || cy >= rows) continue;
+          for (let cx = x0; cx <= x1; cx++) {
+            if (cx < 0 || cx >= cols) continue;
+            // only the ring perimeter (interior was scanned already)
+            if (ring > 0 && cx !== x0 && cx !== x1 && cy !== y0 && cy !== y1) continue;
+            const b = buckets.get(cy * cols + cx);
+            if (!b) continue;
+            for (const idx of b) {
+              if (used[idx]) continue;
+              const dx = shapes[idx].x - p.x, dy = shapes[idx].y - p.y;
+              const d = dx*dx + dy*dy;
+              if (d < bestD) { bestD = d; best = idx; }
+            }
+          }
+        }
+        if (best >= 0 && ring >= 1) break;      // found + one safety ring
+      }
+      if (best < 0) {                            // fallback: linear scan
+        for (let i = 0; i < n; i++) {
+          if (used[i]) continue;
+          const dx = shapes[i].x - p.x, dy = shapes[i].y - p.y;
+          const d = dx*dx + dy*dy;
+          if (d < bestD) { bestD = d; best = i; }
+        }
+      }
+      if (best < 0) break;
+      used[best] = 1; out.push(shapes[best]); cur = best;
+    }
+
+    const after = this._pathLen(out);
+    const saved = before > 0 ? Math.max(0, (1 - after / before) * 100) : 0;
+    // Only adopt the new order if it actually helps
+    const result = after < before
+      ? { shapes: out, beforeMm: before, afterMm: after, saved }
+      : { shapes, beforeMm: before, afterMm: before, saved: 0 };
+    this._cacheKey = key; this._cache = result;
+    return result;
+  },
+
+  _pathLen(arr) {
+    let L = 0;
+    for (let i = 1; i < arr.length; i++) {
+      const dx = arr[i].x - arr[i-1].x, dy = arr[i].y - arr[i-1].y;
+      L += Math.sqrt(dx*dx + dy*dy);
+    }
+    return L;
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+// PRESETS — machine × material starting parameters
+// ════════════════════════════════════════════════════════════════════════
+// IMPORTANT: these are conservative STARTING POINTS gathered from common
+// hobby-machine practice, not guaranteed-safe values. Bit geometry, machine
+// rigidity and material batch all change the right answer, which is why the
+// UI always tells the user to trial-cut on scrap first.
+const PRESET_MACHINES = {
+  router_generic: { label: 'CNC Router ทั่วไป', kind: 'mill',  maxFeed: 3000, maxRPM: 24000 },
+  cnc3018:        { label: 'CNC 3018 / 1610',   kind: 'mill',  maxFeed: 600,  maxRPM: 10000 },
+  router_1500w:   { label: 'Router สปินเดิล 1.5kW', kind: 'mill', maxFeed: 4000, maxRPM: 24000 },
+  laser_diode5:   { label: 'เลเซอร์ไดโอด 5W',   kind: 'laser', maxFeed: 6000,  maxRPM: 1000 },
+  laser_diode20:  { label: 'เลเซอร์ไดโอด 20W',  kind: 'laser', maxFeed: 12000, maxRPM: 1000 },
+  laser_co2_40:   { label: 'เลเซอร์ CO2 40W',   kind: 'laser', maxFeed: 18000, maxRPM: 1000 }
+};
+
+const PRESET_MATERIALS = {
+  plywood:  { label: 'ไม้อัด',        thick: [3,6,9,12,15,18],
+              mill:  { feed: 1200, plunge: 300, rpm: 16000, stepdown: 1.5, tool: 3.175 },
+              laser: { feed: 300,  power: 100, passes: 2 } },
+  mdf:      { label: 'MDF',           thick: [3,6,9,12,18],
+              mill:  { feed: 1500, plunge: 350, rpm: 18000, stepdown: 2.0, tool: 3.175 },
+              laser: { feed: 250,  power: 100, passes: 2 } },
+  hardwood: { label: 'ไม้จริง (แข็ง)', thick: [6,9,12,18,25],
+              mill:  { feed: 800,  plunge: 200, rpm: 18000, stepdown: 1.0, tool: 3.175 },
+              laser: { feed: 180,  power: 100, passes: 3 } },
+  acrylic:  { label: 'อะคริลิก',      thick: [2,3,5,8,10],
+              mill:  { feed: 900,  plunge: 250, rpm: 14000, stepdown: 1.2, tool: 3.175 },
+              laser: { feed: 220,  power: 90,  passes: 1 } },
+  aluminium:{ label: 'อะลูมิเนียม',   thick: [1,2,3,5,6],
+              mill:  { feed: 400,  plunge: 80,  rpm: 12000, stepdown: 0.3, tool: 3.175 },
+              laser: { feed: 0,    power: 0,   passes: 0, note: 'ไดโอด/CO2 ตัดอะลูมิเนียมไม่ได้' } },
+  leather:  { label: 'หนัง',          thick: [1,2,3,4],
+              mill:  { feed: 1000, plunge: 300, rpm: 10000, stepdown: 1.0, tool: 3.175 },
+              laser: { feed: 400,  power: 45,  passes: 1 } },
+  paper:    { label: 'กระดาษ/การ์ด',  thick: [1,2,3],
+              mill:  { feed: 1200, plunge: 400, rpm: 10000, stepdown: 1.0, tool: 1.0 },
+              laser: { feed: 600,  power: 30,  passes: 1 } },
+  foam:     { label: 'โฟม/EVA',       thick: [3,5,10,20],
+              mill:  { feed: 2000, plunge: 600, rpm: 10000, stepdown: 4.0, tool: 3.175 },
+              laser: { feed: 500,  power: 40,  passes: 1 } }
+};
+
+const PRESETS = {
+  CUSTOM_KEY: 'cncpat.presets.custom.v1',
+
+  init() {
+    const mSel = $('presetMachine'), matSel = $('presetMaterial');
+    if (!mSel || !matSel) return;
+    mSel.innerHTML = Object.entries(PRESET_MACHINES)
+      .map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+    matSel.innerHTML = Object.entries(PRESET_MATERIALS)
+      .map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+    this._refreshCustom();
+    this._refreshThickness();
+    matSel.addEventListener('change', () => { this._refreshThickness(); this._preview(); });
+    mSel.addEventListener('change', () => this._preview());
+    $('presetThick').addEventListener('change', () => this._preview());
+    $('btnApplyPreset').addEventListener('click', () => this.apply());
+    $('btnSavePreset').addEventListener('click', () => this.saveCustom());
+    this._preview();
+  },
+
+  _refreshThickness() {
+    const mat = PRESET_MATERIALS[$('presetMaterial').value];
+    if (!mat) return;
+    $('presetThick').innerHTML = mat.thick.map(t => `<option value="${t}">${t} mm</option>`).join('');
+  },
+
+  _refreshCustom() {
+    let custom = {};
+    try { custom = JSON.parse(localStorage.getItem(this.CUSTOM_KEY) || '{}'); } catch (e) {}
+    const sel = $('presetMachine');
+    // Remove any previously injected custom entries, then re-add
+    [...sel.querySelectorAll('option[data-custom]')].forEach(o => o.remove());
+    for (const name of Object.keys(custom)) {
+      const o = document.createElement('option');
+      o.value = 'custom:' + name; o.textContent = '★ ' + name;
+      o.dataset.custom = '1';
+      sel.appendChild(o);
+    }
+  },
+
+  _resolve() {
+    const mKey = $('presetMachine').value;
+    if (mKey.startsWith('custom:')) {
+      let custom = {};
+      try { custom = JSON.parse(localStorage.getItem(this.CUSTOM_KEY) || '{}'); } catch (e) {}
+      const c = custom[mKey.slice(7)];
+      return c ? { custom: true, vals: c } : null;
+    }
+    const machine = PRESET_MACHINES[mKey];
+    const mat     = PRESET_MATERIALS[$('presetMaterial').value];
+    const thick   = parseFloat($('presetThick').value) || 3;
+    if (!machine || !mat) return null;
+
+    const isLaser = machine.kind === 'laser';
+    const rec     = isLaser ? mat.laser : mat.mill;
+    if (isLaser && rec.feed === 0) {
+      return { blocked: rec.note || 'เครื่องนี้ตัดวัสดุนี้ไม่ได้' };
+    }
+
+    const feed   = Math.min(rec.feed, machine.maxFeed);
+    const plunge = isLaser ? feed : Math.min(rec.plunge, Math.round(machine.maxFeed / 3));
+    const rpm    = isLaser ? 1000 : Math.min(rec.rpm, machine.maxRPM);
+    const depth  = thick;
+    const passes = isLaser ? rec.passes : Math.max(1, Math.ceil(thick / rec.stepdown));
+
+    return {
+      machine, mat, thick, isLaser,
+      vals: {
+        toolDia: isLaser ? 0.2 : rec.tool,
+        cutDepth: depth,
+        feedRate: feed,
+        plungeRate: plunge,
+        safeZ: 5,
+        rpm: rpm
+      },
+      passes,
+      capped: feed < rec.feed
+    };
+  },
+
+  _preview() {
+    const r = this._resolve();
+    const note = $('presetNote');
+    if (!r) { note.textContent = '—'; return; }
+    if (r.blocked) {
+      note.innerHTML = `<span class="preset-warn">⚠ ${r.blocked}</span>`;
+      return;
+    }
+    if (r.custom) {
+      note.innerHTML = `<b>พรีเซ็ตของฉัน</b> — feed ${r.vals.feedRate} · depth ${r.vals.cutDepth}mm · ${r.vals.rpm} RPM`;
+      return;
+    }
+    const v = r.vals;
+    note.innerHTML =
+      `<b>${r.isLaser ? 'เลเซอร์' : 'กัด'}</b> · feed ${v.feedRate} mm/min · ` +
+      `ลึก ${v.cutDepth} mm ใน ${r.passes} รอบ` +
+      (r.isLaser ? '' : ` · ดอก Ø${v.toolDia} mm · ${v.rpm} RPM`) +
+      (r.capped ? ` <span class="preset-warn">(ลดตามลิมิตเครื่อง)</span>` : '') +
+      `<br><span class="preset-warn">ค่าเริ่มต้นเท่านั้น — ทดลองกับเศษวัสดุก่อนใช้งานจริงเสมอ</span>`;
+  },
+
+  apply() {
+    const r = this._resolve();
+    if (!r) return;
+    if (r.blocked) { status2('⚠️ ' + r.blocked); return; }
+    for (const [id, val] of Object.entries(r.vals)) {
+      const el = $(id);
+      if (el) { el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); }
+    }
+    HISTORY.push();
+    PROJECT.markDirty();
+    updateStats();
+    status2('✅ ใช้พรีเซ็ตแล้ว — อย่าลืมทดลองกับเศษวัสดุก่อน');
+  },
+
+  saveCustom() {
+    const name = ($('presetSaveName').value || '').trim();
+    if (!name) { status2('⚠️ ใส่ชื่อพรีเซ็ตก่อน'); return; }
+    let custom = {};
+    try { custom = JSON.parse(localStorage.getItem(this.CUSTOM_KEY) || '{}'); } catch (e) {}
+    custom[name] = {
+      toolDia:    parseFloat($('toolDia').value)    || 3.175,
+      cutDepth:   parseFloat($('cutDepth').value)   || 1,
+      feedRate:   parseFloat($('feedRate').value)   || 800,
+      plungeRate: parseFloat($('plungeRate').value) || 200,
+      safeZ:      parseFloat($('safeZ').value)      || 5,
+      rpm:        parseFloat($('rpm').value)        || 12000
+    };
+    try {
+      localStorage.setItem(this.CUSTOM_KEY, JSON.stringify(custom));
+      this._refreshCustom();
+      $('presetSaveName').value = '';
+      status2(`✅ บันทึกพรีเซ็ต "${name}" แล้ว`);
+    } catch (e) { status2('❌ บันทึกไม่สำเร็จ: ' + e.message); }
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+// COST — job cost estimate
+// ════════════════════════════════════════════════════════════════════════
+const COST = {
+  update(timeSec, wWmm, wHmm) {
+    const elBreak = $('costBreakdown'), elStat = $('stCost');
+    if (!elBreak || !elStat) return;
+    const areaM2   = (wWmm / 1000) * (wHmm / 1000);
+    const matRate  = parseFloat($('costMaterial').value) || 0;
+    const powRate  = parseFloat($('costPower').value)    || 0;
+    const labRate  = parseFloat($('costLabour').value)   || 0;
+    const marginPc = parseFloat($('costMargin').value)   || 0;
+
+    const hours    = timeSec / 3600;
+    const matCost  = areaM2 * matRate;
+    const powCost  = hours * powRate;
+    const labCost  = hours * labRate;
+    const subtotal = matCost + powCost + labCost;
+    const total    = subtotal * (1 + marginPc / 100);
+
+    const b = v => v.toLocaleString('th-TH', { maximumFractionDigits: 2 });
+    elStat.textContent = '฿' + b(total);
+    elBreak.innerHTML =
+      `<b>วัสดุ</b> ${b(matCost)} (${areaM2.toFixed(3)} ตร.ม.) · ` +
+      `<b>ไฟ</b> ${b(powCost)} · <b>แรง</b> ${b(labCost)}<br>` +
+      `รวมทุน <b>฿${b(subtotal)}</b> → ราคาขาย <b>฿${b(total)}</b> (บวก ${marginPc}%)`;
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+// GCHECK — pre-export G-code safety validation
+// ════════════════════════════════════════════════════════════════════════
+// A program that drives a machine should never hand the user a file it has
+// not sanity-checked. These are cheap checks that catch the mistakes that
+// actually break bits and workpieces.
+const GCHECK = {
+  run() {
+    const out = [];
+    const add = (level, msg, detail) => out.push({ level, msg, detail });
+
+    const wW = workWmm(), wH = workHmm();
+    const toolDia = parseFloat($('toolDia').value)    || 0;
+    const depth   = parseFloat($('cutDepth').value)   || 0;
+    const feed    = parseFloat($('feedRate').value)   || 0;
+    const plunge  = parseFloat($('plungeRate').value) || 0;
+    const safeZ   = parseFloat($('safeZ').value);
+    const rpm     = parseFloat($('rpm').value)        || 0;
+
+    // ── 1. Geometry inside the work area ──
+    if (S.shapes.length) {
+      const W = pCanvas.width, H = pCanvas.height, sc = wW / W;
+      // The cut edge sits one tool RADIUS outside the nominal outline, so that
+      // is what has to fit inside the work area — not the outline itself.
+      const tr = toolDia / 2;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const s of S.shapes) {
+        const x = s.x * sc, y = (H - s.y) * sc, r = s.r * sc + tr;
+        if (x - r < minX) minX = x - r; if (x + r > maxX) maxX = x + r;
+        if (y - r < minY) minY = y - r; if (y + r > maxY) maxY = y + r;
+      }
+      const tol = 0.01;
+      if (minX < -tol || minY < -tol || maxX > wW + tol || maxY > wH + tol) {
+        add('error', 'เส้นทางออกนอกพื้นที่ทำงาน',
+            `ขอบเขตลาย ${minX.toFixed(1)}…${maxX.toFixed(1)} × ${minY.toFixed(1)}…${maxY.toFixed(1)} mm ` +
+            `เทียบกับพื้นที่ 0…${wW.toFixed(1)} × 0…${wH.toFixed(1)} mm`);
+      } else {
+        add('ok', 'เส้นทางอยู่ในพื้นที่ทำงานทั้งหมด',
+            `${maxX.toFixed(1)} × ${maxY.toFixed(1)} mm ภายใน ${wW.toFixed(1)} × ${wH.toFixed(1)} mm`);
+      }
+
+      // ── 2. Tool fits the smallest feature ──
+      let minR = Infinity;
+      for (const s of S.shapes) minR = Math.min(minR, s.r * sc);
+      if (toolDia > 0 && minR * 2 < toolDia) {
+        add('warn', 'ดอกกัดใหญ่กว่ารูปที่เล็กที่สุด',
+            `รูปเล็กสุด Ø${(minR*2).toFixed(2)} mm แต่ดอก Ø${toolDia} mm — รูปเล็กจะเพี้ยนหรือหายไป`);
+      }
+    } else {
+      add('warn', 'ยังไม่มี pattern', 'กด Regenerate ก่อนตรวจสอบ');
+    }
+
+    // ── 3. Spindle / laser power ──
+    if (rpm <= 0) add('error', 'ยังไม่ได้ตั้งความเร็วสปินเดิล (RPM = 0)', 'M3 S0 = สปินเดิลไม่หมุน แต่เครื่องจะเดินกัด');
+    else add('ok', `สปินเดิล ${rpm.toLocaleString()} RPM`);
+
+    // ── 4. Feeds ──
+    if (feed <= 0) add('error', 'Feed rate เป็น 0', 'เครื่องจะค้างหรือ error ทันทีที่เริ่มกัด');
+    if (plunge <= 0) add('error', 'Plunge rate เป็น 0', 'ดอกจะกดลงโดยไม่มีอัตราป้อน');
+    if (plunge > feed && feed > 0) {
+      add('warn', 'Plunge เร็วกว่า Feed แนวราบ',
+          `Z ${plunge} > XY ${feed} mm/min — การกดลงเร็วกว่าการกัดข้างเป็นสาเหตุหลักที่ดอกหัก`);
+    }
+    if (feed > 0 && plunge > 0 && plunge <= feed) {
+      add('ok', `Feed XY ${feed} / Z ${plunge} mm/min`);
+    }
+
+    // ── 5. Z safety ──
+    if (isNaN(safeZ)) add('error', 'ไม่ได้ตั้ง Safe Z');
+    else if (safeZ <= 0) add('error', `Safe Z = ${safeZ} mm (ต่ำกว่าหรือเท่าผิวชิ้นงาน)`,
+                              'หัวจะลากผ่านชิ้นงานตอนเคลื่อนที่เร็ว');
+    else if (safeZ < 2) add('warn', `Safe Z ต่ำ (${safeZ} mm)`, 'ถ้าชิ้นงานโก่งหรือมีคลิปจับ หัวอาจชน');
+    else add('ok', `Safe Z ${safeZ} mm`);
+
+    // ── 6. Depth of cut ──
+    if (depth <= 0) add('warn', `ความลึกตัด ${depth} mm`, 'จะไม่มีการกัดเนื้อวัสดุจริง');
+    else if (toolDia > 0 && depth > toolDia * 1.5) {
+      add('warn', 'กัดลึกเกินขนาดดอกในรอบเดียว',
+          `ลึก ${depth} mm ด้วยดอก Ø${toolDia} mm — ควรแบ่งเป็นหลายรอบ (ไม่เกิน ~${(toolDia).toFixed(1)} mm ต่อรอบ)`);
+    } else if (depth > 0) add('ok', `ความลึกตัด ${depth} mm`);
+
+    // ── 7. Program size ──
+    if (S.shapes.length > 20000) {
+      add('warn', `จำนวนรูปสูงมาก (${S.shapes.length.toLocaleString()})`,
+          'คอนโทรลเลอร์บางรุ่นบัฟเฟอร์ไม่พอ ควรลองแบ่งงานหรือเพิ่มระยะห่าง');
+    }
+
+    return out;
+  },
+
+  render(list, container) {
+    const icons = { ok: 'i-shield', warn: 'i-alert', error: 'i-alert' };
+    container.innerHTML = list.map(c =>
+      `<div class="chk-item chk-${c.level}">
+         <svg class="ic"><use href="#${icons[c.level]}"/></svg>
+         <div><span>${c.msg}</span>${c.detail ? `<small>${c.detail}</small>` : ''}</div>
+       </div>`).join('');
+  },
+
+  summary(list) {
+    const e = list.filter(c => c.level === 'error').length;
+    const w = list.filter(c => c.level === 'warn').length;
+    if (e) return { level: 'error', text: `❌ พบปัญหาร้ายแรง ${e} ข้อ` + (w ? `, คำเตือน ${w} ข้อ` : '') };
+    if (w) return { level: 'warn',  text: `⚠️ คำเตือน ${w} ข้อ — ตรวจก่อนรันจริง` };
+    return { level: 'ok', text: '✅ ผ่านการตรวจสอบทั้งหมด' };
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+// TILING — split a design larger than the machine bed into tiles
+// ════════════════════════════════════════════════════════════════════════
+const TILING = {
+  plan() {
+    const wW = workWmm(), wH = workHmm();
+    const mW = parseFloat($('tileMachW').value) || 300;
+    const mH = parseFloat($('tileMachH').value) || 200;
+    const ov = Math.max(0, parseFloat($('tileOverlap').value) || 0);
+    const stepX = Math.max(1, mW - ov), stepY = Math.max(1, mH - ov);
+    const cols = Math.max(1, Math.ceil((wW - ov) / stepX));
+    const rows = Math.max(1, Math.ceil((wH - ov) / stepY));
+    return { wW, wH, mW, mH, ov, stepX, stepY, cols, rows, total: cols * rows };
+  },
+
+  updateInfo() {
+    const el = $('tileInfo'); if (!el) return;
+    const p = this.plan();
+    if (p.total <= 1) {
+      el.innerHTML = `<b>ไม่ต้องแบ่ง</b> — งาน ${p.wW.toFixed(0)}×${p.wH.toFixed(0)} mm พอดีกับเครื่อง ${p.mW}×${p.mH} mm`;
+    } else {
+      el.innerHTML = `แบ่งเป็น <b>${p.cols} × ${p.rows} = ${p.total} แผ่น</b> ` +
+                     `(งาน ${p.wW.toFixed(0)}×${p.wH.toFixed(0)} mm · เครื่อง ${p.mW}×${p.mH} mm · ซ้อน ${p.ov} mm)`;
+    }
+  },
+
+  async exportAll() {
+    if (!S.shapes.length) { status2('⚠️ สร้าง pattern ก่อน'); return; }
+    const p = this.plan();
+    if (p.total > 60) { status2(`❌ ${p.total} แผ่นเยอะเกินไป — เพิ่มขนาดเครื่องหรือลดขนาดงาน`); return; }
+
+    const W = pCanvas.width, H = pCanvas.height, sc = p.wW / W;
+    const withMarks = $('tileRegMark').value === '1';
+    const allShapes = S.shapes;
+    const ext = machineExt();
+    let made = 0;
+
+    // Ask once for a destination folder rather than firing a save dialog per
+    // tile. Falls back to individual downloads when the API isn't available.
+    const dir = await FILESAVE.pickDirectory();
+    if (dir === 'cancelled') { status2('ยกเลิกการส่งออก'); return; }
+    status2(`⏳ กำลังส่งออก ${p.total} แผ่น…`);
+
+    for (let ry = 0; ry < p.rows; ry++) {
+      for (let cx = 0; cx < p.cols; cx++) {
+        const ox = cx * p.stepX, oy = ry * p.stepY;   // tile origin in mm
+
+        // Ownership uses the STEP region, not the full bed. The bed overlap
+        // exists so the tiles can be physically aligned — if we assigned by
+        // bed bounds instead, every shape in the overlap strip would be cut
+        // twice, which wrecks the edge and wears the bit for nothing.
+        const ax = ox, ay = oy;
+        const bx = (cx === p.cols - 1) ? Infinity : ox + p.stepX;
+        const by = (ry === p.rows - 1) ? Infinity : oy + p.stepY;
+
+        const subset = allShapes.filter(s => {
+          const mx = s.x * sc, my = (H - s.y) * sc;
+          return mx >= ax && mx < bx && my >= ay && my < by;
+        });
+        if (!subset.length) continue;
+
+        // Reuse buildGcode by swapping the shape list and shifting to tile-local 0,0
+        const saved = S.shapes;
+        S.shapes = subset;
+        TRAVEL._cacheKey = null;                       // subset changes the ordering
+        let g;
+        try { g = buildGcode(-ox, -oy); }
+        finally { S.shapes = saved; TRAVEL._cacheKey = null; }
+        if (!g) continue;
+
+        if (withMarks) g = this._addMarks(g, p);
+        const name = `tile_r${ry+1}c${cx+1}${ext}`;
+        if (dir) {
+          await FILESAVE.writeInto(dir, name, g, 'text/plain');
+        } else {
+          download(name, g, 'text/plain');
+          await new Promise(r => setTimeout(r, 350));  // browsers throttle bursts of downloads
+        }
+        made++;
+      }
+    }
+    TRAVEL._cacheKey = null;
+    buildGcode();                                       // restore full-job G-code in S.lastGcode
+    status2(made
+      ? `✅ ส่งออก ${made} แผ่นแล้ว${dir ? ' ไปที่โฟลเดอร์ ' + (dir.name || '') : ''}`
+      : '⚠️ ไม่มีรูปในแผ่นใดเลย');
+  },
+
+  // Registration marks: two shallow dimples at fixed tile-local coordinates so
+  // consecutive tiles can be aligned by eye or by probing.
+  _addMarks(g, p) {
+    const d  = 3;                                       // mark diameter, mm
+    const mz = -0.5;                                    // shallow
+    const safeZ = parseFloat($('safeZ').value) || 5;
+    const feed  = parseFloat($('feedRate').value) || 800;
+    const inset = Math.max(2, p.ov / 2);
+    const pts = [[inset, inset], [p.mW - inset, p.mH - inset]];
+    let m = '\n; ── Registration marks (align tiles on these) ──\n';
+    for (const [x, y] of pts) {
+      m += `G0 Z${safeZ}\nG0 X${(x + d/2).toFixed(3)} Y${y.toFixed(3)}\n`;
+      m += `G1 Z${mz} F${Math.round(feed/3)}\n`;
+      m += `G2 X${(x + d/2).toFixed(3)} Y${y.toFixed(3)} I${(-d/2).toFixed(3)} J0 F${feed}\n`;
+      m += `G0 Z${safeZ}\n`;
+    }
+    // insert before the end-of-job block
+    const marker = '\n; ── End of job ──';
+    const i = g.indexOf(marker);
+    return i > 0 ? g.slice(0, i) + m + g.slice(i) : g + m;
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+// PROJECT — autosave to localStorage + save/load .cncproj files
+// ════════════════════════════════════════════════════════════════════════
+const PROJECT = {
+  KEY: 'cncpat.autosave.v2',
+  MAX_LS_BYTES: 4_000_000,
+  restoring: false,
+  _saveTimer: null,
+
+  // Toggle buttons carry their state in a CSS class, not a form value
+  TOGGLES: {
+    togInvert: 'invert', togFill: 'fill', togDarkBg: 'darkBg',
+    togQuantRandom: 'quantRandom', togMixLayer: 'mixEnabled'
+  },
+
+  collect(withImages = true) {
+    const ctrls = {};
+    document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+      if (el.type === 'file') return;
+      ctrls[el.id] = (el.type === 'checkbox') ? el.checked : el.value;
+    });
+    const toggles = {};
+    for (const id of Object.keys(this.TOGGLES)) {
+      const el = $(id); if (el) toggles[id] = el.classList.contains('on');
+    }
+    const panels = {};
+    document.querySelectorAll('.collap-panel[id]').forEach(p => { panels[p.id] = p.classList.contains('closed'); });
+
+    const st = {
+      v: 2, savedAt: new Date().toISOString(),
+      ctrls, toggles, panels,
+      pattern: S.pattern, mixPat: S.mixPat,
+      shapeMode: IMGSHAPE.mode, traceMode: IMGSHAPE.traceMode,
+      profToolType, acToolTypeVal
+    };
+    if (withImages) {
+      st.image      = (S.image && S.image.src)      ? S.image.src      : null;
+      st.shapeImage = (IMGSHAPE.img && IMGSHAPE.img.src) ? IMGSHAPE.img.src : null;
+    }
+    return st;
+  },
+
+  apply(st) {
+    if (!st || !st.ctrls) return false;
+    this.restoring = true;
+    try {
+      for (const [id, val] of Object.entries(st.ctrls)) {
+        const el = $(id); if (!el || el.type === 'file') continue;
+        if (el.type === 'checkbox') el.checked = !!val; else el.value = val;
+      }
+      // Fire events once per control so every existing handler syncs S
+      for (const id of Object.keys(st.ctrls)) {
+        const el = $(id); if (!el || el.type === 'file') continue;
+        el.dispatchEvent(new Event('input',  { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      for (const [id, on] of Object.entries(st.toggles || {})) {
+        const el = $(id), key = this.TOGGLES[id];
+        if (!el || !key) continue;
+        if (!!S[key] !== !!on) el.click();          // click keeps side-effects consistent
+      }
+      for (const [id, closed] of Object.entries(st.panels || {})) {
+        const el = $(id); if (el) el.classList.toggle('closed', !!closed);
+      }
+      if (st.pattern) {
+        const b = document.querySelector(`#patternGrid [data-pat="${st.pattern}"]`);
+        if (b) b.click();
+      }
+      if (st.mixPat) {
+        const b = document.querySelector(`#mixPatGrid [data-mixpat="${st.mixPat}"]`);
+        if (b) b.click();
+      }
+      if (st.shapeMode) setShapeMode(st.shapeMode);
+      if (st.traceMode) setShapeTraceMode(st.traceMode);
+      if (st.image)      this._restoreImage(st.image, false);
+      if (st.shapeImage) this._restoreImage(st.shapeImage, true);
+    } catch (e) {
+      console.error('Project restore failed:', e);
+      return false;
+    } finally {
+      this.restoring = false;
+    }
+    scheduleRender(50);
+    return true;
+  },
+
+  _restoreImage(dataUrl, isShape) {
+    const img = new Image();
+    img.onload = () => {
+      if (isShape) {
+        IMGSHAPE.img = img; IMGSHAPE.dirty = true;
+        $('shapeThumb').src = img.src;
+        $('shapeThumbWrap').style.display = 'block';
+        $('shapeUploadArea').style.display = 'none';
+        _buildShapeCanvas();
+      } else {
+        _applyLoadedImage(img);
+      }
+      scheduleRender(50);
+    };
+    img.src = dataUrl;
+  },
+
+  markDirty() {
+    if (this.restoring) return;
+    const ind = $('autosaveInd');
+    if (ind) { ind.textContent = 'กำลังบันทึก…'; ind.className = 'autosave-ind saving'; }
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this.autosave(), 700);
+  },
+
+  autosave() {
+    const ind = $('autosaveInd');
+    try {
+      let st = this.collect(true);
+      let json = JSON.stringify(st);
+      if (json.length > this.MAX_LS_BYTES) {   // images too big — keep the settings at least
+        st = this.collect(false);
+        st.imagesSkipped = true;
+        json = JSON.stringify(st);
+      }
+      localStorage.setItem(this.KEY, json);
+      if (ind) {
+        ind.textContent = st.imagesSkipped ? 'บันทึกแล้ว (ไม่รวมรูป)' : 'บันทึกแล้ว';
+        ind.className = 'autosave-ind saved';
+      }
+    } catch (e) {
+      if (ind) { ind.textContent = 'บันทึกไม่ได้'; ind.className = 'autosave-ind'; }
+      console.warn('Autosave failed:', e);
+    }
+  },
+
+  restore() {
+    let raw;
+    try { raw = localStorage.getItem(this.KEY); } catch (e) { return false; }
+    if (!raw) return false;
+    try {
+      const st = JSON.parse(raw);
+      const ok = this.apply(st);
+      if (ok) {
+        const when = st.savedAt ? new Date(st.savedAt).toLocaleString('th-TH') : '';
+        status2(`↩ กู้คืนงานล่าสุดแล้ว${when ? ' (' + when + ')' : ''}`);
+      }
+      return ok;
+    } catch (e) { console.warn('Restore failed:', e); return false; }
+  },
+
+  saveFile() {
+    const st = this.collect(true);
+    const name = 'cnc-project-' + new Date().toISOString().slice(0, 10) + '.cncproj';
+    // download() reports the final result itself (saved / cancelled / failed)
+    return download(name, JSON.stringify(st, null, 1), 'application/json');
+  },
+
+  loadFile(file) {
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        const st = JSON.parse(e.target.result);
+        if (this.apply(st)) { HISTORY.reset(); this.autosave(); status2('✅ เปิดโปรเจกต์แล้ว'); }
+        else status2('❌ ไฟล์โปรเจกต์ไม่ถูกต้อง');
+      } catch (err) { status2('❌ อ่านไฟล์ไม่ได้: ' + err.message); }
+    };
+    r.readAsText(file);
+  },
+
+  clear() {
+    try { localStorage.removeItem(this.KEY); } catch (e) {}
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+// HISTORY — undo / redo
+// ════════════════════════════════════════════════════════════════════════
+// Snapshots exclude images: they rarely change, and keeping base64 blobs in
+// 50 stack entries would blow through memory for no benefit.
+const HISTORY = {
+  stack: [], idx: -1, MAX: 60, _timer: null,
+
+  reset() {
+    this.stack = [JSON.stringify(PROJECT.collect(false))];
+    this.idx = 0;
+    this._sync();
+  },
+
+  schedule() {
+    if (PROJECT.restoring) return;
+    clearTimeout(this._timer);
+    this._timer = setTimeout(() => this.push(), 450);
+  },
+
+  push() {
+    if (PROJECT.restoring) return;
+    const snap = JSON.stringify(PROJECT.collect(false));
+    if (this.stack[this.idx] === snap) return;      // nothing actually changed
+    this.stack = this.stack.slice(0, this.idx + 1);
+    this.stack.push(snap);
+    if (this.stack.length > this.MAX) this.stack.shift();
+    this.idx = this.stack.length - 1;
+    this._sync();
+  },
+
+  undo() { this._go(-1); },
+  redo() { this._go(1); },
+
+  _go(dir) {
+    const next = this.idx + dir;
+    if (next < 0 || next >= this.stack.length) return;
+    this.idx = next;
+    clearTimeout(this._timer);
+    PROJECT.apply(JSON.parse(this.stack[this.idx]));
+    this._sync();
+    status2(dir < 0 ? '↩ ย้อนกลับ' : '↪ ทำซ้ำ');
+    PROJECT.markDirty();
+  },
+
+  _sync() {
+    const u = $('btnUndo'), r = $('btnRedo');
+    if (u) u.disabled = this.idx <= 0;
+    if (r) r.disabled = this.idx >= this.stack.length - 1;
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+// Wiring for everything above
+// ════════════════════════════════════════════════════════════════════════
+(function initProFeatures() {
+  const boot = () => {
+    // ── Presets ──
+    try { PRESETS.init(); } catch (e) { console.warn('Presets init failed', e); }
+
+    // ── Cost inputs ──
+    ['costMaterial','costPower','costLabour','costMargin'].forEach(id => {
+      const el = $(id); if (el) el.addEventListener('input', () => { if (S.shapes.length) updateStats(); });
+    });
+
+    // ── Tiling ──
+    ['tileMachW','tileMachH','tileOverlap'].forEach(id => {
+      const el = $(id); if (el) el.addEventListener('input', () => TILING.updateInfo());
+    });
+    ['workW','workH','units'].forEach(id => {
+      const el = $(id); if (el) el.addEventListener('input', () => TILING.updateInfo());
+    });
+    const bt = $('btnExportTiles');
+    if (bt) bt.addEventListener('click', () => TILING.exportAll());
+    TILING.updateInfo();
+
+    // ── Safety check ──
+    const runCheck = () => {
+      const list = GCHECK.run();
+      const wrap = $('gcodeCheckWrap');
+      GCHECK.render(list, $('gcodeCheckList'));
+      wrap.style.display = 'block';
+      const s = GCHECK.summary(list);
+      status2(s.text);
+      return s;
+    };
+    const bc = $('btnSafetyCheck');
+    if (bc) bc.addEventListener('click', () => {
+      if (!S.lastGcode) { try { buildGcode(); } catch (e) {} }
+      $('gcodeContent').textContent = S.lastGcode || '(ยังไม่มี G-code)';
+      $('gcodeStats').textContent = `${S.shapes.length.toLocaleString()} shapes`;
+      runCheck();
+      $('gcodeModal').classList.add('show');
+    });
+    // Also run automatically whenever the preview modal opens
+    const bp = $('btnPreview');
+    if (bp) bp.addEventListener('click', () => setTimeout(runCheck, 0));
+    // …and warn before downloading a program with hard errors
+    const bg = $('btnGcode');
+    if (bg) bg.addEventListener('click', e => {
+      const list = GCHECK.run();
+      const s = GCHECK.summary(list);
+      if (s.level === 'error') {
+        GCHECK.render(list, $('gcodeCheckList'));
+        $('gcodeCheckWrap').style.display = 'block';
+        status2(s.text + ' — เปิด "ตรวจสอบ" เพื่อดูรายละเอียด');
+      }
+    }, true);
+
+    // ── Sidebar toggle (small screens) ──
+    const sbBtn = $('btnSidebarToggle');
+    if (sbBtn) sbBtn.addEventListener('click', () => {
+      const sb = document.querySelector('.sidebar');
+      if (sb) { sb.classList.toggle('hidden'); sbBtn.classList.toggle('active', !sb.classList.contains('hidden')); }
+    });
+
+    // ── Undo / redo ──
+    $('btnUndo').addEventListener('click', () => HISTORY.undo());
+    $('btnRedo').addEventListener('click', () => HISTORY.redo());
+    document.addEventListener('keydown', e => {
+      const t = e.target;
+      const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { if (typing && t.type === 'text') return; e.preventDefault(); HISTORY.undo(); }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); HISTORY.redo(); }
+      else if (k === 's') { e.preventDefault(); PROJECT.saveFile(); }
+      else if (k === 'o') { e.preventDefault(); $('projFileInput').click(); }
+    });
+
+    // ── Project save / load ──
+    $('btnSaveProj').addEventListener('click', () => PROJECT.saveFile());
+    $('btnLoadProj').addEventListener('click', () => $('projFileInput').click());
+    $('projFileInput').addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (f) PROJECT.loadFile(f);
+      e.target.value = '';
+    });
+
+    // ── Autosave + history triggers on every control ──
+    document.addEventListener('input',  e => {
+      if (e.target && e.target.id) { PROJECT.markDirty(); HISTORY.schedule(); }
+    }, true);
+    document.addEventListener('change', e => {
+      if (e.target && e.target.id) { PROJECT.markDirty(); HISTORY.schedule(); }
+    }, true);
+    document.addEventListener('click', e => {
+      if (e.target && e.target.closest && e.target.closest('.toggle, [data-pat], [data-mixpat], .tool-type-btn')) {
+        PROJECT.markDirty(); HISTORY.schedule();
+      }
+    }, true);
+
+    // ── Restore last session, then seed the history baseline ──
+    const restored = PROJECT.restore();
+    setTimeout(() => HISTORY.reset(), restored ? 700 : 0);
+    window.addEventListener('beforeunload', () => PROJECT.autosave());
+  };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+
+// ════════════════════════════════════════════════════════════════════════
+// LineTracer Pro modal (embedded via iframe — see #ltModal)
+// ════════════════════════════════════════════════════════════════════════
+// line-tracer.html is a separate file loaded by relative path. That works
+// locally but breaks on GitHub Pages when the file wasn't pushed, or when its
+// name differs only in letter case — Windows filesystems ignore case, GitHub
+// Pages does not. So probe first and, if nothing is there, explain exactly
+// what went wrong instead of dropping a 404 page inside the iframe.
+const LT_CANDIDATES = [
+  'line-tracer.html', 'Line-Tracer.html', 'LineTracer.html',
+  'linetracer.html', 'line_tracer.html', 'lineTracer.html'
+];
+
+async function _findLineTracer() {
+  // file:// can't be probed with fetch (opaque/blocked), so just use the
+  // canonical name — that path already works when opened locally.
+  if (location.protocol === 'file:') return { url: LT_CANDIDATES[0], probed: false };
+
+  const tried = [];
+  for (const name of LT_CANDIDATES) {
+    try {
+      const res = await fetch(name, { method: 'HEAD', cache: 'no-store' });
+      tried.push(`${name} → ${res.status}`);
+      if (res.ok) {
+        const type = res.headers.get('content-type') || '';
+        // A 200 that isn't HTML means we hit a catch-all/404 page
+        if (!type || /html|text/i.test(type)) return { url: name, probed: true, tried };
+      }
+    } catch (e) {
+      tried.push(`${name} → ${e.message}`);
+    }
+  }
+  return { url: null, probed: true, tried };
 }
+
+// The whole tool is inlined in <script type="text/html" id="ltSource">, so the
+// page is fully self-contained — nothing to push separately, nothing to 404.
+// The external-file path below is kept purely as a fallback for anyone who
+// strips the embedded copy out to slim the file down.
+let _ltBlobUrl = null;
+function _ltEmbeddedUrl() {
+  if (_ltBlobUrl) return _ltBlobUrl;
+  const el = document.getElementById('ltSource');
+  if (!el) return null;
+  // Undo the "</script" escaping applied when the copy was embedded
+  const src = (el.textContent || '').replace(/<\\\/script/g, '</script');
+  if (src.length < 5000 || !/<html|<!DOCTYPE/i.test(src)) return null;
+  _ltBlobUrl = URL.createObjectURL(new Blob([src], { type: 'text/html;charset=utf-8' }));
+  return _ltBlobUrl;
+}
+
+async function openLineTracer() {
+  const modal = $('ltModal'), frame = $('ltFrame'), err = $('ltError');
+  modal.style.display = 'flex';
+  if (frame.dataset.loaded === '1') return;      // already showing a working copy
+
+  err.style.display = 'none';
+  frame.style.display = '';
+
+  // 1) Embedded copy — the normal path
+  const embedded = _ltEmbeddedUrl();
+  if (embedded) {
+    frame.src = embedded;
+    frame.dataset.loaded = '1';
+    return;
+  }
+
+  // 2) External file next to this page
+  const found = await _findLineTracer();
+  if (found.url) {
+    frame.src = found.url;
+    frame.dataset.loaded = '1';
+    return;
+  }
+
+  frame.style.display = 'none';
+  err.style.display = 'block';
+  const base = location.href.replace(/[^/]*$/, '');
+  $('ltErrDetail').textContent =
+    'ค้นหาจาก: ' + base + '\n' + (found.tried || []).join('\n');
+}
+
 function closeLineTracer() {
   $('ltModal').style.display = 'none';
 }
+
+// Manual fallback: load the file straight off the user's disk. Works on any
+// host, including github.com's code view where relative fetches never resolve.
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = $('ltPickBtn'), input = $('ltPickInput');
+  if (!btn || !input) return;
+  btn.addEventListener('click', () => input.click());
+  input.addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      const blob = new Blob([ev.target.result], { type: 'text/html' });
+      const frame = $('ltFrame');
+      frame.src = URL.createObjectURL(blob);
+      frame.dataset.loaded = '1';
+      frame.style.display = '';
+      $('ltError').style.display = 'none';
+    };
+    r.readAsText(f);
+    e.target.value = '';
+  });
+});
+</script>
+
+<!-- ══ EMBEDDED COPY OF LineTracer Pro ══════════════════════════════════
+     The whole tool is inlined here so this file works as a single, fully
+     self-contained page. No second file to push, nothing to 404 on GitHub
+     Pages, and no case-sensitivity trap. Loaded into the iframe via a blob
+     URL. All "</script" inside are written as "<\/script" so the parser
+     cannot close this block early; openLineTracer() undoes that at runtime.
+     To update: replace the contents below with a fresh line-tracer.html,
+     applying the same escaping.
+══════════════════════════════════════════════════════════════════════════ -->
+<script type="text/html" id="ltSource">
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LineTracer Pro — คัดลอกลายเส้น + CNC</title>
+<style>
+  :root{
+    --paper:#E9EDF2; --panel:#FFFFFF; --ink:#1B2430; --ink-soft:#5C6B7C;
+    --line:#C9D2DC; --accent:#2B50E0; --accent-soft:#E4EAFD;
+    --radius:10px;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --sans:'Segoe UI',system-ui,-apple-system,'Noto Sans Thai',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--sans);background:var(--paper);color:var(--ink);display:flex;flex-direction:column;overflow:hidden}
+  header{flex:none;display:flex;align-items:baseline;gap:14px;padding:16px 26px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font-size:19px;font-weight:700}
+  header h1 span{color:var(--accent)}
+  header p{font-family:var(--mono);font-size:11px;color:var(--ink-soft);letter-spacing:.5px;text-transform:uppercase}
+
+  .layout{display:grid;grid-template-columns:300px 1fr;flex:1;min-height:0}
+  aside{background:var(--panel);border-right:1px solid var(--line);padding:18px 20px 30px;display:flex;flex-direction:column;gap:20px;overflow-y:auto;min-height:0}
+  .group{display:flex;flex-direction:column;gap:11px}
+  .group>label.title{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--line);padding-bottom:6px}
+
+  .modes,.presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .modes button,.presets button{padding:9px 4px;font-size:12.5px;font-family:var(--sans);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:7px;cursor:pointer;transition:.15s}
+  .modes button.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .modes button:not(.active):hover,.presets button:hover{border-color:var(--accent);color:var(--accent)}
+
+  .ctl{display:flex;flex-direction:column;gap:6px}
+  .ctl .row{display:flex;justify-content:space-between;align-items:center}
+  .ctl label{font-size:13px}
+  .ctl output{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600}
+  input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:linear-gradient(to right,var(--accent) var(--fill,50%),var(--line) var(--fill,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid var(--accent);cursor:pointer}
+  input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent-soft)}
+
+  .toggles{display:flex;flex-direction:column;gap:9px}
+  .tg{display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer;user-select:none}
+  .tg input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
+
+  .num{display:grid;grid-template-columns:1fr 86px;align-items:center;gap:8px}
+  .num label{font-size:12.5px}
+  .num input,.num select{padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-family:var(--mono);font-size:12.5px;width:100%;color:var(--ink);background:var(--panel)}
+  .num input:focus,.num select:focus{outline:none;border-color:var(--accent)}
+  details{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  details summary{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;user-select:none}
+  details[open] summary{margin-bottom:10px}
+  details .inner{display:flex;flex-direction:column;gap:8px}
+
+  .btn{padding:11px;font-size:13.5px;font-weight:600;border-radius:8px;border:1px solid var(--accent);cursor:pointer;transition:.15s;font-family:var(--sans)}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.primary:hover{background:#1E3FBF}
+  .btn.ghost{background:var(--panel);color:var(--accent)}
+  .btn.ghost:hover{background:var(--accent-soft)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .exports{display:flex;flex-direction:column;gap:8px}
+  .hint{font-size:11.5px;color:var(--ink-soft);line-height:1.55}
+
+  main{padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0}
+  .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .view-toggle,.tools{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+  .view-toggle button,.tools button{padding:8px 13px;border:none;background:transparent;font-size:12.5px;cursor:pointer;color:var(--ink-soft);font-family:var(--sans);white-space:nowrap}
+  .view-toggle button.active{background:var(--ink);color:#fff;font-weight:600}
+  .tools button.active{background:var(--accent);color:#fff;font-weight:600}
+  .tools button:disabled{opacity:.4;cursor:not-allowed}
+  .brush{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft)}
+  .brush input{width:90px}
+  .brush span{font-family:var(--mono);min-width:34px}
+  .brush input[type=color]{width:36px;height:27px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer}
+  .meta{position:absolute;bottom:10px;right:12px;z-index:3;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);background:var(--panel);border:1px solid var(--line);padding:4px 10px;border-radius:20px;pointer-events:none}
+
+  .stage{flex:1;position:relative;border:1px solid var(--line);border-radius:var(--radius);
+    background:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px),var(--panel);
+    background-size:24px 24px,24px 24px,auto;background-position:-1px -1px;
+    min-height:0;overflow:hidden}
+  .scroller{position:absolute;inset:0;overflow:auto;display:flex;touch-action:pan-x pan-y;cursor:grab;scrollbar-width:none;-ms-overflow-style:none}
+  .scroller::-webkit-scrollbar{display:none;width:0;height:0}
+  .scroller:active{cursor:grabbing}
+  .stage canvas{margin:auto;flex:none;box-shadow:0 4px 24px rgba(27,36,48,.14);background:#fff}
+  .stage canvas.alpha{background:transparent;box-shadow:none}
+  .stage.no-grid{background-image:none}
+  .minimap{position:absolute;left:12px;bottom:12px;z-index:4;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 14px rgba(27,36,48,.18);padding:4px;display:none;cursor:crosshair;touch-action:none}
+  .minimap canvas{display:block;background:#fff;border-radius:4px}
+  .miniview{position:absolute;border:2px solid var(--accent);background:rgba(43,80,224,.12);pointer-events:none;border-radius:2px}
+  .stage canvas.interactive{touch-action:none;cursor:crosshair}
+  .drop{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;color:var(--ink-soft);cursor:pointer}
+  .drop .icon{width:64px;height:64px;border:2px dashed var(--accent);border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:26px;background:var(--panel)}
+  .drop b{color:var(--ink);font-size:15px}
+  .drop small{font-size:12px}
+  .stage.dragover{outline:3px dashed var(--accent);outline-offset:-8px}
+  .busy{position:absolute;top:12px;right:14px;font-family:var(--mono);font-size:11px;color:var(--accent);background:var(--accent-soft);padding:4px 10px;border-radius:20px;display:none}
+
+  @media (max-width:1000px){
+    .layout{grid-template-columns:248px 1fr}
+    aside{padding:14px 14px 24px}
+    main{padding:10px}
+  }
+  @media (max-width:600px){
+    body{overflow:auto;display:block;height:auto}
+    .layout{grid-template-columns:1fr}
+    aside{border-right:none;border-bottom:1px solid var(--line);overflow-y:visible}
+    .stage{min-height:70vh}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Line<span>Tracer</span> Pro</h1>
+  <p>Image → Vector / CNC Toolchain</p>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="group">
+      <label class="title">รูปต้นฉบับ</label>
+      <button class="btn ghost" id="btnUpload">เลือกรูปภาพ…</button>
+      <input type="file" id="fileInput" accept="image/*" hidden>
+      <div class="ctl">
+        <div class="row"><label for="rgBgTol">ความไวลบพื้นหลัง</label><output id="oBgTol">30</output></div>
+        <input type="range" id="rgBgTol" min="5" max="80" value="30">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="rgFeather">ความฟุ้งขอบ (Feather)</label><output id="oFeather">1</output></div>
+        <input type="range" id="rgFeather" min="0" max="4" value="1">
+      </div>
+      <div class="tools">
+        <button id="btnBgAI" disabled>🤖 ลบพื้นหลัง AI (แม่นสุด)</button>
+      </div>
+      <div class="tools">
+        <button id="btnBgRemove" disabled>✂️ ลบพื้นหลัง</button>
+        <button id="btnBgRestore" disabled>↺ คืนพื้นหลัง</button>
+      </div>
+      <div class="tools">
+        <button id="tlHl" disabled>🖍️ ไฮไลต์ส่วนที่เก็บ</button>
+      </div>
+      <div class="tools">
+        <button id="btnHlApply" disabled>ลบนอกไฮไลต์</button>
+        <button id="btnHlClear" disabled>ล้างไฮไลต์</button>
+      </div>
+      <p class="hint">✂️ ลบอัตโนมัติจากขอบภาพตามความคล้ายสี · 🖍️ หรือระบายทับส่วนที่ต้องการเก็บแล้วกด "ลบนอกไฮไลต์" — ส่วนที่ไม่ได้ระบายจะถูกลบทั้งหมด</p>
+    </div>
+
+
+    <div class="group">
+      <label class="title">Preset งาน</label>
+      <div class="presets">
+        <button data-preset="stencil">ลายฉลุ</button>
+        <button data-preset="stamp">ตราปั๊ม</button>
+        <button data-preset="laser">แกะเลเซอร์</button>
+        <button data-preset="sticker">สติกเกอร์</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <label class="title">โหมดตรวจจับ</label>
+      <div class="modes" role="group" aria-label="โหมด">
+        <button data-mode="sketch" class="active">สเก็ตช์</button>
+        <button data-mode="edge">ขอบภาพ</button>
+        <button data-mode="threshold">ขาว-ดำ</button>
+        <button data-mode="color">สีเต็ม</button>
+        <button data-mode="photo" style="grid-column:span 2">🖼 รูปถ่าย (ปรับแต่ง/Export รูปตรงๆ)</button>
+      </div>
+      <p class="hint" id="modeHint">สเก็ตช์ (Adaptive) — เหมาะกับลายเส้น การ์ตูน ภาพวาด และลายฉลุ CNC</p>
+    </div>
+
+    <div class="group" id="grpAdjust">
+      <label class="title">ปรับแต่ง</label>
+      <div class="ctl" id="colorCtl" style="display:none">
+        <div class="row"><label for="rgColors">จำนวนสี</label><output id="oColors">8</output></div>
+        <input type="range" id="rgColors" min="2" max="24" value="8">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="rgSense">ความไวเส้น</label><output id="oSense">50</output></div>
+        <input type="range" id="rgSense" min="1" max="100" value="50">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="rgBlur">ลด Noise (เบลอ)</label><output id="oBlur">1</output></div>
+        <input type="range" id="rgBlur" min="0" max="6" value="1">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="rgThick">ความหนาเส้น</label><output id="oThick">1</output></div>
+        <input type="range" id="rgThick" min="1" max="4" value="1">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="rgSmooth">ความเนียนเส้น</label><output id="oSmooth">2</output></div>
+        <input type="range" id="rgSmooth" min="0" max="5" value="2">
+      </div>
+      <div class="toggles">
+        <label class="tg"><input type="checkbox" id="ckCAD"> โหมด CAD — เส้นกึ่งกลางบาง 1px</label>
+        <label class="tg"><input type="checkbox" id="ckInvert"> กลับสี (เส้นขาว พื้นดำ)</label>
+        <label class="tg"><input type="checkbox" id="ckTransparent"> PNG พื้นหลังโปร่งใส</label>
+        <label class="tg"><input type="checkbox" id="ckBezier" checked> เส้นโค้งเนียน Bezier (SVG)</label>
+        <label class="tg"><input type="checkbox" id="ckCorner" checked> รักษามุมคม — ไม่กลืนมุมตอน smooth</label>
+      </div>
+    </div>
+
+    <div class="group" id="grpClean">
+      <label class="title">ทำความสะอาดเส้น</label>
+      <div class="ctl">
+        <div class="row"><label for="rgGap">เชื่อมเส้นขาด</label><output id="oGap">1</output></div>
+        <input type="range" id="rgGap" min="0" max="5" value="1">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="rgSpeck">ลบเศษผงเล็กกว่า (px²)</label><output id="oSpeck">20</output></div>
+        <input type="range" id="rgSpeck" min="0" max="200" step="5" value="20">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="rgSpur">ตัดหนวดปลายเส้น (px)</label><output id="oSpur">8</output></div>
+        <input type="range" id="rgSpur" min="0" max="20" value="8">
+      </div>
+      <p class="hint">ลำดับทำงาน: เชื่อมช่องว่างเส้นขาด → กวาดจุดผง → ตัดกิ่งสั้นที่งอกจากจุดตัด (ใช้กับเส้นกึ่งกลาง CAD/DXF)</p>
+    </div>
+
+    <div class="group">
+      <label class="title">ขนาดจริง (mm)</label>
+      <div class="num"><label for="inMM">ความกว้าง (mm)</label><input type="number" id="inMM" value="100" min="1" step="1"></div>
+      <div class="num"><label for="inMMH">ความสูง (mm)</label><input type="number" id="inMMH" value="" min="1" step="1" placeholder="อัตโนมัติ"></div>
+      <button class="btn ghost" id="btnLock" style="padding:8px;font-size:12.5px">🔒 ล็อกสัดส่วน: เปิด</button>
+      <p class="hint">ใช้กับ SVG / DXF — พิกัดออกมาเป็นขนาดจริง ปลดล็อกเพื่อยืด/บีบขนาดอิสระ</p>
+    </div>
+
+    <div class="group">
+      <label class="title">ส่งออก</label>
+      <div class="exports">
+        <div class="num"><label for="imgFmt">นามสกุลไฟล์รูป</label>
+          <select id="imgFmt">
+            <option value="png">PNG</option>
+            <option value="jpeg">JPG</option>
+            <option value="webp">WebP</option>
+          </select>
+        </div>
+        <button class="btn primary" id="btnPNG" disabled>ดาวน์โหลดรูปภาพ</button>
+        <button class="btn ghost" id="btnSVG" disabled>ดาวน์โหลด SVG (เวกเตอร์)</button>
+        <button class="btn ghost" id="btnDXF" disabled>ดาวน์โหลด DXF (AutoCAD)</button>
+      </div>
+      <p class="hint">โหมดสีเต็ม: DXF แยก layer ตามสี · โหมดเส้น: DXF เดินเส้นกึ่งกลาง</p>
+    </div>
+  </aside>
+
+  <main>
+    <div class="toolbar">
+      <div class="view-toggle">
+        <button id="vwResult" class="active">ผลลัพธ์</button>
+        <button id="vwOriginal">ต้นฉบับ</button>
+        <button id="vwSplit">เทียบ</button>
+      </div>
+      <div class="tools">
+        <button id="tlPen" disabled>✏️ ปากกา</button>
+        <button id="tlErase" disabled>🧽 ยางลบ</button>
+        <button id="tlCrop" disabled>◱ ครอบตัด</button>
+      </div>
+      <div class="tools">
+        <button id="btnUndo" disabled title="ย้อนกลับ (Ctrl+Z)">↩️ ย้อน</button>
+        <button id="btnRedo" disabled title="เดินหน้า (Ctrl+Y)">↪️ เดินหน้า</button>
+        <button id="btnReset" disabled title="ล้างการกระทำทั้งหมด กลับสู่รูปเริ่มต้น (ย้อนกลับได้)">♻️ รีเซ็ต</button>
+      </div>
+      <div class="tools" id="cropBar" style="display:none">
+        <button id="cropApply">✅ ตัดตามกรอบ</button>
+        <button id="cropCancel">✖ ยกเลิก</button>
+      </div>
+      <div class="brush">
+        <label for="rgBrush">หัว</label>
+        <input type="range" id="rgBrush" min="3" max="50" value="14">
+        <span id="oBrush">14px</span>
+        <label for="rgSoft">ฟุ้ง</label>
+        <input type="range" id="rgSoft" min="0" max="100" value="60">
+        <span id="oSoft">60%</span>
+      </div>
+      <div class="tools">
+        <button id="zOut" title="ซูมออก">−</button>
+        <button id="zPct" title="กลับขนาดจริง 100%">100%</button>
+        <button id="zIn" title="ซูมเข้า">＋</button>
+        <button id="zFit" title="ซูมพอดีขนาดภาพ">⛶ พอดีภาพ</button>
+        <button id="zGrid" title="เปิด/ปิดกริดพื้นหลัง" class="active">▦</button>
+      </div>
+      <div class="brush" title="เปลี่ยนสีพื้นหลังพื้นที่ทำงาน — ลองวางงานตัดบนสีต่างๆ">
+        <label for="bgColor">พื้น</label>
+        <input type="color" id="bgColor" value="#F4F6F9">
+      </div>
+      <div class="tools">
+        <button id="bgReset" title="กลับพื้นกริดเริ่มต้น">คืนกริด</button>
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <div class="scroller" id="scroller">
+        <canvas id="canvas" hidden></canvas>
+      </div>
+      <div class="drop" id="dropZone">
+        <div class="icon">＋</div>
+        <b>ลากรูปมาวางที่นี่</b>
+        <small>หรือคลิกเพื่อเลือกไฟล์</small>
+      </div>
+      <div class="minimap" id="minimap"><canvas id="miniCanvas"></canvas><div class="miniview" id="miniView"></div></div>
+      <span class="meta" id="metaInfo">—</span>
+      <span class="busy" id="busy">กำลังประมวลผล…</span>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+'use strict';
+const MAX_DIM = 1800;
+const $ = id => document.getElementById(id);
+const canvas = $('canvas'), ctx = canvas.getContext('2d');
+const stage = $('stage'), dropZone = $('dropZone'), busy = $('busy');
+
+let srcCanvas = null, srcRGB = null, gray = null;
+let origRGB = null, grayOrig = null, bgMask = null;
+let origCanvas = null, grayDirty = false;
+let initialSnap = null;   // สถานะรูปตอนโหลด สำหรับปุ่มรีเซ็ต
+let eraseAlpha = null;   // ชั้น alpha จากยางลบฟุ้ง (255 = เก็บเต็ม)
+let keepMask = null, hlAny = false;
+let hlCanvas = null, hlCtx = null;
+let W = 0, H = 0;
+let binary = null;             // ผลลัพธ์โหมดเส้น
+let labelMap = null, palette = null; // ผลลัพธ์โหมดสี
+let mode = 'sketch';
+let viewing = 'result';
+let splitX = 0.5;
+let tool = null;               // null | 'draw' | 'erase'
+let dragging = null;
+let cropRect = null;
+let undoStack = [], redoStack = [];
+const HISTORY_MAX = 12;
+const rangeUpdaters = {};
+
+const modeHints = {
+  sketch: 'สเก็ตช์ (Adaptive) — เหมาะกับลายเส้น การ์ตูน ภาพวาด และลายฉลุ CNC',
+  edge: 'ขอบภาพ (Sobel) — จับเส้นขอบวัตถุจากภาพถ่าย',
+  threshold: 'ขาว-ดำ (Threshold) — แยกส่วนเข้ม/สว่างแบบตรงไปตรงมา',
+  color: 'สีเต็ม (Posterize + Vectorize) — จำลองภาพเป็นเวกเตอร์สีเหมือนต้นฉบับ',
+  photo: 'รูปถ่าย — ปรับแต่งรูปโดยไม่แปลงเป็นลายเส้น: ลบพื้นหลัง ครอบตัด รีทัชด้วยปากกา/ยางลบ แล้ว export เป็นไฟล์รูป (PNG โปร่งใสได้)'
+};
+
+/* ================= upload ================= */
+$('btnUpload').onclick = () => $('fileInput').click();
+dropZone.onclick = () => $('fileInput').click();
+$('fileInput').onchange = e => { if(e.target.files[0]) loadFile(e.target.files[0]); };
+['dragover','dragenter'].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); stage.classList.add('dragover'); }));
+['dragleave','drop'].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); stage.classList.remove('dragover'); }));
+stage.addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0];
+  if(f && f.type.startsWith('image/')) loadFile(f);
+});
+
+function loadFile(file){
+  $('metaInfo').textContent = 'กำลังโหลดรูป…';
+  const reader = new FileReader();
+  reader.onerror = () => { $('metaInfo').textContent = 'อ่านไฟล์ไม่สำเร็จ'; };
+  reader.onload = () => {
+    const img = new Image();
+    img.onerror = () => { $('metaInfo').textContent = 'ไฟล์รูปไม่รองรับ'; };
+    img.onload = () => {
+      const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+      W = Math.max(1, Math.round(img.width * scale));
+      H = Math.max(1, Math.round(img.height * scale));
+      srcCanvas = document.createElement('canvas');
+      srcCanvas.width = W; srcCanvas.height = H;
+      const sctx = srcCanvas.getContext('2d');
+      sctx.drawImage(img, 0, 0, W, H);
+      srcRGB = sctx.getImageData(0,0,W,H).data;
+      gray = new Float32Array(W*H);
+      for(let i=0,p=0;i<gray.length;i++,p+=4)
+        gray[i] = srcRGB[p]*0.299 + srcRGB[p+1]*0.587 + srcRGB[p+2]*0.114;
+      origRGB = srcRGB.slice();
+      grayOrig = gray.slice();
+      bgMask = null;
+      keepMask = new Uint8Array(W*H);
+      hlAny = false;
+      hlCanvas = document.createElement('canvas');
+      hlCanvas.width = W; hlCanvas.height = H;
+      hlCtx = hlCanvas.getContext('2d');
+      $('btnBgRestore').disabled = true;
+      updateHlButtons();
+      rebuildOrigCanvas();
+      eraseAlpha = null;
+      RS = 1;
+      canvas.width = W; canvas.height = H;
+      canvas.hidden = false; dropZone.style.display = 'none';
+      requestAnimationFrame(fitZoom);
+      updateButtons();
+      $('metaInfo').textContent = W + ' × ' + H + 'px';
+      syncSizeFromImage();
+      initialSnap = snapState('full');
+      setView('result');
+      process();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ================= filters ================= */
+function boxBlur(src, w, h, r){
+  if(r <= 0) return src.slice();
+  const tmp = new Float32Array(src.length), out = new Float32Array(src.length);
+  const win = r*2+1;
+  for(let y=0;y<h;y++){
+    let sum = 0, row = y*w;
+    for(let x=-r;x<=r;x++) sum += src[row + Math.min(w-1, Math.max(0,x))];
+    for(let x=0;x<w;x++){
+      tmp[row+x] = sum/win;
+      sum += src[row + Math.min(w-1, x+r+1)] - src[row + Math.max(0, x-r)];
+    }
+  }
+  for(let x=0;x<w;x++){
+    let sum = 0;
+    for(let y=-r;y<=r;y++) sum += tmp[Math.min(h-1, Math.max(0,y))*w + x];
+    for(let y=0;y<h;y++){
+      out[y*w+x] = sum/win;
+      sum += tmp[Math.min(h-1, y+r+1)*w + x] - tmp[Math.max(0, y-r)*w + x];
+    }
+  }
+  return out;
+}
+
+function dilate(bin, w, h){
+  const out = new Uint8Array(bin.length);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const i = y*w+x;
+    if(bin[i] || (x>0&&bin[i-1]) || (x<w-1&&bin[i+1]) || (y>0&&bin[i-w]) || (y<h-1&&bin[i+w])) out[i] = 1;
+  }
+  return out;
+}
+
+function erode(bin, w, h){
+  const out = new Uint8Array(bin.length);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const i = y*w+x;
+    if(bin[i] && (x===0||bin[i-1]) && (x===w-1||bin[i+1]) && (y===0||bin[i-w]) && (y===h-1||bin[i+w])) out[i] = 1;
+  }
+  return out;
+}
+
+/* ลบชิ้นส่วนที่พื้นที่เล็กกว่า minArea (เศษผง/ขนแมว) */
+function removeSpecks(bin, w, h, minArea){
+  const out = Uint8Array.from(bin);
+  const seen = new Uint8Array(w*h);
+  const stack = [];
+  for(let i0=0;i0<w*h;i0++){
+    if(!out[i0] || seen[i0]) continue;
+    const comp = [i0];
+    seen[i0] = 1;
+    stack.length = 0;
+    stack.push(i0);
+    while(stack.length){
+      const c = stack.pop(), x = c%w, y = (c/w)|0;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+        if(!dx && !dy) continue;
+        const nx = x+dx, ny = y+dy;
+        if(nx<0||ny<0||nx>=w||ny>=h) continue;
+        const n = ny*w+nx;
+        if(out[n] && !seen[n]){ seen[n]=1; stack.push(n); comp.push(n); }
+      }
+    }
+    if(comp.length < minArea) for(const p of comp) out[p] = 0;
+  }
+  return out;
+}
+
+/* ตัดหนวด: เดินจากปลายเส้นเข้าหาจุดตัด — ลบเฉพาะกิ่งสั้นสุดของแต่ละจุดตัด
+   (กิ่งจริงที่ยาวหรือกิ่งเดี่ยวยาวกว่าเกณฑ์จะไม่ถูกแตะ) */
+function pruneSpurs(skel, w, h, maxLen){
+  const img = Uint8Array.from(skel);
+  const N = w*h;
+  const nList = i => {
+    const x = i%w, y = (i/w)|0, out = [];
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      if(!dx && !dy) continue;
+      const nx = x+dx, ny = y+dy;
+      if(nx>=0 && ny>=0 && nx<w && ny<h && img[ny*w+nx]) out.push(ny*w+nx);
+    }
+    return out;
+  };
+  const cnt = i => nList(i).length;
+  const adj = (a,b) => Math.abs(a%w - b%w) <= 1 && Math.abs(((a/w)|0) - ((b/w)|0)) <= 1;
+
+  for(let round=0; round<3; round++){
+    // หา endpoint ปัจจุบัน
+    const endpoints = [];
+    for(let i=0;i<N;i++) if(img[i] && cnt(i) === 1) endpoints.push(i);
+    // เดินเก็บ chain ที่จบที่จุดตัดภายใน maxLen
+    const candidates = [];
+    for(const e of endpoints){
+      const chain = [e];
+      let prev = e, cur = nList(e)[0];
+      let steps = 0;
+      while(cur !== undefined && cnt(cur) === 2 && steps++ < maxLen + 2){
+        chain.push(cur);
+        const nxt = nList(cur).find(n => n !== prev);
+        prev = cur; cur = nxt;
+      }
+      if(cur !== undefined && cnt(cur) >= 3 && chain.length < maxLen)
+        candidates.push({ chain, terminal: cur });
+    }
+    // จัดกลุ่มจุดตัดที่ติดกันเป็น cluster เดียว แล้วลบเฉพาะกิ่งสั้นสุดของแต่ละ cluster
+    const used = new Uint8Array(candidates.length);
+    let removed = false;
+    for(let a=0;a<candidates.length;a++){
+      if(used[a]) continue;
+      const group = [a];
+      used[a] = 1;
+      for(let b=a+1;b<candidates.length;b++){
+        if(!used[b] && group.some(g => adj(candidates[g].terminal, candidates[b].terminal))){
+          used[b] = 1; group.push(b);
+        }
+      }
+      let best = group[0];
+      for(const g of group)
+        if(candidates[g].chain.length < candidates[best].chain.length) best = g;
+      for(const p of candidates[best].chain) img[p] = 0;
+      removed = true;
+    }
+    // เก็บกวาด nub: พิกเซลที่เพื่อนบ้าน >=3 และเชื่อมถึงกันเองครบ (ลบแล้วเส้นไม่ขาด)
+    for(let i=0;i<N;i++){
+      if(!img[i]) continue;
+      const nb = nList(i);
+      if(nb.length < 3) continue;
+      const seen = [nb[0]];
+      let grew = true;
+      while(grew){
+        grew = false;
+        for(const n of nb)
+          if(seen.indexOf(n) < 0 && seen.some(s => adj(s,n))){ seen.push(n); grew = true; }
+      }
+      if(seen.length === nb.length){ img[i] = 0; removed = true; }
+    }
+    if(!removed) break;
+  }
+  return img;
+}
+
+/* ================= process ================= */
+function process(preserveHistory){
+  if(!gray) return;
+  busy.style.display = 'inline-block';
+  requestAnimationFrame(() => {
+    if(!preserveHistory) clearHistory();
+    if(mode === 'photo'){
+      invalidateVec();
+      render();
+      busy.style.display = 'none';
+      return;
+    }
+    if(grayDirty){
+      for(let i=0;i<W*H;i++) gray[i] = (bgMask && bgMask[i]) ? 255 : grayOrig[i];
+      grayDirty = false;
+    }
+    invalidateVec();
+    if(mode === 'color'){
+      processColor();
+      render();
+      busy.style.display = 'none';
+      return;
+    }
+    const sense = +$('rgSense').value;
+    const blurR = +$('rgBlur').value;
+    const thick = +$('rgThick').value;
+    const g = boxBlur(gray, W, H, blurR);
+    let bin = new Uint8Array(W*H);
+
+    if(mode === 'edge'){
+      const thr = 12 + (100 - sense) * 1.6;
+      for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+        const i = y*W+x;
+        const gx = -g[i-W-1]-2*g[i-1]-g[i+W-1]+g[i-W+1]+2*g[i+1]+g[i+W+1];
+        const gy = -g[i-W-1]-2*g[i-W]-g[i-W+1]+g[i+W-1]+2*g[i+W]+g[i+W+1];
+        if(Math.hypot(gx,gy) > thr) bin[i] = 1;
+      }
+    } else if(mode === 'sketch'){
+      const local = boxBlur(g, W, H, 8);
+      const C = 2 + (100 - sense) * 0.28;
+      for(let i=0;i<bin.length;i++)
+        if(g[i] < local[i] - C) bin[i] = 1;
+    } else {
+      const thr = 255 * sense / 100;
+      for(let i=0;i<bin.length;i++)
+        if(g[i] < thr) bin[i] = 1;
+    }
+
+    // เชื่อมเส้นขาด (morphological close)
+    const gap = +$('rgGap').value;
+    for(let t=0;t<gap;t++) bin = dilate(bin, W, H);
+    for(let t=0;t<gap;t++) bin = erode(bin, W, H);
+    // กวาดเศษผง
+    const minArea = +$('rgSpeck').value;
+    if(minArea > 0) bin = removeSpecks(bin, W, H, minArea);
+    if($('ckCAD').checked){
+      bin = thinning(bin, W, H);
+      const spur = +$('rgSpur').value;
+      if(spur > 0) bin = pruneSpurs(bin, W, H, spur);
+    } else {
+      for(let t=1;t<thick;t++) bin = dilate(bin, W, H);
+    }
+    binary = bin;
+    render();
+    busy.style.display = 'none';
+  });
+}
+
+/* ---------- โหมดสีเต็ม ---------- */
+function processColor(){
+  const K = +$('rgColors').value;
+  const blurR = +$('rgBlur').value;
+  let R = new Float32Array(W*H), G = new Float32Array(W*H), B = new Float32Array(W*H);
+  for(let i=0,p=0;i<W*H;i++,p+=4){ R[i]=srcRGB[p]; G[i]=srcRGB[p+1]; B[i]=srcRGB[p+2]; }
+  if(blurR > 0){ R = boxBlur(R,W,H,blurR); G = boxBlur(G,W,H,blurR); B = boxBlur(B,W,H,blurR); }
+  const samples = [];
+  const step = Math.max(1, Math.floor(Math.sqrt(W*H / 40000)));
+  for(let y=0;y<H;y+=step) for(let x=0;x<W;x+=step){
+    const i = y*W+x;
+    samples.push([R[i],G[i],B[i]]);
+  }
+  palette = medianCut(samples, K);
+  labelMap = new Int16Array(W*H);
+  for(let i=0;i<W*H;i++){
+    if(bgMask && bgMask[i]){ labelMap[i] = -1; continue; }
+    let best = 0, bd = Infinity;
+    for(let k=0;k<palette.length;k++){
+      const dr=R[i]-palette[k][0], dg=G[i]-palette[k][1], db=B[i]-palette[k][2];
+      const d = dr*dr + dg*dg + db*db;
+      if(d < bd){ bd = d; best = k; }
+    }
+    labelMap[i] = best;
+  }
+  const out = new Int16Array(labelMap);
+  const cnt = new Int32Array(palette.length);
+  for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+    const i = y*W+x;
+    if(labelMap[i] < 0){ out[i] = -1; continue; }
+    cnt.fill(0);
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      const L = labelMap[i+dy*W+dx];
+      if(L >= 0) cnt[L]++;
+    }
+    let mk = labelMap[i];
+    for(let k=0;k<palette.length;k++) if(cnt[k] > cnt[mk]) mk = k;
+    out[i] = mk;
+  }
+  labelMap = out;
+}
+
+function medianCut(pixels, k){
+  let boxes = [pixels];
+  const rangeOf = b => {
+    const mn=[255,255,255], mx=[0,0,0];
+    for(const p of b) for(let c=0;c<3;c++){
+      if(p[c]<mn[c]) mn[c]=p[c];
+      if(p[c]>mx[c]) mx[c]=p[c];
+    }
+    return {mn,mx};
+  };
+  while(boxes.length < k){
+    let bi = -1, best = -1, bch = 0;
+    for(let i=0;i<boxes.length;i++){
+      const b = boxes[i];
+      if(b.length < 2) continue;
+      const {mn,mx} = rangeOf(b);
+      const ranges = [mx[0]-mn[0], mx[1]-mn[1], mx[2]-mn[2]];
+      const ch = ranges[0]>=ranges[1] && ranges[0]>=ranges[2] ? 0 : (ranges[1]>=ranges[2] ? 1 : 2);
+      const score = ranges[ch] * Math.sqrt(b.length);
+      if(score > best){ best = score; bi = i; bch = ch; }
+    }
+    if(bi < 0) break;
+    const b = boxes[bi];
+    b.sort((a,c) => a[bch]-c[bch]);
+    const mid = b.length >> 1;
+    boxes.splice(bi, 1, b.slice(0,mid), b.slice(mid));
+  }
+  return boxes.map(b => {
+    let r=0,g=0,bl=0;
+    for(const p of b){ r+=p[0]; g+=p[1]; bl+=p[2]; }
+    const n = b.length || 1;
+    return [Math.round(r/n), Math.round(g/n), Math.round(bl/n)];
+  });
+}
+
+/* ================= render ================= */
+let vecCache = null;
+function invalidateVec(){ vecCache = null; }
+
+/* Chaikin corner-cutting — ตัดมุมขั้นบันไดให้เส้นลื่น */
+function chaikin(pts, iter, closed){
+  let p = pts;
+  for(let t=0;t<iter;t++){
+    const out = [];
+    const n = p.length;
+    if(n < 3) return p;
+    if(closed){
+      for(let i=0;i<n;i++){
+        const a = p[i], b = p[(i+1)%n];
+        out.push([a[0]*0.75+b[0]*0.25, a[1]*0.75+b[1]*0.25]);
+        out.push([a[0]*0.25+b[0]*0.75, a[1]*0.25+b[1]*0.75]);
+      }
+    } else {
+      out.push(p[0]);
+      for(let i=0;i<n-1;i++){
+        const a = p[i], b = p[i+1];
+        out.push([a[0]*0.75+b[0]*0.25, a[1]*0.75+b[1]*0.25]);
+        out.push([a[0]*0.25+b[0]*0.75, a[1]*0.25+b[1]*0.75]);
+      }
+      out.push(p[n-1]);
+    }
+    p = out;
+  }
+  return p;
+}
+
+/* pipeline เนียนเส้น: ลดจุด → ตัดมุม (เว้นมุมคม) → เก็บกวาด */
+function findCorners(p, closed, angDeg){
+  const n = p.length, out = [];
+  const cosThr = Math.cos(angDeg * Math.PI / 180);
+  const start = closed ? 0 : 1;
+  const end = closed ? n : n-1;
+  for(let i=start; i<end; i++){
+    const a = p[(i-1+n)%n], b = p[i], c = p[(i+1)%n];
+    const v1 = [b[0]-a[0], b[1]-a[1]], v2 = [c[0]-b[0], c[1]-b[1]];
+    const m1 = Math.hypot(v1[0],v1[1]), m2 = Math.hypot(v2[0],v2[1]);
+    if(m1 < 1.5 || m2 < 1.5) continue;   // segment สั้นเกิน = noise ไม่นับเป็นมุม
+    const cos = (v1[0]*v2[0] + v1[1]*v2[1]) / (m1*m2);
+    if(cos < cosThr) out.push(i);
+  }
+  return out;
+}
+
+/* chaikin แบบแบ่งช่วงตามมุมคม — มุมถูกล็อกเป็น endpoint จึงไม่ถูกตัด */
+function chaikinSegmented(p, corners, closed, iter){
+  const out = [];
+  if(closed){
+    const k = corners.length;
+    for(let j=0;j<k;j++){
+      const a = corners[j], b = corners[(j+1)%k];
+      const seg = a < b ? p.slice(a, b+1) : p.slice(a).concat(p.slice(0, b+1));
+      const sm = chaikin(seg, iter, false);
+      for(let i=0;i<sm.length-1;i++) out.push(sm[i]);
+    }
+  } else {
+    const bounds = [0, ...corners.filter(c => c>0 && c<p.length-1), p.length-1];
+    for(let j=0;j<bounds.length-1;j++){
+      const seg = p.slice(bounds[j], bounds[j+1]+1);
+      const sm = chaikin(seg, iter, false);
+      for(let i = (j?1:0); i<sm.length; i++) out.push(sm[i]);
+    }
+  }
+  return out;
+}
+
+function smoothPath(pts, closed){
+  const s = +$('rgSmooth').value;
+  let p = simplifyPath(pts, 0.7 + s*0.3);
+  if(s === 0) return p;
+  const iter = Math.min(3, Math.ceil(s/2));
+  if($('ckCorner').checked && p.length >= 4){
+    const corners = findCorners(p, closed, 55);
+    p = corners.length ? chaikinSegmented(p, corners, closed, iter)
+                       : chaikin(p, iter, closed);
+  } else {
+    p = chaikin(p, iter, closed);
+  }
+  return simplifyPath(p, 0.3);
+}
+
+function buildVec(){
+  if(mode === 'color' || !binary) return null;
+  if($('ckCAD').checked){
+    const chains = skeletonToPolylines(binary, W, H)
+      .map(c => smoothPath(c, false)).filter(c => c.length >= 2);
+    return { cad:true, paths:chains };
+  }
+  const conts = traceContours(binary, W, H)
+    .map(c => smoothPath(c, true)).filter(c => c.length >= 3);
+  return { cad:false, paths:conts };
+}
+
+function addQuadPath(p2, pts, closed){
+  const n = pts.length;
+  if(n < 3){
+    p2.moveTo(pts[0][0], pts[0][1]);
+    for(let i=1;i<n;i++) p2.lineTo(pts[i][0], pts[i][1]);
+    if(closed) p2.closePath();
+    return;
+  }
+  const P = i => pts[((i%n)+n)%n];
+  const mid = (a,b) => [(a[0]+b[0])/2, (a[1]+b[1])/2];
+  if(closed){
+    const m0 = mid(P(0), P(1));
+    p2.moveTo(m0[0], m0[1]);
+    for(let i=1;i<=n;i++){
+      const m = mid(P(i), P(i+1));
+      p2.quadraticCurveTo(P(i)[0], P(i)[1], m[0], m[1]);
+    }
+    p2.closePath();
+  } else {
+    p2.moveTo(pts[0][0], pts[0][1]);
+    for(let i=1;i<n-1;i++){
+      const m = mid(pts[i], pts[i+1]);
+      p2.quadraticCurveTo(pts[i][0], pts[i][1], m[0], m[1]);
+    }
+    p2.lineTo(pts[n-1][0], pts[n-1][1]);
+  }
+}
+
+function drawResult(){
+  ctx.clearRect(0, 0, W, H);
+  if(mode === 'photo'){
+    // โหมดรูปถ่าย: ส่วนโปร่งใสแสดงเป็นพื้นขาวเรียบ (ไฟล์ที่ export ยังโปร่งใสจริง)
+    ctx.drawImage(srcCanvas, 0, 0);
+    return;
+  }
+  if(mode === 'color'){
+    if(!labelMap) return;
+    const img = ctx.createImageData(W,H);
+    const d = img.data;
+    for(let i=0,p=0;i<labelMap.length;i++,p+=4){
+      const li = labelMap[i];
+      if(li < 0){ d[p+3] = 0; continue; }
+      const c = palette[li];
+      d[p]=c[0]; d[p+1]=c[1]; d[p+2]=c[2]; d[p+3]=255;
+    }
+    blitPixels(img);
+    return;
+  }
+  if(!binary) return;
+  const cad = $('ckCAD').checked;
+  const invert = $('ckInvert').checked;
+  const lineCol = (cad || invert) ? '#FFFFFF' : '#000000';
+  const bgCol = cad ? 'rgb(33,40,48)' : (invert ? '#000000' : '#FFFFFF');
+  const s = +$('rgSmooth').value;
+  // preview แบบเวกเตอร์เส้นสมูท (ยกเว้นตอนกำลังลากปากกา/ยางลบ ใช้ pixel เพื่อความไว)
+  if(s > 0 && dragging !== 'tool'){
+    if(!vecCache) vecCache = buildVec();
+    if(vecCache){
+      ctx.fillStyle = bgCol;
+      ctx.fillRect(0,0,W,H);
+      if(vecCache.cad){
+        ctx.strokeStyle = lineCol;
+        ctx.lineWidth = 1.4;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        for(const pts of vecCache.paths){
+          const p2 = new Path2D();
+          addQuadPath(p2, pts, false);
+          ctx.stroke(p2);
+        }
+      } else {
+        const p2 = new Path2D();
+        for(const pts of vecCache.paths) addQuadPath(p2, pts, true);
+        ctx.fillStyle = lineCol;
+        ctx.fill(p2, 'evenodd');
+      }
+      return;
+    }
+  }
+  // pixel fallback
+  const img = ctx.createImageData(W,H);
+  const d = img.data;
+  const lineC = (cad || invert) ? [255,255,255] : [0,0,0];
+  const bgC = cad ? [33,40,48] : (invert ? [0,0,0] : [255,255,255]);
+  for(let i=0,p=0;i<binary.length;i++,p+=4){
+    const c = binary[i] ? lineC : bgC;
+    d[p]=c[0]; d[p+1]=c[1]; d[p+2]=c[2]; d[p+3]=255;
+  }
+  blitPixels(img);
+}
+
+function fmtMM(v){ return (Math.round(v*10)/10).toString(); }
+function updateDims(){
+  if(!gray){ $('metaInfo').textContent = '—'; return; }
+  const [mmW, mmH] = workMM();
+  $('metaInfo').textContent = W + ' × ' + H + 'px · ' + fmtMM(mmW) + ' × ' + fmtMM(mmH) + ' mm';
+}
+
+/* ---------- ซูม + preview ขนาดจริง ---------- */
+const scroller = $('scroller');
+const PPM = 2.4;           // px ต่อ mm ที่ 100% (ช่องกริดพื้นหลัง 24px = 10mm)
+let zoom = 1;
+let RS = 1, pixCanvas = null;   // render scale: วาด canvas ละเอียดขึ้นตามซูม
+
+function workMM(){
+  const mmW = +$('inMM').value || 100;
+  const mmH = +$('inMMH').value || (W ? mmW * H / W : mmW);
+  return [mmW, mmH];
+}
+function applyCanvasSize(){
+  if(!W) return;
+  const [mmW, mmH] = workMM();
+  canvas.style.width = (mmW * PPM * zoom) + 'px';
+  canvas.style.height = (mmH * PPM * zoom) + 'px';
+  $('zPct').textContent = Math.round(zoom * 100) + '%';
+  // เพิ่มความละเอียด backing store ตามระดับซูม ให้ภาพคมไม่เบลอ
+  const dispPPP = (mmW * PPM * zoom) / W;
+  let target = Math.max(1, Math.min(3, Math.ceil(dispPPP)));
+  target = Math.min(target, Math.max(1, Math.floor(4200 / Math.max(W, H))));
+  if(target !== RS){
+    RS = target;
+    canvas.width = W * RS;
+    canvas.height = H * RS;
+    render();
+  }
+  scheduleMinimap();
+}
+function setZoom(nz, fx, fy){
+  if(!W) return;
+  nz = Math.min(8, Math.max(0.05, nz));
+  const s = scroller.getBoundingClientRect();
+  if(fx === undefined){ fx = s.width/2; fy = s.height/2; }
+  const before = canvas.getBoundingClientRect();
+  const u = (s.left + fx - before.left) / before.width;
+  const v = (s.top + fy - before.top) / before.height;
+  zoom = nz;
+  applyCanvasSize();
+  const after = canvas.getBoundingClientRect();
+  scroller.scrollLeft += (after.left - s.left) + u * after.width - fx;
+  scroller.scrollTop  += (after.top - s.top) + v * after.height - fy;
+}
+function fitZoom(){
+  if(!W) return;
+  const s = scroller.getBoundingClientRect();
+  const [mmW, mmH] = workMM();
+  zoom = Math.min(8, Math.max(0.05,
+    Math.min((s.width - 36) / (mmW * PPM), (s.height - 36) / (mmH * PPM))));
+  applyCanvasSize();
+}
+$('zIn').onclick = () => setZoom(zoom * 1.25);
+$('zOut').onclick = () => setZoom(zoom / 1.25);
+$('zPct').onclick = () => setZoom(1);   // กลับขนาดจริง 100% (ตามสเกล mm)
+$('zFit').onclick = fitZoom;            // ซูมพอดีขนาดภาพเต็มพื้นที่แสดง
+$('bgColor').addEventListener('input', e => {
+  stage.style.background = e.target.value;   // ทับกริดด้วยสีล้วน
+});
+$('bgReset').onclick = () => {
+  stage.style.background = '';               // กลับ CSS เดิม (กริด)
+  stage.classList.remove('no-grid');
+  $('zGrid').classList.add('active');
+};
+$('zGrid').onclick = () => {
+  stage.style.background = '';               // เปิด/ปิดกริดได้ ต้องล้างสีล้วนก่อน
+  stage.classList.toggle('no-grid');
+  $('zGrid').classList.toggle('active');
+};
+
+/* ดับเบิลคลิก: สลับ 100% ↔ พอดีภาพ ตรงจุดที่ชี้ */
+scroller.addEventListener('dblclick', e => {
+  if(!gray) return;
+  const s = scroller.getBoundingClientRect();
+  if(Math.abs(zoom - 1) < 0.01) fitZoom();
+  else setZoom(1, e.clientX - s.left, e.clientY - s.top);
+});
+
+/* คีย์ลัดซูม: + - ซูม, 0 พอดีภาพ, 1 ขนาดจริง */
+document.addEventListener('keydown', e => {
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if(e.key === '+' || e.key === '=') setZoom(zoom * 1.25);
+  else if(e.key === '-') setZoom(zoom / 1.25);
+  else if(e.key === '0') fitZoom();
+  else if(e.key === '1') setZoom(1);
+});
+
+/* ---------- มินิแมพนำทาง ---------- */
+const MINI_MAX = 150;
+let miniRAF = 0;
+function scheduleMinimap(){
+  if(!miniRAF) miniRAF = requestAnimationFrame(() => { miniRAF = 0; updateMinimap(); });
+}
+function updateMinimap(){
+  const box = $('minimap'), mc = $('miniCanvas'), mv = $('miniView');
+  if(!gray || canvas.hidden){ box.style.display = 'none'; return; }
+  const cr = canvas.getBoundingClientRect(), sr = scroller.getBoundingClientRect();
+  // แสดงเมื่อภาพใหญ่กว่าพื้นที่ (ซูมเกินพอดี)
+  if(cr.width <= sr.width + 2 && cr.height <= sr.height + 2){
+    box.style.display = 'none'; return;
+  }
+  box.style.display = 'block';
+  const scale = Math.min(MINI_MAX / W, 110 / H);
+  const mw = Math.max(40, Math.round(W * scale)), mh = Math.max(40, Math.round(H * scale));
+  if(mc.width !== mw || mc.height !== mh){ mc.width = mw; mc.height = mh; }
+  const mx = mc.getContext('2d');
+  mx.clearRect(0, 0, mw, mh);
+  mx.drawImage(canvas, 0, 0, mw, mh);
+  const x0 = Math.max(0, (sr.left - cr.left) / cr.width);
+  const y0 = Math.max(0, (sr.top - cr.top) / cr.height);
+  const x1 = Math.min(1, (sr.right - cr.left) / cr.width);
+  const y1 = Math.min(1, (sr.bottom - cr.top) / cr.height);
+  mv.style.left = (4 + x0 * mw) + 'px';
+  mv.style.top = (4 + y0 * mh) + 'px';
+  mv.style.width = Math.max(6, (x1 - x0) * mw) + 'px';
+  mv.style.height = Math.max(6, (y1 - y0) * mh) + 'px';
+}
+function miniJump(e){
+  const r = $('miniCanvas').getBoundingClientRect();
+  const fx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const fy = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+  const cr = canvas.getBoundingClientRect(), sr = scroller.getBoundingClientRect();
+  const cox = cr.left - sr.left + scroller.scrollLeft;
+  const coy = cr.top - sr.top + scroller.scrollTop;
+  scroller.scrollLeft = cox + fx * cr.width - sr.width / 2;
+  scroller.scrollTop = coy + fy * cr.height - sr.height / 2;
+  scheduleMinimap();
+}
+let miniDrag = false;
+$('minimap').addEventListener('pointerdown', e => {
+  miniDrag = true;
+  $('minimap').setPointerCapture(e.pointerId);
+  miniJump(e);
+});
+$('minimap').addEventListener('pointermove', e => { if(miniDrag) miniJump(e); });
+['pointerup','pointercancel'].forEach(ev =>
+  $('minimap').addEventListener(ev, () => miniDrag = false));
+scroller.addEventListener('scroll', scheduleMinimap, { passive:true });
+
+/* ---------- พิกัด mm ใต้เมาส์ (origin มุมซ้ายล่างแบบ CNC) ---------- */
+canvas.addEventListener('pointermove', e => {
+  if(!gray) return;
+  const [cx, cy] = canvasPos(e);
+  const [mmW, mmH] = workMM();
+  const mx = cx / W * mmW, my = (1 - cy / H) * mmH;
+  $('metaInfo').textContent =
+    'X ' + mx.toFixed(1) + ' · Y ' + my.toFixed(1) + ' mm — ' + fmtMM(mmW) + ' × ' + fmtMM(mmH) + ' mm';
+});
+canvas.addEventListener('pointerleave', updateDims);
+scroller.addEventListener('wheel', e => {
+  e.preventDefault();
+  const s = scroller.getBoundingClientRect();
+  setZoom(zoom * (e.deltaY < 0 ? 1.15 : 1/1.15), e.clientX - s.left, e.clientY - s.top);
+}, { passive:false });
+
+/* pinch สองนิ้วบนมือถือ */
+const pinch = { pts:new Map(), d0:0, z0:1 };
+scroller.addEventListener('pointerdown', e => {
+  pinch.pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if(pinch.pts.size === 2){
+    const p = [...pinch.pts.values()];
+    pinch.d0 = Math.hypot(p[0][0]-p[1][0], p[0][1]-p[1][1]) || 1;
+    pinch.z0 = zoom;
+    dragging = null;   // ยกเลิกลากปากกา/split เมื่อเริ่ม pinch
+    pan = null;
+  }
+});
+scroller.addEventListener('pointermove', e => {
+  if(!pinch.pts.has(e.pointerId)) return;
+  pinch.pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if(pinch.pts.size === 2){
+    const p = [...pinch.pts.values()];
+    const d = Math.hypot(p[0][0]-p[1][0], p[0][1]-p[1][1]) || 1;
+    const s = scroller.getBoundingClientRect();
+    setZoom(pinch.z0 * d / pinch.d0,
+      (p[0][0]+p[1][0])/2 - s.left, (p[0][1]+p[1][1])/2 - s.top);
+  }
+});
+['pointerup','pointercancel'].forEach(ev =>
+  scroller.addEventListener(ev, e => pinch.pts.delete(e.pointerId)));
+
+/* คลิกซ้ายค้างแล้วลาก = เลื่อนดูภาพ (pan) */
+let pan = null;
+scroller.addEventListener('pointerdown', e => {
+  if(!gray || pinch.pts.size >= 2) return;
+  const onCanvas = e.target === canvas;
+  // ถ้าบนภาพและกำลังใช้เส้นแบ่งเทียบ/ปากกา/ยางลบ ให้เครื่องมือนั้นทำงานแทน
+  if(onCanvas && (viewing === 'split' || (tool === 'hl') || (tool === 'crop') || (tool && mode !== 'color' && viewing === 'result'))) return;
+  pan = { x:e.clientX, y:e.clientY, sl:scroller.scrollLeft, st:scroller.scrollTop, id:e.pointerId };
+  scroller.setPointerCapture(e.pointerId);
+});
+scroller.addEventListener('pointermove', e => {
+  if(!pan || e.pointerId !== pan.id || pinch.pts.size >= 2) return;
+  scroller.scrollLeft = pan.sl - (e.clientX - pan.x);
+  scroller.scrollTop  = pan.st - (e.clientY - pan.y);
+});
+['pointerup','pointercancel'].forEach(ev =>
+  scroller.addEventListener(ev, e => { if(pan && e.pointerId === pan.id) pan = null; }));
+window.addEventListener('resize', updateDims);
+
+let checkerPat = null;
+
+function blitPixels(img){
+  // putImageData ข้าม transform — ต้องวาดผ่าน canvas กลางเพื่อ scale ตาม RS
+  if(!pixCanvas || pixCanvas.width !== W || pixCanvas.height !== H){
+    pixCanvas = document.createElement('canvas');
+    pixCanvas.width = W; pixCanvas.height = H;
+  }
+  pixCanvas.getContext('2d').putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(pixCanvas, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+}
+
+function render(){
+  if(!srcCanvas) return;
+  // สไตล์ Photoshop: มีส่วนโปร่งใสเมื่อไหร่ ให้ทะลุเห็นพื้นที่ทำงานด้านหลัง เหลือแต่ตัววัตถุ
+  canvas.classList.toggle('alpha', mode === 'photo' || !!bgMask);
+  ctx.setTransform(RS, 0, 0, RS, 0, 0);
+  if(viewing === 'original'){
+    ctx.clearRect(0,0,W,H);
+    if(mode === 'photo' && origCanvas){
+      ctx.drawImage(origCanvas, 0, 0);   // ภาพแท้ก่อนปรับแต่ง
+    } else {
+      ctx.drawImage(srcCanvas,0,0);
+    }
+    if(hlAny){ ctx.globalAlpha = 0.4; ctx.drawImage(hlCanvas,0,0); ctx.globalAlpha = 1; }
+    drawCropOverlay();
+    updateDims();
+    return;
+  }
+  drawResult();
+  if(hlAny && viewing !== 'split'){ ctx.globalAlpha = 0.4; ctx.drawImage(hlCanvas,0,0); ctx.globalAlpha = 1; }
+  if(viewing === 'split'){
+    const sx = Math.round(W * splitX);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0,0,sx,H); ctx.clip();
+    if(mode === 'photo' && origCanvas){
+      ctx.drawImage(origCanvas, 0, 0);
+    } else {
+      ctx.drawImage(srcCanvas,0,0);
+    }
+    ctx.restore();
+    ctx.fillStyle = '#2B50E0';
+    ctx.fillRect(sx-1, 0, 3, H);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(sx, H/2, 9, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#2B50E0'; ctx.lineWidth = 2.5; ctx.stroke();
+  }
+  drawCropOverlay();
+  updateDims();
+  scheduleMinimap();
+}
+
+function drawCropOverlay(){
+  if(tool !== 'crop' || !cropRect) return;
+  const x = Math.min(cropRect.x0, cropRect.x1), y = Math.min(cropRect.y0, cropRect.y1);
+  const w = Math.abs(cropRect.x1 - cropRect.x0), h = Math.abs(cropRect.y1 - cropRect.y0);
+  ctx.save();
+  ctx.fillStyle = 'rgba(27,36,48,.45)';
+  ctx.fillRect(0, 0, W, y);
+  ctx.fillRect(0, y + h, W, H - y - h);
+  ctx.fillRect(0, y, x, h);
+  ctx.fillRect(x + w, y, W - x - w, h);
+  const [mmW0] = workMM();
+  ctx.strokeStyle = '#2B50E0';
+  ctx.lineWidth = Math.max(0.8, 2 * W / (mmW0 * PPM * zoom));
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(x, y, w, h);
+  ctx.restore();
+}
+
+/* ================= controls ================= */
+function bindRange(id, outId, suffix, onInput){
+  const el = $(id), out = $(outId);
+  const upd = () => {
+    out.textContent = el.value + (suffix||'');
+    el.style.setProperty('--fill', ((el.value-el.min)/(el.max-el.min)*100)+'%');
+  };
+  el.addEventListener('input', () => { upd(); if(onInput) onInput(); });
+  upd();
+  rangeUpdaters[id] = upd;
+}
+bindRange('rgSense','oSense','',process);
+bindRange('rgBlur','oBlur','',process);
+bindRange('rgThick','oThick','',process);
+bindRange('rgColors','oColors','',process);
+bindRange('rgSmooth','oSmooth','',() => { invalidateVec(); render(); });
+bindRange('rgGap','oGap','',process);
+bindRange('rgSpeck','oSpeck','',process);
+bindRange('rgSpur','oSpur','',process);
+bindRange('rgBrush','oBrush','px');
+bindRange('rgSoft','oSoft','%');
+bindRange('rgBgTol','oBgTol','');
+bindRange('rgFeather','oFeather','',() => {
+  if(bgMask){ applyBgToSources(); invalidateVec(); render(); }
+});
+$('ckInvert').onchange = render;
+$('ckCAD').onchange = process;
+$('ckCorner').onchange = () => { invalidateVec(); render(); };
+
+/* ---------- ลบพื้นหลังต้นฉบับ (flood fill จากขอบภาพ) ---------- */
+/* กำแพงเส้นขอบ (Sobel): flood/การกัดขอบห้ามข้าม contour ชัดของวัตถุ */
+function makeEdgeBarrier(){
+  const barrier = new Uint8Array(W*H);
+  const g = boxBlur(grayOrig, W, H, 1);
+  const ET2 = 55 * 55;
+  for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+    const i = y*W+x;
+    const gx = -g[i-W-1]-2*g[i-1]-g[i+W-1]+g[i-W+1]+2*g[i+1]+g[i+W+1];
+    const gy = -g[i-W-1]-2*g[i-W]-g[i-W+1]+g[i+W-1]+2*g[i+W]+g[i+W+1];
+    if(gx*gx + gy*gy > ET2 * 16) barrier[i] = 1;
+  }
+  return barrier;
+}
+
+function computeBgMask(tol){
+  const t2 = tol * tol * 3;                 // เกณฑ์เทียบกับสี seed
+  const tn2 = (tol*0.35) * (tol*0.35) * 3;  // เกณฑ์เทียบเพื่อนบ้าน (ไล่เงา/ไล่แสง)
+  const t2ext = (tol*2.2) * (tol*2.2) * 3;  // เพดานกันไหลเข้าวัตถุ
+  const mask = new Uint8Array(W*H);
+  const visited = new Uint8Array(W*H);
+  const stack = new Int32Array(W*H);
+  const R = i => origRGB[i*4], G = i => origRGB[i*4+1], B = i => origRGB[i*4+2];
+  const barrier = makeEdgeBarrier();
+  const trySeed = s => {
+    if(visited[s]) return;
+    const sr = R(s), sg = G(s), sb = B(s);
+    let sp = 0;
+    visited[s] = 1; mask[s] = 1; stack[sp++] = s;
+    while(sp){
+      const c = stack[--sp], x = c % W, y = (c / W) | 0;
+      const cr = R(c), cg = G(c), cb = B(c);
+      const push = n => {
+        if(visited[n] || barrier[n]) return;
+        const dr = R(n)-sr, dg = G(n)-sg, db = B(n)-sb;
+        const ds = dr*dr + dg*dg + db*db;
+        let ok = ds <= t2;
+        if(!ok && ds <= t2ext){
+          // สีต่างจาก seed แต่ไล่ระดับจากเพื่อนบ้าน = เงา/ไล่แสงของพื้น
+          const nr = R(n)-cr, ng = G(n)-cg, nb = B(n)-cb;
+          ok = nr*nr + ng*ng + nb*nb <= tn2;
+        }
+        if(ok){ visited[n] = 1; mask[n] = 1; stack[sp++] = n; }
+      };
+      if(x > 0) push(c-1);
+      if(x < W-1) push(c+1);
+      if(y > 0) push(c-W);
+      if(y < H-1) push(c+W);
+    }
+  };
+  for(let x=0;x<W;x++){ trySeed(x); trySeed((H-1)*W + x); }
+  for(let y=0;y<H;y++){ trySeed(y*W); trySeed(y*W + W-1); }
+  // เก็บเฉพาะวัตถุชิ้นใหญ่สุด — เศษ/เงา/จุดหลุดลอยรอบตัว = ลบทิ้งทั้งหมด
+  const lab = new Int32Array(W*H);
+  let nLab = 0, bestLab = 0, bestArea = 0;
+  for(let i0=0;i0<W*H;i0++){
+    if(mask[i0] || lab[i0]) continue;
+    nLab++;
+    let sp = 0, area = 0;
+    lab[i0] = nLab; stack[sp++] = i0;
+    while(sp){
+      const c = stack[--sp], x = c % W, y = (c / W) | 0;
+      area++;
+      const push = n => { if(!mask[n] && !lab[n]){ lab[n] = nLab; stack[sp++] = n; } };
+      if(x > 0) push(c-1);
+      if(x < W-1) push(c+1);
+      if(y > 0) push(c-W);
+      if(y < H-1) push(c+W);
+    }
+    if(area > bestArea){ bestArea = area; bestLab = nLab; }
+  }
+  for(let i=0;i<W*H;i++)
+    if(!mask[i] && lab[i] !== bestLab) mask[i] = 1;
+  // ลบโพรงพื้นหลังที่ถูกวัตถุล้อม (ซอกแขน ช่องผม ช่องว่างในตัวอักษร):
+  // บริเวณสีใกล้เคียงค่าเฉลี่ยพื้นหลัง และมีขนาดไม่เกิน 12% ของภาพ
+  let ar = 0, ag = 0, ab = 0, an = 0;
+  for(let i=0;i<W*H;i++) if(mask[i]){ ar += R(i); ag += G(i); ab += B(i); an++; }
+  if(an > 0){
+    ar /= an; ag /= an; ab /= an;
+    const cand = new Uint8Array(W*H);
+    for(let i=0;i<W*H;i++){
+      if(mask[i]) continue;
+      const dr = R(i)-ar, dg = G(i)-ag, db = B(i)-ab;
+      if(dr*dr + dg*dg + db*db <= t2) cand[i] = 1;
+    }
+    const seen2 = new Int32Array(W*H);
+    const areas = [0];
+    let id = 0;
+    for(let s0=0;s0<W*H;s0++){
+      if(!cand[s0] || seen2[s0]) continue;
+      id++;
+      let sp = 0, area = 0;
+      seen2[s0] = id; stack[sp++] = s0;
+      while(sp){
+        const c = stack[--sp], x = c % W, y = (c / W) | 0;
+        area++;
+        if(x > 0 && cand[c-1] && !seen2[c-1]){ seen2[c-1] = id; stack[sp++] = c-1; }
+        if(x < W-1 && cand[c+1] && !seen2[c+1]){ seen2[c+1] = id; stack[sp++] = c+1; }
+        if(y > 0 && cand[c-W] && !seen2[c-W]){ seen2[c-W] = id; stack[sp++] = c-W; }
+        if(y < H-1 && cand[c+W] && !seen2[c+W]){ seen2[c+W] = id; stack[sp++] = c+W; }
+      }
+      areas.push(area);
+    }
+    const maxPocket = Math.floor(W*H*0.02);   // เฉพาะซอกเล็กจริง — กันกินชิ้นวัตถุสีเดียวกับพื้น (เช่นเสื้อขาวบนพื้นขาว)
+    for(let i=0;i<W*H;i++)
+      if(seen2[i] && areas[seen2[i]] <= maxPocket) mask[i] = 1;
+
+    // ดูดขอบเงา/ฮาโลรอบรอยตัดที่สียังใกล้พื้นหลัง — ไล่จากขอบ mask ออกทีละชั้น
+    const tEdge = (tol*1.7) * (tol*1.7) * 3;
+    let queue = [];
+    for(let i=0;i<W*H;i++){
+      if(mask[i]) continue;
+      const x = i % W, y = (i / W) | 0;
+      if((x>0 && mask[i-1]) || (x<W-1 && mask[i+1]) || (y>0 && mask[i-W]) || (y<H-1 && mask[i+W]))
+        queue.push(i);
+    }
+    let guard = 0;
+    while(queue.length && guard++ < 4){   // จำกัดลึกสุด 4px: เก็บเฉพาะขลิบ/เงาขอบ ไม่ลามเข้าวัตถุสีคล้ายพื้น
+      const next = [];
+      for(const i of queue){
+        if(mask[i]) continue;
+        const dr = R(i)-ar, dg = G(i)-ag, db = B(i)-ab;
+        if(dr*dr + dg*dg + db*db <= tEdge){
+          mask[i] = 1;
+          const x = i % W, y = (i / W) | 0;
+          if(x>0 && !mask[i-1]) next.push(i-1);
+          if(x<W-1 && !mask[i+1]) next.push(i+1);
+          if(y>0 && !mask[i-W]) next.push(i-W);
+          if(y<H-1 && !mask[i+W]) next.push(i+W);
+        }
+      }
+      queue = next;
+    }
+  }
+  return mask;
+}
+function rebuildOrigCanvas(){
+  origCanvas = document.createElement('canvas');
+  origCanvas.width = W; origCanvas.height = H;
+  const octx = origCanvas.getContext('2d');
+  const im = octx.createImageData(W, H);
+  im.data.set(origRGB);
+  octx.putImageData(im, 0, 0);
+}
+function applyBgToSources(){
+  // gray: พื้นที่ลบ = กระดาษขาว จะไม่เกิดเส้น (เวกเตอร์ยังใช้ mask คมเหมือนเดิม)
+  for(let i=0;i<W*H;i++) gray[i] = (bgMask && bgMask[i]) ? 255 : grayOrig[i];
+  const sctx = srcCanvas.getContext('2d');
+  const im = sctx.createImageData(W, H);
+  const d = im.data;
+  if(!bgMask){
+    for(let i=0,p=0;i<W*H;i++,p+=4){
+      d[p] = origRGB[p]; d[p+1] = origRGB[p+1]; d[p+2] = origRGB[p+2];
+      d[p+3] = eraseAlpha ? eraseAlpha[i] : 255;
+    }
+    sctx.putImageData(im, 0, 0);
+    return;
+  }
+  // --- ขอบเนียน: feather (alpha ฟุ้ง) + defringe (ล้างสีพื้นที่ปนอยู่ตรงขอบ) ---
+  const fr = +($('rgFeather') ? $('rgFeather').value : 1);
+  let soft = null;
+  if(fr > 0){
+    const keepF = new Float32Array(W*H);
+    for(let i=0;i<W*H;i++) keepF[i] = bgMask[i] ? 0 : 255;
+    soft = boxBlur(keepF, W, H, fr);
+  }
+  // ค่าเฉลี่ยสีพื้นหลัง สำหรับสูตรล้างสีปนขอบ
+  let br = 0, bgc = 0, bb = 0, bn = 0;
+  for(let i=0;i<W*H;i++){
+    if(bgMask[i]){ br += origRGB[i*4]; bgc += origRGB[i*4+1]; bb += origRGB[i*4+2]; bn++; }
+  }
+  if(bn > 0){ br /= bn; bgc /= bn; bb /= bn; }
+  const clamp255 = v => v < 0 ? 0 : (v > 255 ? 255 : v);
+  for(let i=0,p=0;i<W*H;i++,p+=4){
+    const a = soft ? soft[i] : (bgMask[i] ? 0 : 255);
+    let r = origRGB[p], g = origRGB[p+1], b = origRGB[p+2];
+    if(a > 12 && a < 244 && bn > 0){
+      // พิกเซลขอบ = ส่วนผสมวัตถุ+พื้น → ถอดสีพื้นออก: fg = (C - (1-f)·bg) / f
+      const f = a / 255;
+      r = clamp255((r - (1 - f) * br) / f);
+      g = clamp255((g - (1 - f) * bgc) / f);
+      b = clamp255((b - (1 - f) * bb) / f);
+    }
+    d[p] = r; d[p+1] = g; d[p+2] = b;
+    d[p+3] = Math.round(a * (eraseAlpha ? eraseAlpha[i] : 255) / 255);
+  }
+  sctx.putImageData(im, 0, 0);
+}
+/* เก็บเฉพาะชิ้นวัตถุที่ใหญ่ที่สุดใน mask (bg=1 คือพื้น) */
+function keepLargestObject(bg){
+  const lab = new Int32Array(W*H);
+  const st = new Int32Array(W*H);
+  let nLab = 0, bestLab = 0, bestArea = 0;
+  for(let s0=0;s0<W*H;s0++){
+    if(bg[s0] || lab[s0]) continue;
+    nLab++;
+    let sp = 0, area = 0;
+    lab[s0] = nLab; st[sp++] = s0;
+    while(sp){
+      const c = st[--sp], x = c % W, y = (c / W) | 0;
+      area++;
+      if(x > 0 && !bg[c-1] && !lab[c-1]){ lab[c-1] = nLab; st[sp++] = c-1; }
+      if(x < W-1 && !bg[c+1] && !lab[c+1]){ lab[c+1] = nLab; st[sp++] = c+1; }
+      if(y > 0 && !bg[c-W] && !lab[c-W]){ lab[c-W] = nLab; st[sp++] = c-W; }
+      if(y < H-1 && !bg[c+W] && !lab[c+W]){ lab[c+W] = nLab; st[sp++] = c+W; }
+    }
+    if(area > bestArea){ bestArea = area; bestLab = nLab; }
+  }
+  for(let i=0;i<W*H;i++) if(!bg[i] && lab[i] !== bestLab) bg[i] = 1;
+  return bg;
+}
+
+/* ---------- ลบพื้นหลังด้วย AI (MediaPipe Selfie Segmentation — รันในเครื่อง) ---------- */
+let ssModel = null;
+function loadScriptOnce(src){
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = res;
+    s.onerror = () => rej(new Error('script load failed'));
+    document.head.appendChild(s);
+  });
+}
+async function getSegmenter(){
+  if(ssModel) return ssModel;
+  await loadScriptOnce('https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js');
+  const ss = new SelfieSegmentation({
+    locateFile: f => 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/' + f
+  });
+  ss.setOptions({ modelSelection: 1 });
+  ssModel = ss;
+  return ss;
+}
+$('btnBgAI').onclick = async () => {
+  if(!gray) return;
+  busy.textContent = 'กำลังโหลดโมเดล AI…';
+  busy.style.display = 'inline-block';
+  try{
+    const ss = await getSegmenter();
+    // ส่งภาพต้นฉบับเต็ม (ก่อนการลบใดๆ) เข้าโมเดล
+    const src = document.createElement('canvas');
+    src.width = W; src.height = H;
+    const sctx2 = src.getContext('2d');
+    const im = sctx2.createImageData(W, H);
+    im.data.set(origRGB);
+    sctx2.putImageData(im, 0, 0);
+    busy.textContent = 'AI กำลังแยกวัตถุ…';
+    const maskImg = await new Promise((res, rej) => {
+      const timer = setTimeout(() => rej(new Error('timeout')), 30000);
+      ss.onResults(r => { clearTimeout(timer); res(r.segmentationMask); });
+      ss.send({ image: src }).catch(e => { clearTimeout(timer); rej(e); });
+    });
+    const mc = document.createElement('canvas');
+    mc.width = W; mc.height = H;
+    const mctx = mc.getContext('2d');
+    mctx.drawImage(maskImg, 0, 0, W, H);
+    const md = mctx.getImageData(0, 0, W, H).data;
+    pushHistory('bg');
+    let bg = new Uint8Array(W*H);
+    for(let i=0;i<W*H;i++) bg[i] = md[i*4] < 128 ? 1 : 0;   // ค่าสว่าง = คน
+    bg = keepLargestObject(bg);
+    bgMask = dilate(bg, W, H);   // เก็บขลิบขอบ 1px
+    applyBgToSources();
+    $('btnBgRestore').disabled = false;
+    setView('result');
+    process(true);
+    $('metaInfo').textContent = '✓ AI ลบพื้นหลังสำเร็จ — ย้อนกลับได้ด้วยปุ่ม ↩️';
+  }catch(err){
+    $('metaInfo').textContent = '⚠ โหลดโมเดล AI ไม่ได้ (ต้องต่ออินเทอร์เน็ต และเปิดนอก sandbox) — ใช้ ✂️ หรือ 🖍️ แทน';
+  }
+  busy.textContent = 'กำลังประมวลผล…';
+  busy.style.display = 'none';
+};
+
+$('btnBgRemove').onclick = () => {
+  if(!gray) return;
+  pushHistory('bg');
+  busy.style.display = 'inline-block';
+  setTimeout(() => {
+    bgMask = computeBgMask(+$('rgBgTol').value);
+    if(hlAny) for(let i=0;i<W*H;i++) if(keepMask[i]) bgMask[i] = 0;  // ไฮไลต์ = ป้องกันไว้เสมอ
+    applyBgToSources();
+    $('btnBgRestore').disabled = false;
+    process(true);
+    busy.style.display = 'none';
+  }, 30);
+};
+$('btnBgRestore').onclick = () => {
+  if(!gray) return;
+  pushHistory('bg');
+  bgMask = null;
+  applyBgToSources();
+  $('btnBgRestore').disabled = true;
+  process(true);
+};
+/* ---------- ขนาดจริง: ล็อก/ปลดล็อกสัดส่วน ---------- */
+let aspectLock = true;
+const r1 = v => Math.round(v*10)/10;
+$('inMM').addEventListener('input', () => {
+  if(aspectLock && W) $('inMMH').value = r1((+$('inMM').value || 0) * H / W);
+  updateDims();
+  applyCanvasSize();
+});
+$('inMMH').addEventListener('input', () => {
+  if(aspectLock && W) $('inMM').value = r1((+$('inMMH').value || 0) * W / H);
+  updateDims();
+  applyCanvasSize();
+});
+$('btnLock').onclick = () => {
+  aspectLock = !aspectLock;
+  $('btnLock').textContent = aspectLock ? '🔒 ล็อกสัดส่วน: เปิด' : '🔓 ล็อกสัดส่วน: ปิด';
+  // กลับมาล็อก → ปรับความสูงให้ตรงสัดส่วนจากความกว้างทันที
+  if(aspectLock && W) $('inMMH').value = r1((+$('inMM').value || 100) * H / W);
+  updateDims();
+  applyCanvasSize();
+};
+function syncSizeFromImage(){
+  if(!W) return;
+  if(aspectLock || !+$('inMMH').value)
+    $('inMMH').value = r1((+$('inMM').value || 100) * H / W);
+}
+
+function setMode(m){
+  mode = m;
+  document.querySelectorAll('.modes button').forEach(x => x.classList.toggle('active', x.dataset.mode===m));
+  $('modeHint').textContent = modeHints[m];
+  $('colorCtl').style.display = m==='color' ? '' : 'none';
+  const isPhoto = m === 'photo';
+  $('grpAdjust').style.display = isPhoto ? 'none' : '';
+  $('grpClean').style.display = isPhoto ? 'none' : '';
+  updateButtons();
+}
+document.querySelectorAll('.modes button').forEach(b => {
+  b.onclick = () => { setMode(b.dataset.mode); process(); };
+});
+
+function updateButtons(){
+  const has = !!gray;
+  const isColor = mode === 'color';
+  $('btnPNG').disabled = !has;
+  $('btnBgRemove').disabled = !has;
+  $('btnBgAI').disabled = !has;
+  const isPhoto = mode === 'photo';
+  $('btnSVG').disabled = !has || isPhoto;
+  $('btnDXF').disabled = !has || isPhoto;
+  $('tlPen').disabled = $('tlErase').disabled = !has || isColor;
+  if(isPhoto){ $('tlPen').disabled = $('tlErase').disabled = !has; }  // โหมดรูป: รีทัชได้
+  $('tlHl').disabled = !has;
+  $('tlCrop').disabled = !has;
+  $('btnReset').disabled = !has;
+  if(isColor && tool && tool !== 'hl' && tool !== 'crop'){ tool = null; updateToolUI(); }
+}
+
+/* ---------- presets ---------- */
+const presets = {
+  stencil:{ mode:'threshold', sense:55, blur:1, thick:2, cad:false, invert:false },
+  stamp:  { mode:'sketch',    sense:60, blur:1, thick:2, cad:false, invert:true  },
+  laser:  { mode:'sketch',    sense:50, blur:1, thick:1, cad:true,  invert:false },
+  sticker:{ mode:'color',     colors:8, blur:2 }
+};
+document.querySelectorAll('.presets button').forEach(b => {
+  b.onclick = () => {
+    const p = presets[b.dataset.preset];
+    if(p.sense !== undefined) $('rgSense').value = p.sense;
+    if(p.blur !== undefined)  $('rgBlur').value = p.blur;
+    if(p.thick !== undefined) $('rgThick').value = p.thick;
+    if(p.colors !== undefined) $('rgColors').value = p.colors;
+    if(p.cad !== undefined) $('ckCAD').checked = p.cad;
+    if(p.invert !== undefined) $('ckInvert').checked = p.invert;
+    ['rgSense','rgBlur','rgThick','rgColors'].forEach(id => rangeUpdaters[id]());
+    setMode(p.mode);
+    process();
+  };
+});
+
+/* ---------- views ---------- */
+$('vwResult').onclick = () => setView('result');
+$('vwOriginal').onclick = () => setView('original');
+$('vwSplit').onclick = () => setView('split');
+function setView(v){
+  viewing = v;
+  $('vwResult').classList.toggle('active', v==='result');
+  $('vwOriginal').classList.toggle('active', v==='original');
+  $('vwSplit').classList.toggle('active', v==='split');
+  canvas.classList.toggle('interactive', v==='split' || !!tool);
+  render();
+}
+
+/* ---------- ปากกา / ยางลบ ---------- */
+$('tlPen').onclick = () => setTool('draw');
+$('tlErase').onclick = () => setTool('erase');
+function setTool(t){
+  tool = (tool === t) ? null : t;
+  updateToolUI();
+}
+function updateToolUI(){
+  $('tlPen').classList.toggle('active', tool==='draw');
+  $('tlErase').classList.toggle('active', tool==='erase');
+  $('tlHl').classList.toggle('active', tool==='hl');
+  $('tlCrop').classList.toggle('active', tool==='crop');
+  $('cropBar').style.display = tool==='crop' ? 'flex' : 'none';
+  if(tool !== 'crop') cropRect = null;
+  canvas.classList.toggle('interactive', viewing==='split' || !!tool);
+}
+
+/* ---------- ย้อนกลับ / เดินหน้า ---------- */
+/* ประวัติแบบ snapshot ตามชนิดคำสั่ง: binary (ปากกา/ยางลบ) | bg (ลบพื้น/ไฮไลต์) */
+function snapState(kind){
+  if(kind === 'full')
+    return {
+      kind:'full', W, H,
+      origRGB: origRGB.slice(),
+      grayOrig: grayOrig.slice(),
+      bgMask: bgMask ? bgMask.slice() : null
+    };
+  if(kind === 'binary')
+    return { kind:'binary', binary: binary ? binary.slice() : null };
+  return {
+    kind:'bg',
+    bgMask: bgMask ? bgMask.slice() : null,
+    keepMask: keepMask ? keepMask.slice() : null,
+    eraseAlpha: eraseAlpha ? eraseAlpha.slice() : null,
+    hlAny
+  };
+}
+function resetHlLayer(){
+  keepMask = new Uint8Array(W*H);
+  hlAny = false;
+  hlCanvas = document.createElement('canvas');
+  hlCanvas.width = W; hlCanvas.height = H;
+  hlCtx = hlCanvas.getContext('2d');
+}
+function applySnap(s){
+  if(s.kind === 'full'){
+    W = s.W; H = s.H;
+    origRGB = s.origRGB.slice();
+    grayOrig = s.grayOrig.slice();
+    bgMask = s.bgMask ? s.bgMask.slice() : null;
+    srcRGB = origRGB.slice();
+    gray = new Float32Array(W*H);
+    srcCanvas.width = W; srcCanvas.height = H;
+    resetHlLayer();
+    rebuildOrigCanvas();
+    eraseAlpha = null;
+    applyBgToSources();
+    RS = 1;
+    canvas.width = W; canvas.height = H;
+    if(aspectLock) $('inMMH').value = r1((+$('inMM').value || 100) * H / W);
+    $('btnBgRestore').disabled = !bgMask;
+    updateHlButtons();
+    updateDims();
+    fitZoom();
+    process(true);
+    return;
+  }
+  if(s.kind === 'binary'){
+    if(s.binary) binary = s.binary;
+    invalidateVec();
+    render();
+    return;
+  }
+  bgMask = s.bgMask;
+  eraseAlpha = s.eraseAlpha ? s.eraseAlpha.slice() : null;
+  if(s.keepMask && keepMask) keepMask.set(s.keepMask);
+  hlAny = s.hlAny;
+  rebuildHlFromMask();
+  applyBgToSources();
+  $('btnBgRestore').disabled = !bgMask;
+  updateHlButtons();
+  process(true);
+}
+function rebuildHlFromMask(){
+  if(!hlCtx) return;
+  hlCtx.clearRect(0, 0, W, H);
+  if(!keepMask || !hlAny) return;
+  const im = hlCtx.createImageData(W, H);
+  for(let i=0,p=0;i<W*H;i++,p+=4){
+    if(keepMask[i]){ im.data[p]=43; im.data[p+1]=80; im.data[p+2]=224; im.data[p+3]=115; }
+  }
+  hlCtx.putImageData(im, 0, 0);
+}
+function pushHistory(kind){
+  if(!gray) return;
+  undoStack.push(snapState(kind || 'binary'));
+  if(undoStack.length > HISTORY_MAX) undoStack.shift();
+  redoStack.length = 0;
+  updateHistoryUI();
+}
+function undo(){
+  if(!undoStack.length) return;
+  const s = undoStack.pop();
+  redoStack.push(snapState(s.kind));
+  applySnap(s);
+  updateHistoryUI();
+}
+function redo(){
+  if(!redoStack.length) return;
+  const s = redoStack.pop();
+  undoStack.push(snapState(s.kind));
+  applySnap(s);
+  updateHistoryUI();
+}
+function clearHistory(){
+  undoStack.length = 0;
+  redoStack.length = 0;
+  updateHistoryUI();
+}
+function updateHistoryUI(){
+  $('btnUndo').disabled = !undoStack.length;
+  $('btnRedo').disabled = !redoStack.length;
+}
+$('cropApply').onclick = () => {
+  if(!cropRect || !gray) return;
+  const x = Math.round(Math.min(cropRect.x0, cropRect.x1));
+  const y = Math.round(Math.min(cropRect.y0, cropRect.y1));
+  const w = Math.round(Math.abs(cropRect.x1 - cropRect.x0));
+  const h = Math.round(Math.abs(cropRect.y1 - cropRect.y0));
+  if(w < 10 || h < 10) return;
+  busy.style.display = 'inline-block';
+  setTimeout(() => {
+    pushHistory('full');
+    const copyRGBA = src => {
+      const out = new Uint8ClampedArray(w*h*4);
+      for(let r=0;r<h;r++) out.set(src.subarray(((y+r)*W + x)*4, ((y+r)*W + x + w)*4), r*w*4);
+      return out;
+    };
+    const copyF32 = src => {
+      const out = new Float32Array(w*h);
+      for(let r=0;r<h;r++) out.set(src.subarray((y+r)*W + x, (y+r)*W + x + w), r*w);
+      return out;
+    };
+    const copyU8 = src => {
+      const out = new Uint8Array(w*h);
+      for(let r=0;r<h;r++) out.set(src.subarray((y+r)*W + x, (y+r)*W + x + w), r*w);
+      return out;
+    };
+    origRGB = copyRGBA(origRGB);
+    grayOrig = copyF32(grayOrig);
+    bgMask = bgMask ? copyU8(bgMask) : null;
+    W = w; H = h;
+    srcRGB = origRGB.slice();
+    gray = new Float32Array(W*H);
+    srcCanvas.width = W; srcCanvas.height = H;
+    resetHlLayer();
+    rebuildOrigCanvas();
+    eraseAlpha = null;
+    applyBgToSources();
+    RS = 1;
+    canvas.width = W; canvas.height = H;
+    if(aspectLock) $('inMMH').value = r1((+$('inMM').value || 100) * H / W);
+    updateHlButtons();
+    cropRect = null;
+    if(tool === 'crop') setTool('crop');
+    updateDims();
+    fitZoom();
+    process(true);
+    busy.style.display = 'none';
+  }, 30);
+};
+$('cropCancel').onclick = () => {
+  cropRect = null;
+  if(tool === 'crop') setTool('crop');
+  render();
+};
+
+$('btnReset').onclick = () => {
+  if(!gray || !initialSnap) return;
+  pushHistory('full');            // รีเซ็ตเองก็ย้อนกลับได้
+  cropRect = null;
+  if(tool){ tool = null; updateToolUI(); }
+  applySnap(initialSnap);         // applySnap คัดลอกข้อมูลเอง ไม่แตะต้นฉบับ
+  $('metaInfo').textContent = '♻️ รีเซ็ตกลับสู่รูปเริ่มต้นแล้ว — กด ↩️ หากต้องการย้อนคืน';
+};
+
+$('btnUndo').onclick = undo;
+$('btnRedo').onclick = redo;
+document.addEventListener('keydown', e => {
+  if(!(e.ctrlKey || e.metaKey)) return;
+  const k = e.key.toLowerCase();
+  if(k === 'z' && !e.shiftKey){ e.preventDefault(); undo(); }
+  else if(k === 'y' || (k === 'z' && e.shiftKey)){ e.preventDefault(); redo(); }
+});
+
+function canvasPos(e){
+  const r = canvas.getBoundingClientRect();
+  return [ (e.clientX - r.left) * (W / r.width), (e.clientY - r.top) * (H / r.height) ];
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if(!gray || dragging || pinch.pts.size >= 2) return;
+  if(viewing === 'split'){
+    dragging = 'split';
+    canvas.setPointerCapture(e.pointerId);
+    moveSplit(e);
+  } else if(mode === 'photo' && (tool === 'draw' || tool === 'erase') && viewing === 'result'){
+    canvas.setPointerCapture(e.pointerId);
+    dragging = 'photoTool';
+    pushHistory('bg');
+    stampPhoto(e);
+  } else if(tool === 'crop'){
+    dragging = 'crop';
+    canvas.setPointerCapture(e.pointerId);
+    const [cx, cy] = canvasPos(e);
+    cropRect = { x0:cx, y0:cy, x1:cx, y1:cy };
+    render();
+  } else if(tool === 'hl' && viewing !== 'split'){
+    dragging = 'hl';
+    canvas.setPointerCapture(e.pointerId);
+    stampHl(e);
+  } else if(tool && binary && mode !== 'color' && viewing === 'result'){
+    dragging = 'tool';
+    canvas.setPointerCapture(e.pointerId);
+    pushHistory();
+    stamp(e);
+  }
+});
+canvas.addEventListener('pointermove', e => {
+  if(dragging === 'split') moveSplit(e);
+  else if(dragging === 'tool') stamp(e);
+  else if(dragging === 'hl') stampHl(e);
+  else if(dragging === 'photoTool') stampPhoto(e);
+  else if(dragging === 'crop' && cropRect){
+    const [cx, cy] = canvasPos(e);
+    cropRect.x1 = Math.min(W, Math.max(0, cx));
+    cropRect.y1 = Math.min(H, Math.max(0, cy));
+    render();
+  }
+});
+['pointerup','pointercancel'].forEach(ev => canvas.addEventListener(ev, () => {
+  if(dragging === 'tool'){ invalidateVec(); render(); }
+  else if(dragging === 'photoTool'){ applyBgToSources(); render(); }
+  dragging = null;
+}));
+
+function moveSplit(e){
+  splitX = Math.min(1, Math.max(0, canvasPos(e)[0] / W));
+  render();
+}
+function updateHlButtons(){
+  $('btnHlApply').disabled = $('btnHlClear').disabled = !hlAny;
+}
+$('tlHl').onclick = () => setTool('hl');
+$('tlCrop').onclick = () => setTool('crop');
+/* รีทัชรูปถ่ายแบบแปรงฟุ้ง (Photoshop-style):
+   ยางลบ = ลดความทึบตามระยะจากกลางหัวแปรง / ปากกา = กู้คืนแบบฟุ้งเช่นกัน */
+function stampPhoto(e){
+  const [cx, cy] = canvasPos(e);
+  const r = +$('rgBrush').value;
+  const soft = +$('rgSoft').value / 100;        // 0 = ขอบคม, 1 = ฟุ้งทั้งหัว
+  const hardR = r * (1 - soft);                 // รัศมีส่วนที่แรงเต็ม
+  const erase = tool === 'erase';
+  if(!eraseAlpha){
+    eraseAlpha = new Uint8Array(W*H);
+    eraseAlpha.fill(255);
+  }
+  if(!bgMask) bgMask = new Uint8Array(W*H);
+  const x0 = Math.max(0, Math.floor(cx-r)), x1 = Math.min(W-1, Math.ceil(cx+r));
+  const y0 = Math.max(0, Math.floor(cy-r)), y1 = Math.min(H-1, Math.ceil(cy+r));
+  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
+    const dx = x-cx, dy = y-cy;
+    const dist = Math.hypot(dx, dy);
+    if(dist > r) continue;
+    // ความแรง: เต็มในโซนแข็ง แล้วไล่โค้งนุ่มถึงขอบ (cosine falloff)
+    let s;
+    if(dist <= hardR) s = 1;
+    else s = 0.5 * (1 + Math.cos(Math.PI * (dist - hardR) / (r - hardR || 1)));
+    const i = y*W + x;
+    const amt = Math.round(255 * s);
+    if(erase){
+      eraseAlpha[i] = Math.max(0, eraseAlpha[i] - amt);
+    } else {
+      eraseAlpha[i] = Math.min(255, eraseAlpha[i] + amt);
+      if(s >= 0.99) bgMask[i] = 0;              // ปากกาเต็มแรง = กู้คืนจาก mask ด้วย
+    }
+  }
+  // อัปเดต srcCanvas เฉพาะกรอบที่แตะ (base โดยประมาณ ไม่รวม feather — เก็บงานตอนปล่อยนิ้ว)
+  const sctx = srcCanvas.getContext('2d');
+  const bw = x1-x0+1, bh = y1-y0+1;
+  const im = sctx.getImageData(x0, y0, bw, bh);
+  for(let yy=0;yy<bh;yy++) for(let xx=0;xx<bw;xx++){
+    const gi = (y0+yy)*W + (x0+xx);
+    const p = (yy*bw+xx)*4;
+    im.data[p]   = origRGB[gi*4];
+    im.data[p+1] = origRGB[gi*4+1];
+    im.data[p+2] = origRGB[gi*4+2];
+    const base = bgMask[gi] ? 0 : 255;
+    im.data[p+3] = Math.round(base * eraseAlpha[gi] / 255);
+  }
+  sctx.putImageData(im, x0, y0);
+  grayDirty = true;
+  $('btnBgRestore').disabled = false;
+  render();
+}
+
+function stampHl(e){
+  if(!keepMask) return;
+  const [cx, cy] = canvasPos(e);
+  const r = +$('rgBrush').value;
+  const x0 = Math.max(0, Math.floor(cx-r)), x1 = Math.min(W-1, Math.ceil(cx+r));
+  const y0 = Math.max(0, Math.floor(cy-r)), y1 = Math.min(H-1, Math.ceil(cy+r));
+  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
+    const dx=x-cx, dy=y-cy;
+    if(dx*dx+dy*dy <= r*r) keepMask[y*W+x] = 1;
+  }
+  hlCtx.fillStyle = 'rgba(43,80,224,0.9)';
+  hlCtx.beginPath();
+  hlCtx.arc(cx, cy, r, 0, Math.PI*2);
+  hlCtx.fill();
+  if(!hlAny){ hlAny = true; updateHlButtons(); }
+  render();
+}
+/* ลบทุกอย่างนอกบริเวณที่ไฮไลต์ */
+/* คำนวณ bgMask จากรอยไฮไลต์
+   กติกาเหล็ก: แกนบริเวณที่ผู้ใช้ระบายไว้ต้องไม่ถูกลบเด็ดขาด
+   - core = รอยระบายกร่อนเข้า 6px (ชิ้นเล็กที่กร่อนจนหาย → ป้องกันทั้งชิ้น)
+   - การกัดขอบ/ดูดฮาโล ทำได้เฉพาะแถบนอก core
+   - เก็บทุกชิ้นวัตถุที่แตะรอยระบาย (ไม่ใช่แค่ชิ้นใหญ่สุด) */
+function refineHighlightMask(){
+  const keep = dilate(dilate(keepMask, W, H), W, H);   // เผื่อขอบ 2px
+  const bg = new Uint8Array(W*H);
+  for(let i=0;i<W*H;i++) bg[i] = keep[i] ? 0 : 1;
+
+  // --- สร้างแกนป้องกัน ---
+  let core = keepMask;
+  for(let t=0;t<6;t++) core = erode(core, W, H);
+  {
+    const lab = new Int32Array(W*H);
+    const st = new Int32Array(W*H);
+    const hasCore = [false];
+    let n = 0;
+    for(let s0=0;s0<W*H;s0++){
+      if(!keepMask[s0] || lab[s0]) continue;
+      n++;
+      let sp = 0, has = false;
+      lab[s0] = n; st[sp++] = s0;
+      while(sp){
+        const c = st[--sp], x = c % W, y = (c / W) | 0;
+        if(core[c]) has = true;
+        if(x > 0 && keepMask[c-1] && !lab[c-1]){ lab[c-1] = n; st[sp++] = c-1; }
+        if(x < W-1 && keepMask[c+1] && !lab[c+1]){ lab[c+1] = n; st[sp++] = c+1; }
+        if(y > 0 && keepMask[c-W] && !lab[c-W]){ lab[c-W] = n; st[sp++] = c-W; }
+        if(y < H-1 && keepMask[c+W] && !lab[c+W]){ lab[c+W] = n; st[sp++] = c+W; }
+      }
+      hasCore.push(has);
+    }
+    const core2 = Uint8Array.from(core);
+    for(let i=0;i<W*H;i++)
+      if(keepMask[i] && !hasCore[lab[i]]) core2[i] = 1;   // ชิ้นระบายเล็ก: ป้องกันทั้งชิ้น
+    core = core2;
+  }
+
+  const R = i => origRGB[i*4], G = i => origRGB[i*4+1], B = i => origRGB[i*4+2];
+  let ar = 0, ag = 0, ab = 0, an = 0;
+  for(let i=0;i<W*H;i++) if(bg[i]){ ar += R(i); ag += G(i); ab += B(i); an++; }
+  if(an === 0) return dilate(bg, W, H);   // ระบายคลุมทั้งภาพ — ไม่มีพื้นให้อ้างอิง
+  ar /= an; ag /= an; ab /= an;
+  const tol = +$('rgBgTol').value;
+  const t2 = tol * tol * 3;
+  const barrier = makeEdgeBarrier();
+
+  // --- กัดพื้นส่วนเกินจากขอบรอยระบายจนชนขอบวัตถุจริง (ห้ามเข้า core) ---
+  let queue = [];
+  for(let i=0;i<W*H;i++){
+    if(bg[i]) continue;
+    const x = i % W, y = (i / W) | 0;
+    if((x>0 && bg[i-1]) || (x<W-1 && bg[i+1]) || (y>0 && bg[i-W]) || (y<H-1 && bg[i+W]))
+      queue.push(i);
+  }
+  while(queue.length){
+    const next = [];
+    for(const i of queue){
+      if(bg[i] || barrier[i] || core[i]) continue;
+      const dr = R(i)-ar, dg = G(i)-ag, db = B(i)-ab;
+      if(dr*dr + dg*dg + db*db > t2) continue;
+      bg[i] = 1;
+      const x = i % W, y = (i / W) | 0;
+      if(x > 0 && !bg[i-1]) next.push(i-1);
+      if(x < W-1 && !bg[i+1]) next.push(i+1);
+      if(y > 0 && !bg[i-W]) next.push(i-W);
+      if(y < H-1 && !bg[i+W]) next.push(i+W);
+    }
+    queue = next;
+  }
+
+  // --- ดูดฮาโล 3 ชั้น (ห้ามเข้า core) ---
+  const tHalo = (tol*1.6) * (tol*1.6) * 3;
+  queue = [];
+  for(let i=0;i<W*H;i++){
+    if(bg[i]) continue;
+    const x = i % W, y = (i / W) | 0;
+    if((x>0 && bg[i-1]) || (x<W-1 && bg[i+1]) || (y>0 && bg[i-W]) || (y<H-1 && bg[i+W]))
+      queue.push(i);
+  }
+  for(let layer=0; layer<3 && queue.length; layer++){
+    const next = [];
+    for(const i of queue){
+      if(bg[i] || core[i]) continue;
+      const dr = R(i)-ar, dg = G(i)-ag, db = B(i)-ab;
+      if(dr*dr + dg*dg + db*db > tHalo) continue;
+      bg[i] = 1;
+      const x = i % W, y = (i / W) | 0;
+      if(x > 0 && !bg[i-1]) next.push(i-1);
+      if(x < W-1 && !bg[i+1]) next.push(i+1);
+      if(y > 0 && !bg[i-W]) next.push(i-W);
+      if(y < H-1 && !bg[i+W]) next.push(i+W);
+    }
+    queue = next;
+  }
+
+  // --- เก็บทุกชิ้นที่แตะรอยระบาย ชิ้นที่ไม่แตะเลย = เศษ ---
+  {
+    const lab = new Int32Array(W*H);
+    const st = new Int32Array(W*H);
+    const touch = [false];
+    let n = 0;
+    for(let s0=0;s0<W*H;s0++){
+      if(bg[s0] || lab[s0]) continue;
+      n++;
+      let sp = 0, t = false;
+      lab[s0] = n; st[sp++] = s0;
+      while(sp){
+        const c = st[--sp], x = c % W, y = (c / W) | 0;
+        if(keepMask[c]) t = true;
+        if(x > 0 && !bg[c-1] && !lab[c-1]){ lab[c-1] = n; st[sp++] = c-1; }
+        if(x < W-1 && !bg[c+1] && !lab[c+1]){ lab[c+1] = n; st[sp++] = c+1; }
+        if(y > 0 && !bg[c-W] && !lab[c-W]){ lab[c-W] = n; st[sp++] = c-W; }
+        if(y < H-1 && !bg[c+W] && !lab[c+W]){ lab[c+W] = n; st[sp++] = c+W; }
+      }
+      touch.push(t);
+    }
+    for(let i=0;i<W*H;i++)
+      if(!bg[i] && !touch[lab[i]]) bg[i] = 1;
+  }
+  return dilate(bg, W, H);   // เก็บขลิบ 1px
+}
+
+/* แปลงรอยระบาย "เก็บ" เป็น bg mask พร้อมเก็บงานขอบ —
+   กติกาเหล็ก: แกนของรอยระบาย (ลึกเข้าไป 3px) คือคำสั่งผู้ใช้ ห้ามลบเด็ดขาด */
+function refineKeepToBg(keepM){
+  const keep = dilate(dilate(keepM, W, H), W, H);          // เผื่อขอบนอก 2px
+  const protect = buildProtect(keepM);                     // แกนป้องกันตามความหนารอยระบาย
+  const bg = new Uint8Array(W*H);
+  for(let i=0;i<W*H;i++) bg[i] = keep[i] ? 0 : 1;
+  const R = i => origRGB[i*4], G = i => origRGB[i*4+1], B = i => origRGB[i*4+2];
+  let ar = 0, ag = 0, ab = 0, an = 0;
+  for(let i=0;i<W*H;i++) if(bg[i]){ ar += R(i); ag += G(i); ab += B(i); an++; }
+  if(an === 0) return bg;
+  ar /= an; ag /= an; ab /= an;
+  const tol = +$('rgBgTol').value;
+  const t2 = tol * tol * 3;
+  const barrier = makeEdgeBarrier();
+  const seedQueue = () => {
+    const q = [];
+    for(let i=0;i<W*H;i++){
+      if(bg[i]) continue;
+      const x = i % W, y = (i / W) | 0;
+      if((x>0 && bg[i-1]) || (x<W-1 && bg[i+1]) || (y>0 && bg[i-W]) || (y<H-1 && bg[i+W]))
+        q.push(i);
+    }
+    return q;
+  };
+  const eat = (queue, thr, useBarrier, maxLayers) => {
+    for(let layer=0; queue.length && (maxLayers === 0 || layer < maxLayers); layer++){
+      const next = [];
+      for(const i of queue){
+        if(bg[i] || protect[i]) continue;                 // ห้ามแตะแกนป้องกัน
+        if(useBarrier && barrier[i]) continue;
+        const dr = R(i)-ar, dg = G(i)-ag, db = B(i)-ab;
+        if(dr*dr + dg*dg + db*db > thr) continue;
+        bg[i] = 1;
+        const x = i % W, y = (i / W) | 0;
+        if(x > 0 && !bg[i-1]) next.push(i-1);
+        if(x < W-1 && !bg[i+1]) next.push(i+1);
+        if(y > 0 && !bg[i-W]) next.push(i-W);
+        if(y < H-1 && !bg[i+W]) next.push(i+W);
+      }
+      queue = next;
+    }
+  };
+  eat(seedQueue(), t2, true, 0);                          // กัดพื้นในรอยระบายถึงขอบวัตถุ
+  eat(seedQueue(), (tol*1.6)*(tol*1.6)*3, false, 3);      // ดูดฮาโล 3 ชั้น
+  keepMarkedComponents(bg, protect);                       // เก็บทุกชิ้นที่ผู้ใช้ระบาย
+  const out = dilate(bg, W, H);                            // เก็บขลิบ 1px
+  for(let i=0;i<W*H;i++) if(protect[i]) out[i] = 0;        // แกนป้องกันไม่ถูกกินแม้แต่ 1px
+  return out;
+}
+
+/* สร้างแกนป้องกันจากรอยระบาย: รอยหนาใช้แกนลึก 3px (เหลือที่ให้เก็บงานขอบ)
+   รอยบางใช้แกน 1px / บางมากป้องกันทั้งรอย — คำสั่งผู้ใช้ต้องไม่หลุดไม่ว่าแปรงเล็กแค่ไหน */
+function buildProtect(keepM){
+  const p1 = erode(keepM, W, H);
+  const p3 = erode(erode(p1, W, H), W, H);
+  const lab = new Int32Array(W*H);
+  const st = new Int32Array(W*H);
+  let n = 0;
+  const has3 = [true], has1 = [true];
+  for(let s0=0;s0<W*H;s0++){
+    if(!keepM[s0] || lab[s0]) continue;
+    n++;
+    let sp = 0, h3 = false, h1 = false;
+    lab[s0] = n; st[sp++] = s0;
+    while(sp){
+      const c = st[--sp], x = c % W, y = (c / W) | 0;
+      if(p3[c]) h3 = true;
+      if(p1[c]) h1 = true;
+      if(x > 0 && keepM[c-1] && !lab[c-1]){ lab[c-1] = n; st[sp++] = c-1; }
+      if(x < W-1 && keepM[c+1] && !lab[c+1]){ lab[c+1] = n; st[sp++] = c+1; }
+      if(y > 0 && keepM[c-W] && !lab[c-W]){ lab[c-W] = n; st[sp++] = c-W; }
+      if(y < H-1 && keepM[c+W] && !lab[c+W]){ lab[c+W] = n; st[sp++] = c+W; }
+    }
+    has3.push(h3); has1.push(h1);
+  }
+  const out = new Uint8Array(W*H);
+  for(let i=0;i<W*H;i++){
+    const c = lab[i];
+    if(!c) continue;
+    if(has3[c]) out[i] = p3[i];
+    else if(has1[c]) out[i] = p1[i];
+    else out[i] = 1;   // รอยบางมาก — ป้องกันทั้งรอย
+  }
+  return out;
+}
+
+/* เก็บเฉพาะ component ที่มีพิกเซลถูกระบาย — รองรับไฮไลต์หลายชิ้นแยกกัน */
+function keepMarkedComponents(bg, marked){
+  const lab = new Int32Array(W*H);
+  const st = new Int32Array(W*H);
+  let nLab = 0;
+  const hasMark = [false];
+  for(let s0=0;s0<W*H;s0++){
+    if(bg[s0] || lab[s0]) continue;
+    nLab++;
+    let sp = 0, mk = false;
+    lab[s0] = nLab; st[sp++] = s0;
+    while(sp){
+      const c = st[--sp], x = c % W, y = (c / W) | 0;
+      if(marked[c]) mk = true;
+      if(x > 0 && !bg[c-1] && !lab[c-1]){ lab[c-1] = nLab; st[sp++] = c-1; }
+      if(x < W-1 && !bg[c+1] && !lab[c+1]){ lab[c+1] = nLab; st[sp++] = c+1; }
+      if(y > 0 && !bg[c-W] && !lab[c-W]){ lab[c-W] = nLab; st[sp++] = c-W; }
+      if(y < H-1 && !bg[c+W] && !lab[c+W]){ lab[c+W] = nLab; st[sp++] = c+W; }
+    }
+    hasMark.push(mk);
+  }
+  for(let i=0;i<W*H;i++) if(!bg[i] && !hasMark[lab[i]]) bg[i] = 1;
+}
+
+$('btnHlApply').onclick = () => {
+  if(!hlAny || !gray) return;
+  pushHistory('bg');
+  busy.style.display = 'inline-block';
+  setTimeout(() => {
+    bgMask = refineKeepToBg(keepMask);
+    applyBgToSources();
+    hlAny = false;
+    keepMask.fill(0);
+    if(hlCtx) hlCtx.clearRect(0, 0, W, H);
+    updateHlButtons();
+    $('btnBgRestore').disabled = false;
+    if(tool === 'hl'){ tool = null; updateToolUI(); }
+    setView('result');
+    process(true);
+    busy.style.display = 'none';
+  }, 30);
+};
+$('btnHlClear').onclick = () => {
+  if(!keepMask) return;
+  pushHistory('bg');
+  keepMask.fill(0);
+  hlAny = false;
+  hlCtx.clearRect(0, 0, W, H);
+  updateHlButtons();
+  render();
+};
+
+function stamp(e){
+  const [cx, cy] = canvasPos(e);
+  const r = +$('rgBrush').value;
+  const v = tool === 'draw' ? 1 : 0;
+  const x0 = Math.max(0, Math.floor(cx-r)), x1 = Math.min(W-1, Math.ceil(cx+r));
+  const y0 = Math.max(0, Math.floor(cy-r)), y1 = Math.min(H-1, Math.ceil(cy+r));
+  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
+    const dx=x-cx, dy=y-cy;
+    if(dx*dx+dy*dy <= r*r) binary[y*W+x] = v;
+  }
+  render();
+}
+
+/* ================= geometry helpers ================= */
+function traceContours(bin, w, h){
+  const val = (x,y) => (x<0||y<0||x>=w||y>=h) ? 0 : bin[y*w+x];
+  const visitedH = new Uint8Array((w+1)*(h+1));
+  const paths = [];
+  for(let y=0;y<=h;y++){
+    for(let x=0;x<w;x++){
+      if(val(x,y)===1 && val(x,y-1)===0 && !visitedH[y*(w+1)+x]){
+        const pts = walk(x, y);
+        if(pts && pts.length >= 3) paths.push(pts);
+      }
+    }
+  }
+  return paths;
+
+  function walk(sx, sy){
+    const pts = [];
+    let x = sx, y = sy, dx = 1, dy = 0;
+    let guard = w*h*4;
+    do{
+      if(dx===1 && dy===0) visitedH[y*(w+1)+x] = 1;
+      pts.push([x,y]);
+      x += dx; y += dy;
+      let fl, fr;
+      if(dx===1){ fl = val(x, y-1);  fr = val(x, y); }
+      else if(dx===-1){ fl = val(x-1, y); fr = val(x-1, y-1); }
+      else if(dy===1){ fl = val(x, y);   fr = val(x-1, y); }
+      else { fl = val(x-1, y-1); fr = val(x, y-1); }
+      if(fl===1){ const t = dx; dx = dy; dy = -t; }
+      else if(fr===0){ const t = dx; dx = -dy; dy = t; }
+      if(--guard < 0) return null;
+    } while(!(x===sx && y===sy && dx===1 && dy===0));
+    return pts;
+  }
+}
+
+function thinning(src, w, h){
+  const img = Uint8Array.from(src);
+  const at = (x,y) => (x<0||y<0||x>=w||y>=h) ? 0 : img[y*w+x];
+  let changed = true, iter = 0;
+  const toClear = [];
+  while(changed && iter++ < 80){
+    changed = false;
+    for(let pass=0; pass<2; pass++){
+      toClear.length = 0;
+      for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+        const i = y*w+x;
+        if(!img[i]) continue;
+        const p2=at(x,y-1),p3=at(x+1,y-1),p4=at(x+1,y),p5=at(x+1,y+1),
+              p6=at(x,y+1),p7=at(x-1,y+1),p8=at(x-1,y),p9=at(x-1,y-1);
+        const B = p2+p3+p4+p5+p6+p7+p8+p9;
+        if(B<2 || B>6) continue;
+        let A = 0;
+        const s = [p2,p3,p4,p5,p6,p7,p8,p9,p2];
+        for(let k=0;k<8;k++) if(s[k]===0 && s[k+1]===1) A++;
+        if(A!==1) continue;
+        if(pass===0){ if(p2*p4*p6 !== 0 || p4*p6*p8 !== 0) continue; }
+        else { if(p2*p4*p8 !== 0 || p2*p6*p8 !== 0) continue; }
+        toClear.push(i);
+      }
+      if(toClear.length){ changed = true; for(const i of toClear) img[i]=0; }
+    }
+  }
+  return img;
+}
+
+function skeletonToPolylines(skel, w, h){
+  const N = w*h;
+  const nbrs = i => {
+    const x=i%w, y=(i/w)|0, out=[];
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      if(!dx && !dy) continue;
+      const nx=x+dx, ny=y+dy;
+      if(nx>=0 && ny>=0 && nx<w && ny<h && skel[ny*w+nx]) out.push(ny*w+nx);
+    }
+    return out;
+  };
+  const deg = new Uint8Array(N);
+  const nodes = [];
+  for(let i=0;i<N;i++) if(skel[i]){ deg[i] = nbrs(i).length; nodes.push(i); }
+  const visited = new Set();
+  const ekey = (a,b) => a<b ? a*N+b : b*N+a;
+  const chains = [];
+  const walk = (start, next) => {
+    const pts = [start];
+    let prev = start, cur = next;
+    visited.add(ekey(prev,cur));
+    pts.push(cur);
+    let guard = N;
+    while(deg[cur] === 2 && guard-- > 0){
+      let nxt = -1;
+      for(const n of nbrs(cur)){
+        if(n !== prev && !visited.has(ekey(cur,n))){ nxt = n; break; }
+      }
+      if(nxt < 0) break;
+      visited.add(ekey(cur,nxt));
+      prev = cur; cur = nxt; pts.push(cur);
+    }
+    return pts;
+  };
+  for(const i of nodes){
+    if(deg[i] !== 2){
+      for(const n of nbrs(i))
+        if(!visited.has(ekey(i,n))) chains.push(walk(i,n));
+    }
+  }
+  for(const i of nodes){
+    if(deg[i] === 2){
+      for(const n of nbrs(i))
+        if(!visited.has(ekey(i,n))) chains.push(walk(i,n));
+    }
+  }
+  return chains.filter(c => c.length >= 2).map(c => c.map(i => [i%w, (i/w)|0]));
+}
+
+function simplifyPath(pts, eps){
+  if(pts.length < 3) return pts;
+  const keep = new Uint8Array(pts.length);
+  keep[0] = keep[pts.length-1] = 1;
+  const stack = [[0, pts.length-1]];
+  while(stack.length){
+    const [a,b] = stack.pop();
+    let maxD = 0, idx = -1;
+    const [ax,ay] = pts[a], [bx,by] = pts[b];
+    const dx = bx-ax, dy = by-ay;
+    const len = Math.hypot(dx,dy) || 1;
+    for(let i=a+1;i<b;i++){
+      const d = Math.abs(dy*(pts[i][0]-ax) - dx*(pts[i][1]-ay)) / len;
+      if(d > maxD){ maxD = d; idx = i; }
+    }
+    if(maxD > eps){ keep[idx]=1; stack.push([a,idx],[idx,b]); }
+  }
+  const out = [];
+  for(let i=0;i<pts.length;i++) if(keep[i]) out.push(pts[i]);
+  return out;
+}
+
+/* ---------- Bezier smoothing (quadratic ผ่านจุดกึ่งกลาง) ---------- */
+function pathD(pts, closed, smooth){
+  const f = v => +v.toFixed(1);
+  if(!smooth || pts.length < 3){
+    let d = 'M' + f(pts[0][0]) + ' ' + f(pts[0][1]);
+    for(let i=1;i<pts.length;i++) d += 'L' + f(pts[i][0]) + ' ' + f(pts[i][1]);
+    return d + (closed ? 'Z' : '');
+  }
+  const n = pts.length;
+  const P = i => pts[((i%n)+n)%n];
+  const mid = (a,b) => [(a[0]+b[0])/2, (a[1]+b[1])/2];
+  let d;
+  if(closed){
+    const m0 = mid(P(0), P(1));
+    d = 'M' + f(m0[0]) + ' ' + f(m0[1]);
+    for(let i=1;i<=n;i++){
+      const m = mid(P(i), P(i+1));
+      d += 'Q' + f(P(i)[0]) + ' ' + f(P(i)[1]) + ' ' + f(m[0]) + ' ' + f(m[1]);
+    }
+    d += 'Z';
+  } else {
+    d = 'M' + f(pts[0][0]) + ' ' + f(pts[0][1]);
+    for(let i=1;i<n-1;i++){
+      const m = mid(pts[i], pts[i+1]);
+      d += 'Q' + f(pts[i][0]) + ' ' + f(pts[i][1]) + ' ' + f(m[0]) + ' ' + f(m[1]);
+    }
+    d += 'L' + f(pts[n-1][0]) + ' ' + f(pts[n-1][1]);
+  }
+  return d;
+}
+
+/* ================= exports ================= */
+function mmScaleXY(){
+  const mw = +$('inMM').value || 100;
+  const mh = +$('inMMH').value || (mw * H / W);
+  return { sx: mw / W, sy: mh / H, mw, mh };
+}
+function svgHeader(){
+  const {mw, mh} = mmScaleXY();
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + mw.toFixed(2) + 'mm" height="' + mh.toFixed(2) + 'mm" preserveAspectRatio="none">';
+}
+function download(href, name){
+  const a = document.createElement('a');
+  a.href = href; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+/* แปลงข้อความเป็น base64 data URL — sandbox ต้องการ base64 (atob) เท่านั้น */
+function b64encode(str){
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  const CHUNK = 0x8000;
+  for(let i=0;i<bytes.length;i+=CHUNK)
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i+CHUNK));
+  return btoa(bin);
+}
+function downloadText(text, mime, name){
+  download('data:' + mime + ';base64,' + b64encode(text), name);
+}
+const hex = c => '#' + c.map(v => v.toString(16).padStart(2,'0')).join('');
+
+/* ---------- ส่งออกรูปภาพ ---------- */
+$('btnPNG').onclick = () => {
+  const fmt = $('imgFmt').value;
+  if(mode === 'photo'){
+    if(!srcCanvas) return;
+    const out = document.createElement('canvas');
+    out.width = W; out.height = H;
+    const octx = out.getContext('2d');
+    if(fmt === 'jpeg'){ octx.fillStyle = '#FFFFFF'; octx.fillRect(0, 0, W, H); }  // JPG ไม่มี alpha
+    octx.drawImage(srcCanvas, 0, 0);
+    const ext = fmt === 'jpeg' ? 'jpg' : fmt;
+    download(out.toDataURL('image/' + fmt, 0.92), 'photo.' + ext);
+    return;
+  }                     // png | jpeg | webp
+  const transparent = $('ckTransparent').checked && fmt !== 'jpeg'; // JPG ไม่มี alpha
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const octx = out.getContext('2d');
+
+  if(mode === 'color'){
+    if(!labelMap) return;
+    // พื้นหลังโปร่งใส = ลบสีที่ครองพื้นที่มากสุดออก
+    let bgLabel = -1;
+    if(transparent){
+      const area = new Int32Array(palette.length);
+      for(let i=0;i<labelMap.length;i++) area[labelMap[i]]++;
+      bgLabel = 0;
+      for(let k=1;k<palette.length;k++) if(area[k] > area[bgLabel]) bgLabel = k;
+    }
+    const img = octx.createImageData(W,H);
+    const d = img.data;
+    for(let i=0,p=0;i<labelMap.length;i++,p+=4){
+      const li = labelMap[i];
+      if(li < 0){                              // พื้นหลังที่ลบไว้แล้ว
+        if(transparent){ d[p+3] = 0; }
+        else { d[p]=d[p+1]=d[p+2]=255; d[p+3]=255; }
+        continue;
+      }
+      if(li === bgLabel){ d[p+3] = 0; continue; }
+      const c = palette[li];
+      d[p]=c[0]; d[p+1]=c[1]; d[p+2]=c[2]; d[p+3]=255;
+    }
+    octx.putImageData(img,0,0);
+  } else {
+    if(!binary) return;
+    const cad = $('ckCAD').checked;
+    const invert = $('ckInvert').checked;
+    const s = +$('rgSmooth').value;
+    // โปร่งใส: เหลือเฉพาะเส้นหมึก (ดำ หรือขาวถ้ากลับสี)
+    const lineCol = transparent ? (invert ? '#FFFFFF' : '#000000')
+                                : ((cad || invert) ? '#FFFFFF' : '#000000');
+    const bgCol = cad ? 'rgb(33,40,48)' : (invert ? '#000000' : '#FFFFFF');
+    if(s > 0){
+      // ส่งออกเส้นเวกเตอร์เนียนแบบเดียวกับ preview
+      if(!vecCache) vecCache = buildVec();
+      if(!transparent){ octx.fillStyle = bgCol; octx.fillRect(0,0,W,H); }
+      if(vecCache && vecCache.cad){
+        octx.strokeStyle = lineCol;
+        octx.lineWidth = 1.4;
+        octx.lineCap = 'round'; octx.lineJoin = 'round';
+        for(const pts of vecCache.paths){
+          const p2 = new Path2D();
+          addQuadPath(p2, pts, false);
+          octx.stroke(p2);
+        }
+      } else if(vecCache){
+        const p2 = new Path2D();
+        for(const pts of vecCache.paths) addQuadPath(p2, pts, true);
+        octx.fillStyle = lineCol;
+        octx.fill(p2, 'evenodd');
+      }
+    } else {
+      const img = octx.createImageData(W,H);
+      const d = img.data;
+      const lineV = invert ? 255 : 0;
+      for(let i=0,p=0;i<binary.length;i++,p+=4){
+        if(binary[i]){ d[p]=d[p+1]=d[p+2]=lineV; d[p+3]=255; }
+        else if(transparent){ d[p+3]=0; }
+        else { const bg = invert?0:255; d[p]=d[p+1]=d[p+2]=bg; d[p+3]=255; }
+      }
+      octx.putImageData(img,0,0);
+    }
+  }
+  const ext = fmt === 'jpeg' ? 'jpg' : fmt;
+  const base = mode === 'color' ? 'color-art.' : 'line-art.';
+  download(out.toDataURL('image/' + fmt, 0.92), base + ext);
+};
+
+/* ---------- SVG ---------- */
+$('btnSVG').onclick = () => {
+  busy.style.display = 'inline-block';
+  setTimeout(() => {
+    const smooth = $('ckBezier').checked;
+    let svg;
+    if(mode === 'color'){
+      if(!labelMap){ busy.style.display='none'; return; }
+      const area = new Int32Array(palette.length);
+      for(let i=0;i<labelMap.length;i++) if(labelMap[i] >= 0) area[labelMap[i]]++;
+      const order = palette.map((_,k) => k).sort((a,b) => area[b]-area[a]);
+      svg = svgHeader();
+      let startIdx = 1;
+      if(bgMask){ startIdx = 0; }             // ลบพื้นแล้ว: ไม่เท rect พื้นหลัง วาดทุกสีเป็นชิ้น
+      else svg += '<rect width="100%" height="100%" fill="' + hex(palette[order[0]]) + '"/>';
+      const mask = new Uint8Array(W*H);
+      for(let oi=startIdx; oi<order.length; oi++){
+        const k = order[oi];
+        if(!area[k]) continue;
+        mask.fill(0);
+        for(let i=0;i<labelMap.length;i++) if(labelMap[i]===k) mask[i]=1;
+        const paths = traceContours(mask, W, H).map(c => smoothPath(c, true));
+        if(!paths.length) continue;
+        const col = hex(palette[k]);
+        svg += '<path fill="' + col + '" stroke="' + col + '" stroke-width="0.6" fill-rule="evenodd" d="';
+        for(const pts of paths) svg += pathD(pts, true, smooth);
+        svg += '"/>';
+      }
+      svg += '</svg>';
+      downloadText(svg, 'image/svg+xml', 'color-art.svg');
+    } else {
+      if(!binary){ busy.style.display='none'; return; }
+      if($('ckCAD').checked){
+        const chains = skeletonToPolylines(binary, W, H).map(c => smoothPath(c, false));
+        svg = svgHeader() + '<g fill="none" stroke="#000" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">';
+        for(const pts of chains){
+          if(pts.length < 2) continue;
+          svg += '<path d="' + pathD(pts, false, smooth) + '"/>';
+        }
+        svg += '</g></svg>';
+      } else {
+        const paths = traceContours(binary, W, H).map(c => smoothPath(c, true));
+        const invert = $('ckInvert').checked;
+        const fill = invert ? '#FFFFFF' : '#000000';
+        const bg = invert ? '<rect width="100%" height="100%" fill="#000"/>' : '';
+        svg = svgHeader() + bg + '<path fill="' + fill + '" fill-rule="evenodd" d="';
+        for(const pts of paths) svg += pathD(pts, true, smooth);
+        svg += '"/></svg>';
+      }
+      downloadText(svg, 'image/svg+xml', 'line-art.svg');
+    }
+    busy.style.display = 'none';
+  }, 30);
+};
+
+/* ---------- DXF ---------- */
+// ACI สีพื้นฐาน 1-7 สำหรับ layer
+function nearestACI(c){
+  const aci = [[255,0,0],[255,255,0],[0,255,0],[0,255,255],[0,0,255],[255,0,255],[255,255,255]];
+  let best = 7, bd = Infinity;
+  for(let i=0;i<aci.length;i++){
+    const d = (c[0]-aci[i][0])**2 + (c[1]-aci[i][1])**2 + (c[2]-aci[i][2])**2;
+    if(d < bd){ bd = d; best = i+1; }
+  }
+  return best;
+}
+function dxfPolyline(pts, layer, closed, sx, sy){
+  let d = '0\nPOLYLINE\n8\n' + layer + '\n66\n1\n70\n' + (closed?1:0) + '\n';
+  for(const [x,y] of pts)
+    d += '0\nVERTEX\n8\n' + layer + '\n10\n' + (x*sx).toFixed(3) + '\n20\n' + ((H-y)*sy).toFixed(3) + '\n30\n0\n';
+  return d + '0\nSEQEND\n';
+}
+$('btnDXF').onclick = () => {
+  busy.style.display = 'inline-block';
+  setTimeout(() => {
+    const {sx, sy} = mmScaleXY();
+    let dxf = '';
+    if(mode === 'color'){
+      if(!labelMap){ busy.style.display='none'; return; }
+      // สร้าง layer ต่อสี
+      const layers = palette.map((c,k) => ({ name: 'COLOR_' + k + '_' + hex(c).slice(1).toUpperCase(), aci: nearestACI(c) }));
+      dxf = '0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n' + layers.length + '\n';
+      for(const L of layers)
+        dxf += '0\nLAYER\n2\n' + L.name + '\n70\n0\n62\n' + L.aci + '\n6\nCONTINUOUS\n';
+      dxf += '0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n';
+      const mask = new Uint8Array(W*H);
+      for(let k=0;k<palette.length;k++){
+        mask.fill(0);
+        let any = false;
+        for(let i=0;i<labelMap.length;i++) if(labelMap[i]===k){ mask[i]=1; any = true; }
+        if(!any) continue;
+        const paths = traceContours(mask, W, H).map(c => smoothPath(c, true));
+        for(const pts of paths) dxf += dxfPolyline(pts, layers[k].name, true, sx, sy);
+      }
+      dxf += '0\nENDSEC\n0\nEOF\n';
+    } else {
+      if(!binary){ busy.style.display='none'; return; }
+      // ยึดลายเส้นตามที่แสดงบน preview:
+      // - ปิดโหมด CAD → เส้นขอบรูปทรง (closed contour) แบบเดียวกับภาพทึบที่เห็น
+      // - เปิดโหมด CAD → เส้นกึ่งกลาง 1px แบบเดียวกับเส้นบนจอ
+      if(!vecCache) vecCache = buildVec();
+      const paths = vecCache ? vecCache.paths : [];
+      const closed = vecCache ? !vecCache.cad : false;
+      dxf = '0\nSECTION\n2\nENTITIES\n';
+      for(const pts of paths){
+        if(pts.length < 2) continue;
+        dxf += dxfPolyline(pts, '0', closed, sx, sy);
+      }
+      dxf += '0\nENDSEC\n0\nEOF\n';
+    }
+    downloadText(dxf, 'application/dxf', 'line-art.dxf');
+    busy.style.display = 'none';
+  }, 30);
+};
+
+
+})();
+<\/script>
+</body>
+</html>
+
 </script>
 </body>
 </html>
