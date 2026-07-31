@@ -383,9 +383,45 @@ pre.gcode-content {
 .export-footer { padding: 10px 16px; display: flex; gap: 8px; justify-content: flex-end; }
 
 #shapeThumbWrap:hover #shapeThumbOverlay { opacity: 1 !important; }
+
+/* ── LineTracer Pro modal (full-screen overlay embedding line-tracer.html) ── */
+#ltModal {
+  display: none;
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.72);
+  align-items: center; justify-content: center;
+}
+#ltModal .lt-box {
+  width: 96vw; height: 94vh;
+  background: #111; border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+}
+#ltModal .lt-bar {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; background: #1a1a1a; border-bottom: 1px solid #333;
+}
+#ltModal .lt-bar span { font-size: 13px; font-weight: 700; color: #ddd; }
+#ltModal .lt-close {
+  background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px;
+  padding: 5px 12px; font-size: 12px; cursor: pointer;
+}
+#ltModal .lt-close:hover { background: #3a3a3a; }
+#ltFrame { flex: 1; width: 100%; border: none; background: #fff; }
 </style>
 </head>
 <body>
+
+<!-- ══ LineTracer Pro modal (opened from AI Vectorizer Engines panel) ══ -->
+<div id="ltModal">
+  <div class="lt-box">
+    <div class="lt-bar">
+      <span>🤖 LineTracer Pro — Image → Vector / CNC Toolchain</span>
+      <button class="lt-close" onclick="closeLineTracer()">✖ ปิด</button>
+    </div>
+    <iframe id="ltFrame" title="LineTracer Pro"></iframe>
+  </div>
+</div>
 
 <header>
   <div class="logo">⚙</div>
@@ -489,6 +525,20 @@ pre.gcode-content {
         </div>
         <input type="file" id="shapeFileInput" accept="image/*,.svg,.dxf" style="display:none">
         <div id="shapeInfo" style="font-size:10px;color:#888;margin-top:6px"></div>
+
+        <!-- Trace mode: how the image is converted to a line/outline shape -->
+        <div style="margin-top:8px">
+          <div style="font-size:10px;color:#aaa;margin-bottom:4px">โหมดตรวจจับเส้น (ความแม่นยำ)</div>
+          <div style="display:flex;gap:4px">
+            <button id="shTraceAutoBtn" class="tool-type-btn active"
+              onclick="setShapeTraceMode('auto')" style="flex:1;font-size:9px;padding:4px 2px">🤖 อัตโนมัติ</button>
+            <button id="shTraceOutlineBtn" class="tool-type-btn"
+              onclick="setShapeTraceMode('outline')" style="flex:1;font-size:9px;padding:4px 2px">⬛ เส้นขอบ</button>
+            <button id="shTraceSkeletonBtn" class="tool-type-btn"
+              onclick="setShapeTraceMode('skeleton')" style="flex:1;font-size:9px;padding:4px 2px">✏️ เส้นกลาง</button>
+          </div>
+          <div style="font-size:9px;color:#666;margin-top:3px;line-height:1.4">เส้นขอบ = รูปทึบ/โลโก้ · เส้นกลาง = ลายเส้น/สเก็ตช์บาง — ถ้าลอกลายแล้วเพี้ยน ลองสลับโหมดนี้</div>
+        </div>
 
         <!-- Render mode -->
         <div style="margin-top:8px">
@@ -773,6 +823,8 @@ pre.gcode-content {
           <label>หน่วย (Units)</label>
           <select id="units">
             <option value="mm">มิลลิเมตร (mm)</option>
+            <option value="cm">เซนติเมตร (cm)</option>
+            <option value="m">เมตร (m)</option>
             <option value="inch">นิ้ว (inch)</option>
           </select>
         </div>
@@ -781,11 +833,11 @@ pre.gcode-content {
       <!-- Work size with aspect lock -->
       <div class="worksize-row">
         <div class="in-grp"><label>ขนาดงาน W</label>
-          <input type="number" class="num-in" id="workW" value="100" min="1" max="3000" step="0.1">
+          <input type="number" class="num-in" id="workW" value="100" min="0.001" max="100000" step="0.1">
         </div>
         <button class="aspect-btn locked" id="aspectLock" title="Lock aspect ratio">🔒</button>
         <div class="in-grp"><label>ขนาดงาน H</label>
-          <input type="number" class="num-in" id="workH" value="100" min="1" max="3000" step="0.1">
+          <input type="number" class="num-in" id="workH" value="100" min="0.001" max="100000" step="0.1">
         </div>
       </div>
 
@@ -964,226 +1016,20 @@ pre.gcode-content {
       </div>
     </div>
 
-    <!-- ══ Vector Tracing Panel ══ -->
+    <!-- ══ AI Vectorizer (LineTracer Pro, embedded) ══ -->
     <div class="panel collap-panel closed" id="panVec">
       <div class="panel-title" onclick="togglePanel('panVec')">
         🤖 AI Vectorizer Engines <span class="collap-arrow">▾</span>
       </div>
       <div class="collap-body">
-
-        <!-- STEP ① Input Model -->
-        <div style="margin-bottom:10px">
-          <div style="font-size:9px;font-weight:700;color:#0a7aff;letter-spacing:1px;margin-bottom:5px">STEP ① — Input Model</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px">
-            <button class="vec-model-btn active" id="vecModel_clipart" onclick="setVecInputModel('clipart')"
-              style="font-size:9px;padding:5px 2px;border-radius:4px;border:1px solid #444;background:#1a2a1a;color:#aaa;cursor:pointer;text-align:center;line-height:1.3">
-              🎨<br>Clipart
-            </button>
-            <button class="vec-model-btn" id="vecModel_photo" onclick="setVecInputModel('photo')"
-              style="font-size:9px;padding:5px 2px;border-radius:4px;border:1px solid #444;background:#111;color:#888;cursor:pointer;text-align:center;line-height:1.3">
-              🖼️<br>Photo
-            </button>
-            <button class="vec-model-btn" id="vecModel_sketch" onclick="setVecInputModel('sketch')"
-              style="font-size:9px;padding:5px 2px;border-radius:4px;border:1px solid #444;background:#111;color:#888;cursor:pointer;text-align:center;line-height:1.3">
-              ✏️<br>Sketch
-            </button>
-            <button class="vec-model-btn" id="vecModel_drawing" onclick="setVecInputModel('drawing')"
-              style="font-size:9px;padding:5px 2px;border-radius:4px;border:1px solid #444;background:#111;color:#888;cursor:pointer;text-align:center;line-height:1.3">
-              📐<br>Drawing
-            </button>
-          </div>
-        </div>
-
-        <!-- STEP ② Algorithm -->
-        <div style="margin-bottom:10px">
-          <div style="font-size:9px;font-weight:700;color:#0a7aff;letter-spacing:1px;margin-bottom:5px">STEP ② — Algorithm</div>
-          <div style="display:flex;gap:3px;margin-bottom:4px">
-            <button id="vecMode_centerlineBtn" class="tool-type-btn active"
-              onclick="setVecMode('centerline')" style="flex:1;font-size:9px;padding:5px 2px;line-height:1.3">
-              ✏️<br>Centerline
-            </button>
-            <button id="vecMode_outlineBtn" class="tool-type-btn"
-              onclick="setVecMode('outline')" style="flex:1;font-size:9px;padding:5px 2px;line-height:1.3">
-              ⬜<br>Outline
-            </button>
-            <button id="vecMode_patternBtn" class="tool-type-btn"
-              onclick="setVecMode('pattern')" style="flex:1;font-size:9px;padding:5px 2px;line-height:1.3">
-              ▦<br>Pattern
-            </button>
-          </div>
-          <div id="vecAlgoDesc" style="font-size:9px;color:#666;line-height:1.5;padding:3px 5px;background:#161616;border-radius:3px">
-            คำนวณแกนกลางของเส้น → ลายเดี่ยวคมชัด เหมาะ CNC/CAD
-          </div>
-        </div>
-
-        <!-- STEP ③ Filters -->
-        <div style="margin-bottom:10px">
-          <div style="font-size:9px;font-weight:700;color:#0a7aff;letter-spacing:1px;margin-bottom:6px">STEP ③ — Filters</div>
-
-          <!-- Anti-aliasing -->
-          <div style="margin-bottom:7px">
-            <div style="font-size:10px;color:#ccc;margin-bottom:3px">Anti-aliasing</div>
-            <div style="display:flex;gap:3px">
-              <button class="vec-filter-btn active" id="vecAA_off" onclick="setVecFilter('aa','off')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#1a2a1a;color:#aaa;cursor:pointer">Off</button>
-              <button class="vec-filter-btn" id="vecAA_smart" onclick="setVecFilter('aa','smart')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Smart</button>
-              <button class="vec-filter-btn" id="vecAA_mid" onclick="setVecFilter('aa','mid')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Mid</button>
-            </div>
-          </div>
-
-          <!-- Noise Reduction -->
-          <div style="margin-bottom:7px">
-            <div style="font-size:10px;color:#ccc;margin-bottom:3px">Noise Reduction</div>
-            <div style="display:flex;gap:3px">
-              <button class="vec-filter-btn active" id="vecNR_off" onclick="setVecFilter('nr','off')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#1a2a1a;color:#aaa;cursor:pointer">Off</button>
-              <button class="vec-filter-btn" id="vecNR_low" onclick="setVecFilter('nr','low')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Low</button>
-              <button class="vec-filter-btn" id="vecNR_high" onclick="setVecFilter('nr','high')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">High</button>
-            </div>
-          </div>
-
-          <!-- Roundness -->
-          <div style="margin-bottom:7px">
-            <div style="font-size:10px;color:#ccc;margin-bottom:3px">Roundness (ความโค้งมน)</div>
-            <div style="display:flex;gap:2px">
-              <button class="vec-filter-btn" id="vecRD_off" onclick="setVecFilter('rd','off')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Off</button>
-              <button class="vec-filter-btn" id="vecRD_low" onclick="setVecFilter('rd','low')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Low</button>
-              <button class="vec-filter-btn active" id="vecRD_default" onclick="setVecFilter('rd','default')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#1a2a1a;color:#aaa;cursor:pointer">Default</button>
-              <button class="vec-filter-btn" id="vecRD_high" onclick="setVecFilter('rd','high')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">High</button>
-              <button class="vec-filter-btn" id="vecRD_max" onclick="setVecFilter('rd','max')"
-                style="flex:1;font-size:9px;padding:3px;border-radius:3px;border:1px solid #333;background:#111;color:#666;cursor:pointer">Max</button>
-            </div>
-          </div>
-
-          <!-- Min Area -->
-          <div style="margin-bottom:4px">
-            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-              <span style="color:#ccc">Min Area (ตัดเส้นสั้น px)</span>
-              <span id="vecMinLen2V" style="color:#0a7aff;font-size:10px;font-weight:600">15</span>
-            </div>
-            <input type="range" id="vecMinLen2" min="3" max="200" value="15"
-              oninput="$('vecMinLen2V').textContent=this.value"
-              style="width:100%;accent-color:#0a7aff">
-          </div>
-        </div>
-
-        <!-- ▸ Advanced Settings (collapsed) -->
-        <details style="margin-bottom:8px">
-          <summary style="font-size:9px;color:#555;cursor:pointer;user-select:none;padding:3px 0">▸ Advanced Settings</summary>
-          <div style="padding-top:6px">
-
-            <!-- Threshold -->
-            <div style="margin-bottom:5px">
-              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-                <span>Threshold</span>
-                <span id="vecThresh2V" style="color:#0a7aff;font-size:10px;font-weight:600">128</span>
-              </div>
-              <input type="range" id="vecThresh2" min="10" max="245" value="128"
-                oninput="$('vecThresh2V').textContent=this.value"
-                style="width:100%;accent-color:#0a7aff">
-              <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-                <input type="checkbox" id="vecInvert" style="accent-color:#0a7aff">
-                <label for="vecInvert" style="font-size:10px;color:#aaa">Invert</label>
-              </div>
-            </div>
-
-            <!-- Blur -->
-            <div style="margin-bottom:5px">
-              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-                <span>Gaussian Blur</span>
-                <span id="vecBlur2V" style="color:#0a7aff;font-size:10px;font-weight:600">1.0</span>
-              </div>
-              <input type="range" id="vecBlur2" min="0" max="30" value="10"
-                oninput="$('vecBlur2V').textContent=(this.value/10).toFixed(1)"
-                style="width:100%;accent-color:#0a7aff">
-            </div>
-
-            <!-- Close gaps -->
-            <div style="margin-bottom:5px">
-              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-                <span>Close Gaps (ต่อเส้นขาด)</span>
-                <span id="vecCloseV" style="color:#0a7aff;font-size:10px;font-weight:600">1</span>
-              </div>
-              <input type="range" id="vecClose" min="0" max="8" value="1"
-                oninput="$('vecCloseV').textContent=this.value"
-                style="width:100%;accent-color:#0a7aff">
-            </div>
-
-            <!-- Simplify -->
-            <div style="margin-bottom:5px">
-              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-                <span>Simplify (ลดจุด)</span>
-                <span id="vecEps2V" style="color:#0a7aff;font-size:10px;font-weight:600">0.8</span>
-              </div>
-              <input type="range" id="vecEps2" min="1" max="60" value="8"
-                oninput="$('vecEps2V').textContent=(this.value/10).toFixed(1)"
-                style="width:100%;accent-color:#0a7aff">
-            </div>
-
-            <!-- Stroke Width output -->
-            <div style="margin-bottom:5px">
-              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-                <span>Output Stroke Width</span>
-                <span id="vecStrokeWV" style="color:#0a7aff;font-size:10px;font-weight:600">1.5</span>
-              </div>
-              <input type="range" id="vecStrokeW" min="1" max="40" value="15"
-                oninput="$('vecStrokeWV').textContent=(this.value/10).toFixed(1)"
-                style="width:100%;accent-color:#0a7aff">
-            </div>
-
-          </div>
-        </details>
-
-        <!-- Pattern-only settings (hidden, shown by setVecMode) -->
-        <div id="vecSettings_pattern" style="display:none;margin-bottom:6px">
-          <div style="margin-bottom:5px">
-            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
-              <span>Threshold (Pattern)</span>
-              <span id="vecPThresh2V" style="color:#0a7aff;font-size:10px;font-weight:600">128</span>
-            </div>
-            <input type="range" id="vecPThresh2" min="10" max="245" value="128"
-              oninput="$('vecPThresh2V').textContent=this.value"
-              style="width:100%;accent-color:#0a7aff">
-            <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-              <input type="checkbox" id="vecInvert2" style="accent-color:#0a7aff">
-              <label for="vecInvert2" style="font-size:10px;color:#aaa">Invert</label>
-            </div>
-          </div>
-          <div id="vecTileInfo" style="font-size:10px;color:#888;line-height:1.5">
-            ตรวจจับ tile ซ้ำในภาพโดยอัตโนมัติ<br>แล้ว export เฉพาะ tile เดียว
-          </div>
-        </div>
-
-        <!-- Preview canvas -->
-        <canvas id="vecPreviewCanvas"
-          style="width:100%;border:1px solid #333;border-radius:4px;display:block;margin-bottom:6px;background:#111;max-height:160px;object-fit:contain">
-        </canvas>
-
-        <!-- Info bar -->
-        <div id="vecInfo" style="font-size:10px;color:#888;margin-bottom:8px;min-height:14px">
-          กดปุ่มด้านล่างเพื่อเริ่มตรวจจับเส้น
-        </div>
-
-        <!-- Trace button -->
-        <button style="width:100%;margin-bottom:6px;background:#0d2a0d;color:#5dff5d;border:1px solid #1a5a1a;border-radius:5px;padding:7px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.3px"
-          onclick="runVectorTrace()">🤖 Vectorize</button>
-
-        <!-- Export buttons -->
-        <div style="display:flex;gap:6px">
-          <button style="flex:1;background:#1a2a3a;color:#7ab3e0;border:1px solid #1e3a5a;border-radius:5px;padding:5px;font-size:10px;cursor:pointer"
-            onclick="exportVectorSVG()" id="vecExportSVG">💾 Export SVG</button>
-          <button style="flex:1;background:#1a2a3a;color:#7ab3e0;border:1px solid #1e3a5a;border-radius:5px;padding:5px;font-size:10px;cursor:pointer"
-            onclick="exportVectorDXF()" id="vecExportDXF">💾 Export DXF</button>
-        </div>
-
+        <p style="font-size:11px;color:#999;line-height:1.6;margin-bottom:10px">
+          เครื่องมือแปลงรูปเป็นเวกเตอร์แบบเต็มรูปแบบ (LineTracer Pro) —
+          ลบพื้นหลังอัตโนมัติ/AI, พรีเซ็ตงาน (ลายฉลุ/ตราปั๊ม/แกะเลเซอร์/สติกเกอร์),
+          5 โหมดตรวจจับเส้น (สเก็ตช์/ขอบภาพ/ขาว-ดำ/สีเต็ม/รูปถ่าย),
+          เครื่องมือปากกา/ยางลบ/ครอบตัด, ซูม+มินิแมพ และ export PNG/SVG/DXF ในตัว
+        </p>
+        <button style="width:100%;background:#0d2a0d;color:#5dff5d;border:1px solid #1a5a1a;border-radius:5px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:0.3px"
+          onclick="openLineTracer()">🤖 เปิด LineTracer Pro</button>
       </div>
     </div>
 
@@ -1704,6 +1550,13 @@ const S = {
 };
 
 const $ = id => document.getElementById(id);
+
+// ── Unit conversion (workW/workH are entered in the currently selected unit) ──
+const UNIT_MM_FACTOR = { mm: 1, cm: 10, m: 1000, inch: 25.4 };
+function unitFactor() { return UNIT_MM_FACTOR[$('units').value] || 1; }
+function workWmm() { return (parseFloat($('workW').value) || 100) * unitFactor(); }
+function workHmm() { return (parseFloat($('workH').value) || 100) * unitFactor(); }
+
 const pCanvas = $('previewCanvas');   // export canvas (hidden)
 const vCanvas = $('viewCanvas');      // display canvas (zoom-aware, vector-crisp)
 const iCanvas = $('imgCanvas');
@@ -1768,6 +1621,20 @@ $('workH').addEventListener('input', () => {
   if (S.aspectLocked && S.imgAspect) {
     const h = parseFloat($('workH').value) || 1;
     $('workW').value = (h * S.imgAspect).toFixed(1);
+  }
+  scheduleRender();
+});
+
+// ── Units dropdown: rescale W/H box values so the real-world size stays the same ──
+let _prevUnitFactor = unitFactor();
+$('units').addEventListener('change', () => {
+  const newFactor = unitFactor();
+  if (newFactor !== _prevUnitFactor) {
+    const w = parseFloat($('workW').value) || 100;
+    const h = parseFloat($('workH').value) || 100;
+    $('workW').value = (w * _prevUnitFactor / newFactor).toFixed(4).replace(/\.?0+$/, '') || '0';
+    $('workH').value = (h * _prevUnitFactor / newFactor).toFixed(4).replace(/\.?0+$/, '') || '0';
+    _prevUnitFactor = newFactor;
   }
   scheduleRender();
 });
@@ -2078,41 +1945,6 @@ function updateViewCanvas() {
 
   vCtx.clearRect(0, 0, vW, vH);
 
-  // ── Vector trace main display ──────────────────────────────
-  if (VEC.showMain && VEC.svgPaths && VEC.svgPaths.length > 0) {
-    vCtx.fillStyle = S.darkBg ? '#111111' : '#ffffff';
-    vCtx.fillRect(tx, ty, cW * sc, cH * sc);
-    vCtx.save();
-    vCtx.setTransform(sc, 0, 0, sc, tx, ty);
-    // Faded original image underneath
-    vCtx.globalAlpha = 0.18;
-    vCtx.drawImage(iCanvas, 0, 0, cW, cH);
-    vCtx.globalAlpha = 1;
-    // Scale VEC paths from image-pixel space → pCanvas space
-    const scX = cW / VEC.imgW, scY = cH / VEC.imgH;
-    vCtx.scale(scX, scY);
-    vCtx.strokeStyle = S.darkBg ? '#00e5ff' : '#0055dd';
-    vCtx.lineWidth = 1 / Math.min(scX, scY);
-    vCtx.lineCap = 'round'; vCtx.lineJoin = 'round';
-    VEC.svgPaths.forEach(d => { try { vCtx.stroke(new Path2D(d)); } catch(e) {} });
-    // Pattern tile grid overlay
-    if (VEC.mode === 'pattern' && VEC.tileW > 0 && VEC.tileH > 0) {
-      vCtx.strokeStyle = '#ff6b35';
-      vCtx.lineWidth = 2 / Math.min(scX, scY);
-      vCtx.setLineDash([6, 3]);
-      for (let x = 0; x <= VEC.imgW; x += VEC.tileW) {
-        vCtx.beginPath(); vCtx.moveTo(x, 0); vCtx.lineTo(x, VEC.imgH); vCtx.stroke();
-      }
-      for (let y = 0; y <= VEC.imgH; y += VEC.tileH) {
-        vCtx.beginPath(); vCtx.moveTo(0, y); vCtx.lineTo(VEC.imgW, y); vCtx.stroke();
-      }
-      vCtx.setLineDash([]);
-    }
-    vCtx.restore();
-    return;
-  }
-
-
   if (!S.shapes.length) return;
 
   // Work-area background
@@ -2139,6 +1971,7 @@ function updateViewCanvas() {
         const d = s.r * 2;
         vCtx.drawImage(_ishStamp, s.x - s.r, s.y - s.r, d, d);
       }
+      _applyMixLayer(vCtx, fg);
       vCtx.restore();
       return;
     }
@@ -2165,6 +1998,7 @@ function updateViewCanvas() {
       }
     }
     if (isContour && S.fill) vCtx.fill('evenodd'); else vCtx.stroke();
+    _applyMixLayer(vCtx, fg);
     vCtx.restore();
     return;
   }
@@ -2175,6 +2009,7 @@ function updateViewCanvas() {
       vCtx.fillStyle = fg;
       _drawLineRows(vCtx, S.lineRows, S.lrNx, S.lrNy);
     }
+    _applyMixLayer(vCtx, fg);
     vCtx.restore();
     return;
   }
@@ -2211,7 +2046,7 @@ function updateViewCanvas() {
 
 function _applyMixLayer(ctx, fg) {
   if (!S.mixEnabled || !S.mixPat || !S.mixShapes || !S.mixShapes.length) return;
-  const wW = parseFloat($('workW').value) || 100;
+  const wW = workWmm();
   const r2 = Math.max(0.5, (S.mixDiamMm / 2) * (pCanvas.width / wW));
   ctx.globalAlpha = S.mixAlpha;
   ctx.fillStyle = fg; ctx.strokeStyle = fg;
@@ -2396,12 +2231,11 @@ function generatePattern() {
 }
 
 function _generate() {
-  VEC.showMain = false;   // switch main view back to pattern mode
   const W = pCanvas.width, H = pCanvas.height;
   const bg = S.darkBg ? '#111111' : '#ffffff';
   pCtx.fillStyle = bg; pCtx.fillRect(0, 0, W, H);
 
-  const workW_mm = parseFloat($('workW').value) || 100;
+  const workW_mm = workWmm();
   const mmToPx   = W / workW_mm;
   let spacingPx = S.spacingMm * mmToPx;
   const minRpx    = (S.minDmm / 2) * mmToPx;
@@ -2666,6 +2500,30 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright) {
   S.lrNx = nx; S.lrNy = ny;
   S.lineRows = lineRows;
   S.shapes = [{ x: W * 0.5, y: H * 0.5, r: spacingPx * 0.5, rMm: null, frac: 0.5 }];
+
+  // ── Compute mix layer positions between scan lines ──────────
+  {
+    const mixShapes = [];
+    // Place mix dots at midpoints between adjacent line rows (half spacing perpendicular)
+    // and at regular intervals along the lines (full spacing) — dots land between lines
+    for (let d = -halfDiag - spacingPx; d <= halfDiag + spacingPx; d += spacingPx) {
+      const midD = d + spacingPx * 0.5; // perpendicular midpoint between row d and d+spacingPx
+      for (let t = -halfDiag - spacingPx; t <= halfDiag + spacingPx; t += spacingPx) {
+        const mx = cx0 + midD * nx + t * lx;
+        const my = cy0 + midD * ny + t * ly;
+        if (mx < -maxRpx - 1 || mx > W + maxRpx + 1 || my < -maxRpx - 1 || my > H + maxRpx + 1) continue;
+        let mb = bright(mx, my);
+        if (S.invert) mb = 1 - mb;
+        const mt = 1 - mb;
+        let mr = minRpx + mt * (maxRpx - minRpx);
+        mr = Math.min(mr, spacingPx * 0.40);
+        if (mr < 0.25) continue;
+        mixShapes.push({ x: mx, y: my, r: mr });
+      }
+    }
+    S.mixShapes = mixShapes;
+  }
+
   updateViewCanvas();
   updateStats();
   updateNestInfo();
@@ -2751,8 +2609,8 @@ function shapePath(ctx, x, y, r, pat, rot) {
 function updateStats() {
   if (!S.shapes.length) return;
   const W = pCanvas.width, H = pCanvas.height;
-  const wW = parseFloat($('workW').value) || 100;
-  const wH = parseFloat($('workH').value) || 100;
+  const wW = workWmm();
+  const wH = workHmm();
   const feed = parseFloat($('feedRate').value) || 800;
   const units = $('units').value;
   const avgR_mm = (S.minDmm + S.maxDmm) / 4; // diameter → radius: avg(d/2)
@@ -2763,7 +2621,7 @@ function updateStats() {
   $('stShapes').textContent = S.shapes.length.toLocaleString();
   $('stPat').textContent    = patName(S.pattern);
   $('stGrid').textContent   = `${Math.ceil(W/Math.max(1,spacePx))}×${Math.ceil(H/Math.max(1,spacePx))}`;
-  $('stSize').textContent   = `${wW}×${wH} ${units}`;
+  $('stSize').textContent   = `${$('workW').value}×${$('workH').value} ${units}`;
   $('stTime').textContent   = timeSec < 60 ? `~${Math.ceil(timeSec)} วิ` : `~${(timeSec/60).toFixed(1)} นาที`;
 }
 function patName(p) {
@@ -2778,8 +2636,8 @@ function updateNestInfo() {
   const sH = parseFloat($('sheetH').value)||400;
   const mg = parseFloat($('sheetMargin').value)||10;
   const sp = parseFloat($('partSpacing').value)||5;
-  const pW = parseFloat($('workW').value)||100;
-  const pH = parseFloat($('workH').value)||100;
+  const pW = workWmm();
+  const pH = workHmm();
   const areaW = sW - mg*2;
   const areaH = sH - mg*2;
   const cols = Math.max(0, Math.floor((areaW + sp) / (pW + sp)));
@@ -2808,8 +2666,8 @@ function renderSheet() {
   const sH = parseFloat($('sheetH').value)||400;
   const mg = parseFloat($('sheetMargin').value)||10;
   const sp = parseFloat($('partSpacing').value)||5;
-  const pW = parseFloat($('workW').value)||100;
-  const pH = parseFloat($('workH').value)||100;
+  const pW = workWmm();
+  const pH = workHmm();
 
   const maxW = wrap.clientWidth - 40;
   const maxH = wrap.clientHeight - 40;
@@ -2885,7 +2743,7 @@ function renderSheet() {
 function buildSimMoves() {
   if (!S.shapes.length) return [];
   const W = pCanvas.width, H = pCanvas.height;
-  const wW = parseFloat($('workW').value)||100;
+  const wW = workWmm();
   const sc = W / wW;  // px-per-mm for canvas coords
   const safeZ  = parseFloat($('safeZ').value);
   const depth  = parseFloat($('cutDepth').value);
@@ -3086,7 +2944,7 @@ function buildGcode(offsetX=0, offsetY=0) {
     alert('กรุณาสร้าง Pattern ก่อน'); return;
   }
   const W    = pCanvas.width, H = pCanvas.height;
-  const wW   = parseFloat($('workW').value);
+  const wW   = workWmm();
   const depth  = parseFloat($('cutDepth').value);
   const feed   = parseInt($('feedRate').value);
   const plunge = parseInt($('plungeRate').value);
@@ -3109,12 +2967,12 @@ function buildGcode(offsetX=0, offsetY=0) {
   g += cm('CNC Pattern Generator v2');
   g += cm(`Pattern   : ${patName(S.pattern)}`);
   g += cm(`Shapes    : ${S.shapes.length}`);
-  g += cm(`Work area : ${$('workW').value} × ${$('workH').value} ${units}`);
-  g += cm(`Tool Ø    : ${$('toolDia').value} ${units}`);
-  g += cm(`Cut depth : ${depth} ${units}`);
-  g += cm(`Feed XY   : ${feed} ${units}/min`);
-  g += cm(`Feed Z    : ${plunge} ${units}/min`);
-  g += cm(`Safe Z    : ${safeZ} ${units}`);
+  g += cm(`Work area : ${$('workW').value} × ${$('workH').value} ${units}  (= ${wW.toFixed(2)} × ${workHmm().toFixed(2)} mm)`);
+  g += cm(`Tool Ø    : ${$('toolDia').value} mm`);
+  g += cm(`Cut depth : ${depth} mm`);
+  g += cm(`Feed XY   : ${feed} mm/min`);
+  g += cm(`Feed Z    : ${plunge} mm/min`);
+  g += cm(`Safe Z    : ${safeZ} mm`);
   g += cm(`Spindle   : ${spRPM} RPM`);
   g += cm(`Format    : ${fmt.toUpperCase()}`);
   g += cm(`Generated : ${new Date().toLocaleString('th-TH')}`);
@@ -3128,7 +2986,7 @@ function buildGcode(offsetX=0, offsetY=0) {
     g += `G4 F2\n`;
     g += `G0 Z${safeZ}\n\n`;
   } else {
-    g += units === 'mm' ? `G21\n` : `G20\n`;
+    g += `G21\n`;   // work size is always converted to real mm regardless of selected display unit
     g += `G90\nG17\n`;
     g += fmt === 'linuxcnc' ? `G64 P0.001\n` : '';
     g += `M3 S${spRPM}\n`;
@@ -3232,9 +3090,9 @@ function svgShapePath(x, y, r, pat, rot) {
 
 function buildSVGString(units) {
   const W = pCanvas.width, H = pCanvas.height;
-  const wW = parseFloat($('workW').value);
-  const wH = parseFloat($('workH').value);
-  const un = units || ($('units').value === 'mm' ? 'mm' : 'in');
+  const wW = workWmm();
+  const wH = workHmm();
+  const un = units || 'mm';   // wW/wH are always real mm now (converted from the selected display unit)
   const sc = wW / W;
   const bg = S.darkBg ? '#111111' : '#ffffff';
   const fg = S.darkBg ? '#ffffff' : '#000000';
@@ -6396,7 +6254,7 @@ EOF
 
 function buildDXF() {
   const W = pCanvas.width, H = pCanvas.height;
-  const wW = parseFloat($('workW').value);
+  const wW = workWmm();
   const sc = wW / W;
   const ff = v => v.toFixed(4);
   const f6 = v => v.toFixed(6);
@@ -6471,16 +6329,20 @@ function buildDXF() {
       if (!_ishArcs) continue;
       const isCont = !!IMGSHAPE.isContour;
       if (isCont && _ishArcs[0] && _ishArcs[0].starMode) {
-        // Use the actual traced contour for bezier fitting — matches the canvas preview
-        // and preserves the original aspect ratio (unlike the parametric k-based star).
-        const _np0 = IMGSHAPE.normPaths[0];
+        // Use the actual traced contours for bezier fitting — matches the canvas
+        // preview and preserves the original aspect ratio (unlike the parametric
+        // k-based star). Every traced sub-shape and hole is exported, not just the first.
         const _rot0 = -_ishArcs[0].rot;   // _ishArcs[0].rot == -rot; undo the sign
-        if (_np0 && _np0.length >= 8) {
-          entities += _gen4StarContourSplineDXF(sx, sy, sr, _np0, _rot0, _h, MS_OWNER);
-        } else {
-          entities += _gen4StarSplineDXF(sx, sy, sr, _ishArcs[0].k, _ishArcs[0].rot, _h, MS_OWNER);
+        let _wroteAny = false;
+        for (const _np of IMGSHAPE.normPaths) {
+          if (!_np || _np.length < 8) continue;
+          entities += _gen4StarContourSplineDXF(sx, sy, sr, _np, _rot0, _h, MS_OWNER);
+          _h += 4; _wroteAny = true;
         }
-        _h += 4;
+        if (!_wroteAny) {
+          entities += _gen4StarSplineDXF(sx, sy, sr, _ishArcs[0].k, _ishArcs[0].rot, _h, MS_OWNER);
+          _h += 4;
+        }
       } else {
         for (const arcPath of _ishArcs) {
           if (arcPath.length < 2) continue;
@@ -6554,8 +6416,8 @@ function syncProfTool() {}
 
 // ── Profile G-code ─────────────────────────────────────────
 function calcProfileGcode(downloadNow) {
-  const wW       = parseFloat($('workW').value) || 100;
-  const wH       = parseFloat($('workH').value) || 100;
+  const wW       = workWmm();
+  const wH       = workHmm();
   const profType = $('profProfile').value;
   const allowance= parseFloat($('profAllowance').value) || 0;
   const toolDia  = parseFloat($('profDia').value) || 3;
@@ -6707,8 +6569,8 @@ function calcAreaGcode(downloadNow) {
     rpm: parseInt($('rpm').value)||12000, num:1, vAngle:60, ballR:0.5,
     name: `Endmill Ø${parseFloat($('toolDia').value)||3}`
   };
-  const wW      = parseFloat($('workW').value) || 100;
-  const wH      = parseFloat($('workH').value) || 100;
+  const wW      = workWmm();
+  const wH      = workHmm();
   const startZ  = parseFloat($('acStartZ').value) || 0;
   const finishZ = parseFloat($('acFinishZ').value) || -5;
   const alw     = parseFloat($('acAllowance').value) || 0;
@@ -6804,7 +6666,7 @@ $('expSVG').addEventListener('click', () => {
 $('expAI').addEventListener('click', () => {
   if (!requireShapes()) return;
   const W = pCanvas.width, H = pCanvas.height;
-  const wW = parseFloat($('workW').value), wH = parseFloat($('workH').value);
+  const wW = workWmm(), wH = workHmm();
   const sc = wW / W;
   let d = '';
   for (const s of S.shapes) d += svgShapePath(s.x*sc, (H-s.y)*sc, s.r*sc, S.pattern, S.patRot);
@@ -6860,7 +6722,7 @@ $('expPDF').addEventListener('click', () => {
   if (!requireShapes()) return;
   if (typeof window.jspdf === 'undefined') { alert('กำลังโหลด jsPDF...'); return; }
   const { jsPDF } = window.jspdf;
-  const wW = parseFloat($('workW').value), wH = parseFloat($('workH').value);
+  const wW = workWmm(), wH = workHmm();
   const orient = wW >= wH ? 'landscape' : 'portrait';
   const doc = new jsPDF({ orientation: orient, unit: 'mm', format: [wW, wH] });
   const imgData = pCanvas.toDataURL('image/png');
@@ -6879,7 +6741,7 @@ $('expGCODE').addEventListener('click', () => {
 $('expCSV').addEventListener('click', () => {
   if (!requireShapes()) return;
   const W = pCanvas.width, H = pCanvas.height;
-  const wW = parseFloat($('workW').value);
+  const wW = workWmm();
   const sc = wW / W;
   let csv = 'Index,X_mm,Y_mm,Radius_mm,SizeFraction,Pattern\n';
   S.shapes.forEach((s,i) => {
@@ -6895,8 +6757,8 @@ $('expSheetGcode').addEventListener('click', () => {
   const sH = parseFloat($('sheetH').value)||400;
   const mg = parseFloat($('sheetMargin').value)||10;
   const sp = parseFloat($('partSpacing').value)||5;
-  const pW = parseFloat($('workW').value)||100;
-  const pH = parseFloat($('workH').value)||100;
+  const pW = workWmm();
+  const pH = workHmm();
   const cols = Math.max(0, Math.floor(((sW-2*mg) + sp) / (pW + sp)));
   const rows = Math.max(0, Math.floor(((sH-2*mg) + sp) / (pH + sp)));
   const maxCount = cols * rows;
@@ -6906,7 +6768,7 @@ $('expSheetGcode').addEventListener('click', () => {
 
   // Build combined G-code for all parts
   const W = pCanvas.width, H = pCanvas.height;
-  const wW = parseFloat($('workW').value);
+  const wW = workWmm();
   const depth  = parseFloat($('cutDepth').value);
   const feed   = parseInt($('feedRate').value);
   const plunge = parseInt($('plungeRate').value);
@@ -6926,7 +6788,7 @@ $('expSheetGcode').addEventListener('click', () => {
   g += cm(`Sheet: ${sW}×${sH}mm | Margin: ${mg}mm | Spacing: ${sp}mm`);
   g += cm(`Parts: ${exportCount} of ${maxCount} (${cols}×${rows} max)`);
   g += '\n';
-  g += units==='mm'?`G21\n`:`G20\n`;
+  g += `G21\n`;   // work size is always converted to real mm regardless of selected display unit
   g += `G90\nM3 S${spRPM}\nG4 P2.0\nG0 Z${safeZ}\n\n`;
 
   let partNum = 0;
@@ -7269,7 +7131,7 @@ procPreview();
 // ============================================================
 // IMGSHAPE MODULE  — custom image as pattern element
 // ============================================================
-const IMGSHAPE = { img: null, canvas: null, normPaths: [], rawPaths: [], mode: 'asis', dirty: false, version: 0 };
+const IMGSHAPE = { img: null, canvas: null, normPaths: [], rawPaths: [], mode: 'asis', dirty: false, version: 0, traceMode: 'auto' };
 
 // ── Offscreen stamp cache for imgshape fast rendering ────────────────────────
 // Pre-bakes the shape into a 512×512 canvas once; updateViewCanvas() stamps it
@@ -7318,9 +7180,54 @@ function setShapeMode(m) {
   if (IMGSHAPE.img) { _buildShapeCanvas(); scheduleRender(); }
 }
 
+// ── โหมดตรวจจับเส้น: อัตโนมัติ / บังคับเส้นขอบ (รูปทึบ) / บังคับเส้นกลาง (ลายเส้นบาง) ──
+function setShapeTraceMode(m) {
+  IMGSHAPE.traceMode = m;
+  ['auto','outline','skeleton'].forEach(k=>{
+    const b=$('shTrace'+k.charAt(0).toUpperCase()+k.slice(1)+'Btn');
+    if(b) b.classList.toggle('active', k===m);
+  });
+  if (IMGSHAPE.img) { IMGSHAPE.dirty = true; _buildShapeCanvas(); scheduleRender(); }
+}
+
 function onImgShapeSelect() {
   const p = $('panImgShape');
   if (p) p.style.display = '';
+}
+
+// ── Stitch skeleton fragments back into long continuous strokes ──────────────
+// Zhang-Suen thinning breaks a single hand-drawn line into many pieces wherever
+// the stroke has a bump or a crossing, so a raw trace of a doodle returns dozens
+// of disconnected stubs. Repeatedly welding endpoints that sit within `maxGap`
+// pixels of each other recovers the original strokes (measured: 53 → 12 paths
+// on a test spiral while keeping 95% of the traced points).
+function stitchPaths(paths, maxGap) {
+  if (!paths.length || paths.length > 500) return paths;
+  const segs = paths.map(p => p.slice());
+  const d = (p, q) => Math.hypot(p[0]-q[0], p[1]-q[1]);
+  let merged = true, guard = 0;
+  while (merged && guard++ < 3000) {
+    merged = false;
+    outer:
+    for (let i = 0; i < segs.length; i++) {
+      if (!segs[i]) continue;
+      for (let j = i+1; j < segs.length; j++) {
+        if (!segs[j]) continue;
+        const A = segs[i], B = segs[j];
+        const a0 = A[0], a1 = A[A.length-1], b0 = B[0], b1 = B[B.length-1];
+        const cand = [[d(a1,b0),0], [d(a1,b1),1], [d(a0,b0),2], [d(a0,b1),3]];
+        cand.sort((x,y) => x[0]-y[0]);
+        if (cand[0][0] <= maxGap) {
+          segs[i] = cand[0][1]===0 ? A.concat(B)
+                  : cand[0][1]===1 ? A.concat(B.slice().reverse())
+                  : cand[0][1]===2 ? A.slice().reverse().concat(B)
+                  :                  B.concat(A);
+          segs[j] = null; merged = true; break outer;
+        }
+      }
+    }
+  }
+  return segs.filter(Boolean);
 }
 
 function _buildShapeCanvas() {
@@ -7413,77 +7320,154 @@ function _buildShapeCanvas() {
     return mask;
   }
 
-  // ── 6. Build all binary images at once (shared gray already computed) ──
-  const strategies = [];
-  if (hasAlpha) {
-    const b = new Uint8Array(N);
-    for (let i=0;i<N;i++) b[i] = alphaA[i] > 102 ? 1 : 0;
-    strategies.push(['alpha', b]);
-  }
-  for (const th of [0.25, 0.5, 0.75]) {
-    const bHi = new Uint8Array(N), bLo = new Uint8Array(N);
-    for (let i=0;i<N;i++) { bHi[i]=gray[i]>th?1:0; bLo[i]=gray[i]<th?1:0; }
-    strategies.push([`lum>${th}`, bHi]);
-    strategies.push([`lum<${th}`, bLo]);
-  }
+  // ── 6. Foreground mask — adaptive Otsu + automatic polarity ──────
+  // A fixed ladder of luminance thresholds (0.25/0.5/0.75) fails on scans,
+  // pencil sketches and low-contrast photos. Otsu finds the threshold that
+  // best separates ink from paper for THIS image, and the border ring tells
+  // us which side is the background, so dark-on-light and light-on-dark both
+  // work without the user touching anything.
+  // All thresholding is done in 0..255 BIN space (not float luminance) so the
+  // comparison can never fall between Otsu's bin boundary and the actual pixel
+  // value — that off-by-a-fraction wipes out the mask on pure black-on-white art.
+  const q = new Uint8Array(N);
+  for (let i=0;i<N;i++) q[i] = Math.min(255, (gray[i]*255)|0);
 
-  // ── 7. Try each strategy; pick the most detailed result ──────────
-  let bestSimp = null, bestScore = 0, bestDebug = '';
-  for (const [label, bin] of strategies) {
-    const closed  = morphClose1(bin);
-    const mask    = largestInteriorCC(closed);
-    if (!mask) continue;
-    const contour = _outerBoundary(mask, SZ, SZ);
-    // Background "frame" after erode has contour = 4*(SZ-2)-4 = 1588; canvas border = 4*(SZ-1) = 1596
-    // Reject those two known-bad values but accept large valid sparkles (e.g. R=170 → contour≈1528)
-    if (contour.length < 8 || contour.length >= 4*(SZ-2) - 4) continue;
-    const simp    = vecSimplify(contour, 0.8);
-    if (simp.length > bestScore) {
-      bestScore = simp.length; bestSimp = simp;
-      let area = 0; for (let i=0;i<N;i++) area+=mask[i];
-      bestDebug = `${label}|raw:${contour.length}|mask:${area}`;
-      if (bestScore > 50) break;  // early exit — good enough
+  function otsuThreshold() {
+    const hist = new Int32Array(256);
+    for (let i=0;i<N;i++) hist[q[i]]++;
+    let total = 0; for (let t=0;t<256;t++) total += t*hist[t];
+    let sumB = 0, wB = 0, best = -1, thr = 128;
+    for (let t=0;t<256;t++) {
+      wB += hist[t]; if (!wB) continue;
+      const wF = N - wB; if (!wF) break;
+      sumB += t*hist[t];
+      const mB = sumB/wB, mF = (total-sumB)/wF;
+      const v = wB*wF*(mB-mF)*(mB-mF);
+      if (v > best) { best = v; thr = t; }
     }
+    return thr;   // bin index: the LAST bin belonging to the dark class
   }
 
-  if (bestSimp && bestSimp.length >= 8) {
-    const half = SZ / 2;
-    // Re-simplify with higher eps to strip pixel-level staircase artifacts,
-    // then apply 2 rounds of Chaikin corner-cutting to smooth the curves.
-    // (bestSimp used eps=0.8 for strategy selection; now clean up for output)
-    const clean  = vecSimplify(bestSimp, 1.5);
-    const smooth = chaikinSmooth(clean, true, 2);
-    IMGSHAPE.normPaths = [ smooth.map(([x,y]) => ({ x:(x-half)/half, y:(y-half)/half })) ];
-    // rawPaths = pre-Chaikin simplified contour; used in DXF export to preserve sharp corners
-    IMGSHAPE.rawPaths  = [ bestSimp.map(([x,y]) => ({ x:(x-half)/half, y:(y-half)/half })) ];
-    IMGSHAPE.isContour = true; IMGSHAPE.dirty = false; IMGSHAPE.version++;
-    _ishStamp = null; // invalidate stamp cache
-    $('shapeInfo').textContent = `✅ ${smooth.length} จุด (raw:${bestSimp.length}→clean:${clean.length}→smooth) (${bestDebug}) (outline)`;
+  const invertUI = !!($('shSilInvert') && $('shSilInvert').checked);
+  const fg = new Uint8Array(N);
+  let fgLabel;
+  if (hasAlpha) {
+    for (let i=0;i<N;i++) fg[i] = (alphaA[i] > 128) !== invertUI ? 1 : 0;
+    fgLabel = 'alpha';
+  } else {
+    const thr = otsuThreshold();
+    // Background level = mean of the 1px border ring (in bin space)
+    let bSum = 0, bCnt = 0;
+    for (let x=0;x<SZ;x++) { bSum += q[x] + q[(SZ-1)*SZ+x]; bCnt += 2; }
+    for (let y=1;y<SZ-1;y++) { bSum += q[y*SZ] + q[y*SZ+SZ-1]; bCnt += 2; }
+    const bgLevel = bSum/bCnt;
+    let darkIsFg = bgLevel > thr;          // light paper → ink is the dark side
+    if (invertUI) darkIsFg = !darkIsFg;
+    // `<=` on the dark side: thr is inclusive of the dark class
+    for (let i=0;i<N;i++) fg[i] = (darkIsFg ? q[i] <= thr : q[i] > thr) ? 1 : 0;
+    fgLabel = `otsu${thr}${darkIsFg ? '↓' : '↑'}`;
+  }
+
+  let fgArea = 0; for (let i=0;i<N;i++) fgArea += fg[i];
+  if (fgArea < 40) {
+    $('shapeInfo').textContent = '⚠️ ไม่พบลายในภาพ — ลองติ๊ก Invert หรือใช้ภาพที่คอนทราสต์สูงกว่า';
     return;
   }
 
-  // ── 8. Fallback: skeleton for line-art / very thin shapes ────────
-  const binSk = new Uint8Array(N);
-  if (hasAlpha) {
-    for (let i=0;i<N;i++) binSk[i] = alphaA[i] > 102 ? 1 : 0;
-  } else {
-    const thSk = (parseInt($('shSilTh').value)||128) / 255;
-    const invSk = $('shSilInvert').checked;
-    for (let i=0;i<N;i++) binSk[i] = (gray[i] < thSk) !== invSk ? 1 : 0;
+  const traceMode = IMGSHAPE.traceMode || 'auto';
+
+  // ── 7. Choose outline vs skeleton from the REAL stroke width ─────
+  // width ≈ area / centreline-length. Hand-drawn line art gives a small
+  // number (a few px of ink); a solid logo or letter gives a large one.
+  // This is far more reliable than a perimeter/area shape ratio because it
+  // measures the thing that actually decides which algorithm is correct.
+  const _fgClosed = new Uint8Array(morphClose1(fg));   // heal 1px gaps (copy: shared buffer)
+  const skelProbe = vecThinZhangSuen(_fgClosed, SZ, SZ);
+  let skelLen = 0; for (let i=0;i<N;i++) skelLen += skelProbe[i];
+  const strokeW = skelLen > 0 ? (fgArea / skelLen) : 999;
+  const LINEART_W = 7;   // px @ SZ=400 — thinner than this ⇒ treat as line art
+  const wantSkeleton = traceMode === 'skeleton' ||
+                       (traceMode === 'auto' && strokeW < LINEART_W);
+  const half = SZ / 2;
+  const norm = pts => pts.map(([x,y]) => ({ x:(x-half)/half, y:(y-half)/half }));
+
+  // ── 8a. Outline mode — trace EVERY blob and every enclosed hole ──
+  // The old code kept only the single largest component, so multi-part
+  // artwork (a logo + its text, a dotted i, a donut) lost almost everything.
+  if (!wantSkeleton) {
+    const seen  = new Uint8Array(N);
+    const minArea = Math.max(50, (fgArea * 0.004) | 0);
+    const regions = [];
+
+    function collect(target, wantValue, requireEnclosed) {
+      for (let s = 0; s < N; s++) {
+        if (_fgClosed[s] !== wantValue || target[s]) continue;
+        target[s] = 1; _q[0] = s;
+        let head = 0, tail = 1, touches = false;
+        const cells = [s];
+        while (head < tail) {
+          const idx = _q[head++], x = idx%SZ, y = (idx/SZ)|0;
+          if (x===0 || y===0 || x===SZ-1 || y===SZ-1) touches = true;
+          let nx, ny, ni;
+          nx=x+1; if(nx<SZ){ni=y*SZ+nx; if(_fgClosed[ni]===wantValue&&!target[ni]){target[ni]=1;_q[tail++]=ni;cells.push(ni);}}
+          nx=x-1; if(nx>=0){ni=y*SZ+nx; if(_fgClosed[ni]===wantValue&&!target[ni]){target[ni]=1;_q[tail++]=ni;cells.push(ni);}}
+          ny=y+1; if(ny<SZ){ni=ny*SZ+x; if(_fgClosed[ni]===wantValue&&!target[ni]){target[ni]=1;_q[tail++]=ni;cells.push(ni);}}
+          ny=y-1; if(ny>=0){ni=ny*SZ+x; if(_fgClosed[ni]===wantValue&&!target[ni]){target[ni]=1;_q[tail++]=ni;cells.push(ni);}}
+        }
+        if (cells.length >= minArea && !(requireEnclosed && touches)) regions.push(cells);
+      }
+    }
+    collect(seen, 1, false);                        // ink blobs
+    const bseen = new Uint8Array(N);
+    collect(bseen, 0, true);                        // enclosed holes
+
+    regions.sort((a,b) => b.length - a.length);
+    const outSmooth = [], outRaw = [];
+    const m = new Uint8Array(N);
+    for (const cells of regions.slice(0, 60)) {
+      m.fill(0);
+      for (let k=0;k<cells.length;k++) m[cells[k]] = 1;
+      const contour = _outerBoundary(m, SZ, SZ);
+      if (contour.length < 12) continue;
+      const raw    = vecSimplify(contour, 0.7);     // sharp corners → DXF
+      const clean  = vecSimplify(contour, 1.2);     // eps lowered 1.5→1.2 for fidelity
+      outSmooth.push(chaikinSmooth(clean, true, 2));
+      outRaw.push(raw);
+    }
+
+    if (outSmooth.length) {
+      IMGSHAPE.normPaths = outSmooth.map(norm);
+      IMGSHAPE.rawPaths  = outRaw.map(norm);
+      IMGSHAPE.isContour = true; IMGSHAPE.dirty = false; IMGSHAPE.version++;
+      _ishStamp = null;
+      const pts = outSmooth.reduce((a,p)=>a+p.length, 0);
+      $('shapeInfo').textContent =
+        `✅ ${outSmooth.length} รูปร่าง / ${pts} จุด (outline · ${fgLabel} · เส้นหนา ${strokeW.toFixed(1)}px)`;
+      return;
+    }
+    // nothing usable → fall through to skeleton rather than showing nothing
   }
-  const closedSk = morphClose1(binSk);
-  const skel     = vecThinZhangSuen(closedSk, SZ, SZ);
-  const allPaths = vecTraceSkeleton(skel, SZ, SZ, 4);
+
+  // ── 8b. Skeleton mode — follow the centreline of every stroke ─────
+  let allPaths = vecTraceSkeleton(skelProbe, SZ, SZ, 4);
+  allPaths = stitchPaths(allPaths, 3.5);          // weld fragments into real strokes
+  // Drop specks, but keep anything meaningful relative to the biggest stroke
+  const _maxLen = allPaths.reduce((a,p) => Math.max(a, p.length), 0);
+  allPaths = allPaths.filter(p => p.length >= Math.max(5, _maxLen * 0.02));
   allPaths.sort((a,b) => b.length - a.length);
-  const simp2   = allPaths.slice(0, 8).map(p => vecSimplify(p, 1.5));
-  const smooth2 = simp2.map(p => chaikinSmooth(p, false, 1)); // 1 round for open strokes
-  const half2 = SZ / 2;
-  IMGSHAPE.normPaths = smooth2.map(pts => pts.map(([x,y]) => ({ x:(x-half2)/half2, y:(y-half2)/half2 })));
-  IMGSHAPE.rawPaths  = simp2.map(pts => pts.map(([x,y]) => ({ x:(x-half2)/half2, y:(y-half2)/half2 })));
+  const simp2   = allPaths.slice(0, 120).map(p => vecSimplify(p, 1.0));  // eps 1.5→1.0
+  const smooth2 = simp2.filter(p => p.length >= 2).map(p => chaikinSmooth(p, false, 1));
+  if (!smooth2.length) {
+    $('shapeInfo').textContent = '⚠️ ลอกลายไม่สำเร็จ — ลองสลับโหมดตรวจจับเส้น หรือใช้ภาพลายเส้นที่ชัดกว่า';
+    return;
+  }
+  IMGSHAPE.normPaths = smooth2.map(norm);
+  IMGSHAPE.rawPaths  = simp2.filter(p => p.length >= 2).map(norm);
   IMGSHAPE.isContour = false; IMGSHAPE.dirty = false; IMGSHAPE.version++;
   _ishStamp = null; // invalidate stamp cache
+  const pts2 = smooth2.reduce((a,p)=>a+p.length, 0);
   $('shapeInfo').textContent =
-    `✅ ${IMGSHAPE.normPaths.length} เส้น (skeleton)  (${IMGSHAPE.img.naturalWidth}×${IMGSHAPE.img.naturalHeight}px)`;
+    `✅ ${smooth2.length} เส้น / ${pts2} จุด (skeleton · ${fgLabel} · เส้นหนา ${strokeW.toFixed(1)}px)`;
 }
 
 // ── Flood-fill from center → binary mask of main component ──
@@ -7580,184 +7564,8 @@ function loadShapeImg(file) {
 
 
 // ============================================================
-// VECTOR TRACING MODULE  v2
+// SHARED VECTOR UTILITIES (used by IMGSHAPE module for auto-contour tracing)
 // ============================================================
-// ============================================================
-// VECTOR TRACING MODULE  v2  (Potrace-style + Centerline)
-// ============================================================
-const VEC = {
-  mode: 'centerline',
-  inputModel: 'clipart',   // clipart | photo | sketch | drawing
-  antiAlias: 'off',        // off | smart | mid
-  noiseReduce: 'off',      // off | low | high
-  roundness: 'default',    // off | low | default | high | max
-  contours: [],
-  svgPaths: [],
-  imgW: 0, imgH: 0,
-  tileW: 0, tileH: 0,
-  showMain: false,
-};
-
-// ── Input Model descriptions ─────────────────────────────────
-const VEC_ALGO_DESC = {
-  centerline: 'คำนวณแกนกลางของเส้น → ลายเดี่ยวคมชัด เหมาะ CNC/CAD',
-  outline:    'ตามเส้นขอบรูปทรง → Filled shape เหมาะงาน artwork',
-  pattern:    'ตรวจจับ tile ซ้ำแล้ว export pattern เดี่ยว',
-};
-
-function setVecMode(mode) {
-  VEC.mode = mode;
-  ['centerline','outline','pattern'].forEach(m => {
-    const btn=$('vecMode_'+m+'Btn'); if(btn) btn.classList.toggle('active', m===mode);
-  });
-  const pt=$('vecSettings_pattern');
-  if(pt) pt.style.display = mode==='pattern' ? '' : 'none';
-  const desc=$('vecAlgoDesc');
-  if(desc) desc.textContent = VEC_ALGO_DESC[mode]||'';
-}
-
-// ── Input Model preset ────────────────────────────────────────
-function setVecInputModel(model) {
-  VEC.inputModel = model;
-  document.querySelectorAll('.vec-model-btn').forEach(b=>{
-    const active = b.id === 'vecModel_'+model;
-    b.classList.toggle('active', active);
-    b.style.background = active ? '#1a2a1a' : '#111';
-    b.style.color       = active ? '#aaa'    : '#555';
-    b.style.borderColor = active ? '#2a5a2a' : '#333';
-  });
-  // Apply preset values
-  const sv=(id,val,div)=>{
-    const el=$(id); if(!el)return; el.value=val;
-    const lv=$(id+'V'); if(lv) lv.textContent=div?(val/div).toFixed(1):val;
-  };
-  const presets = {
-    clipart: {t:128,inv:false,b:5, c:0,nr:'off',aa:'off', rd:'default',m:10,e:8},
-    photo:   {t:140,inv:false,b:15,c:1,nr:'low', aa:'smart',rd:'high',  m:15,e:10},
-    sketch:  {t:185,inv:false,b:12,c:2,nr:'low', aa:'smart',rd:'high',  m:20,e:12},
-    drawing: {t:155,inv:false,b:8, c:1,nr:'off', aa:'smart',rd:'default',m:12,e:8},
-  };
-  const P = presets[model]; if(!P) return;
-  sv('vecThresh2',P.t);
-  if($('vecInvert'))$('vecInvert').checked=P.inv;
-  sv('vecBlur2',P.b,10); sv('vecClose',P.c); sv('vecMinLen2',P.m);
-  sv('vecEps2',P.e,10);
-  setVecFilter('aa',P.aa);
-  setVecFilter('nr',P.nr);
-  setVecFilter('rd',P.rd);
-}
-
-// ── Filter button state ───────────────────────────────────────
-function setVecFilter(type, val) {
-  const prefixMap = { aa:'vecAA_', nr:'vecNR_', rd:'vecRD_' };
-  const stateMap  = { aa:'antiAlias', nr:'noiseReduce', rd:'roundness' };
-  const keysMap   = { aa:['off','smart','mid'], nr:['off','low','high'],
-                      rd:['off','low','default','high','max'] };
-  VEC[stateMap[type]] = val;
-  keysMap[type].forEach(k=>{
-    const b=$(prefixMap[type]+k); if(!b) return;
-    const active = k===val;
-    b.classList.toggle('active', active);
-    b.style.background = active ? '#1a2a1a' : '#111';
-    b.style.color       = active ? '#aaa'    : '#555';
-    b.style.borderColor = active ? '#2a5a2a' : '#333';
-  });
-}
-
-// ── Roundness → chaikin iterations + bezier tension ──────────
-function vecRoundnessParams(rd) {
-  return {off:[0,3], low:[1,4], default:[2,6], high:[3,8], max:[4,10]}[rd] || [2,6];
-}
-
-// ── Legacy preset (kept for backward compat) ──────────────────
-function applyVecPreset(v) {
-  if(!v) return;
-  const P={
-    line_art:  {t:128,inv:false,b:10,c:1,m:15,e:8},
-    technical: {t:160,inv:false,b:5, c:0,m:10,e:5},
-    sketch:    {t:190,inv:false,b:15,c:2,m:20,e:12},
-    dark_bg:   {t:128,inv:true, b:10,c:1,m:15,e:8},
-  }[v]; if(!P) return;
-  const sv=(id,val,div)=>{
-    const el=$(id); if(!el)return; el.value=val;
-    const lv=$(id+'V'); if(lv) lv.textContent=div?(val/div).toFixed(1):val;
-  };
-  sv('vecThresh2',P.t);
-  if($('vecInvert'))$('vecInvert').checked=P.inv;
-  sv('vecBlur2',P.b,10); sv('vecClose',P.c); sv('vecMinLen2',P.m);
-  sv('vecEps2',P.e,10);
-}
-
-// ── Grayscale from S.image ───────────────────────────────────
-function vecGetGray(maxDim) {
-  if(!S.image) return null;
-  const sw=S.image.naturalWidth||S.image.width;
-  const sh=S.image.naturalHeight||S.image.height;
-  const sc=Math.min(1,maxDim/sw,maxDim/sh);
-  const w=Math.round(sw*sc), h=Math.round(sh*sc);
-  const c=document.createElement('canvas'); c.width=w; c.height=h;
-  c.getContext('2d').drawImage(S.image,0,0,w,h);
-  const d=c.getContext('2d').getImageData(0,0,w,h).data;
-  const g=new Float32Array(w*h);
-  for(let i=0;i<w*h;i++) g[i]=(0.299*d[i*4]+0.587*d[i*4+1]+0.114*d[i*4+2])/255;
-  return{gray:g,w,h};
-}
-
-// ── Gaussian blur (separable) ────────────────────────────────
-function vecBlur(g,w,h,sigma) {
-  if(sigma<0.3) return g;
-  const r=Math.ceil(sigma*2.5);
-  const k=[]; let ks=0;
-  for(let i=-r;i<=r;i++){const v=Math.exp(-(i*i)/(2*sigma*sigma));k.push(v);ks+=v;}
-  const kn=k.map(v=>v/ks),kl=kn.length;
-  const tmp=new Float32Array(w*h);
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    let s=0; for(let i=0;i<kl;i++){const xi=Math.max(0,Math.min(w-1,x+i-r));s+=kn[i]*g[y*w+xi];}
-    tmp[y*w+x]=s;
-  }
-  const out=new Float32Array(w*h);
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    let s=0; for(let i=0;i<kl;i++){const yi=Math.max(0,Math.min(h-1,y+i-r));s+=kn[i]*tmp[yi*w+x];}
-    out[y*w+x]=s;
-  }
-  return out;
-}
-
-// ── Threshold → binary ───────────────────────────────────────
-function vecBinarize(gray,w,h,thresh,invert) {
-  const t=thresh/255, bin=new Uint8Array(w*h);
-  for(let i=0;i<w*h;i++) bin[i]=((gray[i]<t)!==!!invert)?1:0;
-  return bin;
-}
-
-// ── Morphological dilate / erode / close ─────────────────────
-function vecMorphDilate(bin,w,h,r) {
-  if(r<1) return bin;
-  const out=new Uint8Array(w*h);
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    let hit=0;
-    lp: for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
-      const nx=x+dx,ny=y+dy;
-      if(nx>=0&&nx<w&&ny>=0&&ny<h&&bin[ny*w+nx]){hit=1;break lp;}
-    }
-    out[y*w+x]=hit;
-  }
-  return out;
-}
-function vecMorphErode(bin,w,h,r) {
-  if(r<1) return bin;
-  const out=new Uint8Array(w*h);
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    let all=1;
-    lp: for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
-      const nx=x+dx,ny=y+dy;
-      if(nx<0||nx>=w||ny<0||ny>=h||!bin[ny*w+nx]){all=0;break lp;}
-    }
-    out[y*w+x]=all;
-  }
-  return out;
-}
-function vecMorphClose(bin,w,h,r){return r<1?bin:vecMorphErode(vecMorphDilate(bin,w,h,r),w,h,r);}
 
 // ── Zhang-Suen thinning ──────────────────────────────────────
 function vecThinZhangSuen(bin,w,h) {
@@ -7826,33 +7634,6 @@ function vecTraceSkeleton(skel,w,h,minLen) {
   return paths;
 }
 
-// ── Contour trace (Outline mode) ─────────────────────────────
-function vecTraceContours(bin,w,h,minLen) {
-  const vis=new Uint8Array(w*h), paths=[];
-  const dx8=[1,1,0,-1,-1,-1,0,1], dy8=[0,1,1,1,0,-1,-1,-1];
-  for(let y=1;y<h-1;y++) for(let x=1;x<w-1;x++){
-    if(!bin[y*w+x]||vis[y*w+x]) continue;
-    let bnd=false;
-    for(let d=0;d<8;d++) if(!bin[(y+dy8[d])*w+(x+dx8[d])]){bnd=true;break;}
-    if(!bnd) continue;
-    const path=[[x,y]]; vis[y*w+x]=1;
-    let cx=x,cy=y,pd=4;
-    for(let step=0;step<50000;step++){
-      let found=false;
-      for(let di=0;di<8;di++){
-        const d=(pd+6+di)%8,nx=cx+dx8[d],ny=cy+dy8[d];
-        if(nx<0||nx>=w||ny<0||ny>=h||!bin[ny*w+nx]) continue;
-        if(nx===x&&ny===y&&path.length>2){found=true;break;}
-        if(!vis[ny*w+nx]){vis[ny*w+nx]=1;path.push([nx,ny]);cx=nx;cy=ny;pd=d;found=true;break;}
-        // visited-but-not-start: try next direction (was: break → caused fragments)
-      }
-      if(!found||(cx===x&&cy===y&&path.length>2)) break;
-    }
-    if(path.length>=minLen) paths.push(path);
-  }
-  return paths;
-}
-
 // ── Douglas-Peucker ──────────────────────────────────────────
 function vecSimplify(pts,eps) {
   if(pts.length<=2) return pts;
@@ -7894,210 +7675,15 @@ function chaikinSmooth(pts, closed, iterations) {
   return p;
 }
 
-// ── Cubic bezier path (Catmull-Rom tangents) ─────────────────
-function vecSmoothPath(pts,tension) {
-  if(pts.length<2) return '';
-  const t=Math.max(0,Math.min(1,(tension||5)/12));
-  let d=`M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
-  for(let i=1;i<pts.length;i++){
-    const p0=pts[Math.max(0,i-2)],p1=pts[i-1],p2=pts[i],p3=pts[Math.min(pts.length-1,i+1)];
-    const c1x=(p1[0]+(p2[0]-p0[0])*t/3).toFixed(1);
-    const c1y=(p1[1]+(p2[1]-p0[1])*t/3).toFixed(1);
-    const c2x=(p2[0]-(p3[0]-p1[0])*t/3).toFixed(1);
-    const c2y=(p2[1]-(p3[1]-p1[1])*t/3).toFixed(1);
-    d+=` C ${c1x} ${c1y} ${c2x} ${c2y} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
-  }
-  return d;
+// ── LineTracer Pro modal (embedded via iframe — see #ltModal) ──
+function openLineTracer() {
+  const modal = $('ltModal');
+  const frame = $('ltFrame');
+  if (!frame.src) frame.src = 'line-tracer.html';
+  modal.style.display = 'flex';
 }
-
-// ── Tile detection ───────────────────────────────────────────
-function vecDetectTile(gray,w,h) {
-  const mxW=Math.min(Math.floor(w/2),400), mxH=Math.min(Math.floor(h/2),400);
-  function bestPeriod(dir){
-    let bestScore=Infinity, bestP=0;
-    const step=dir==='x'?1:1;
-    for(let p=16;p<(dir==='x'?mxW:mxH);p+=step){
-      let s=0,n=0;
-      if(dir==='x'){
-        for(let y=0;y<h;y+=4) for(let x=0;x<w-p;x+=4){
-          const d=gray[y*w+x]-gray[y*w+(x+p)]; s+=d*d; n++;
-        }
-      } else {
-        for(let y=0;y<h-p;y+=4) for(let x=0;x<w;x+=4){
-          const d=gray[y*w+x]-gray[(y+p)*w+x]; s+=d*d; n++;
-        }
-      }
-      const score=n?s/n:Infinity;
-      if(score<bestScore){bestScore=score;bestP=p;}
-    }
-    return bestP;
-  }
-  const tw=bestPeriod('x'), th=bestPeriod('y');
-  let intra=0,inter=0,n=0;
-  for(let y=0;y<h-th;y+=8) for(let x=0;x<w-tw;x+=8){
-    const d=gray[y*w+x]-gray[(y+th)*w+(x+tw)]; inter+=d*d;
-    const d2=gray[y*w+x]-gray[Math.min(h-1,y+4)*w+Math.min(w-1,x+4)]; intra+=d2*d2; n++;
-  }
-  const cx=n?Math.max(0,1-inter/(intra+0.001)):0;
-  return{tw,th,cx,cy:cx};
-}
-
-// ── Preview canvas ───────────────────────────────────────────
-function vecDrawPreview(bin,w,h) {
-  const pv=$('vecPreviewCanvas'); pv.width=w; pv.height=h;
-  const ctx=pv.getContext('2d');
-  const id=ctx.createImageData(w,h);
-  for(let i=0;i<w*h;i++){
-    const v=bin[i]?30:220;
-    id.data[i*4]=id.data[i*4+1]=id.data[i*4+2]=v; id.data[i*4+3]=255;
-  }
-  ctx.putImageData(id,0,0);
-  if(VEC.svgPaths.length>0){
-    ctx.strokeStyle='#00e5ff'; ctx.lineWidth=1.2;
-    VEC.svgPaths.forEach(d=>{try{ctx.stroke(new Path2D(d));}catch(e){}});
-  }
-  if(VEC.mode==='pattern'&&VEC.tileW>0&&VEC.tileH>0){
-    ctx.strokeStyle='#ff6b35'; ctx.lineWidth=2; ctx.setLineDash([6,3]);
-    for(let x=0;x<=w;x+=VEC.tileW){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
-    for(let y=0;y<=h;y+=VEC.tileH){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
-    ctx.setLineDash([]);
-  }
-}
-
-// ── Main trace runner ─────────────────────────────────────────
-function runVectorTrace() {
-  if(!S.image){$('vecInfo').textContent='⚠️ กรุณาโหลดรูปก่อน';return;}
-  $('vecInfo').textContent='⏳ กำลังประมวลผล...';
-  setTimeout(()=>{
-    try{
-      const isPattern = VEC.mode==='pattern';
-      const thresh  = parseInt(isPattern?$('vecPThresh2').value:$('vecThresh2').value)||128;
-      const invert  = isPattern?$('vecInvert2').checked:$('vecInvert').checked;
-
-      // Gaussian Blur — boosted by Anti-aliasing setting
-      let blurRaw = isPattern ? 1.0 : (parseInt($('vecBlur2').value)/10||0);
-      if(!isPattern){
-        if(VEC.antiAlias==='smart') blurRaw = Math.max(0.5, blurRaw + 0.3);
-        else if(VEC.antiAlias==='mid') blurRaw = Math.max(0.8, blurRaw + 0.6);
-      }
-      const blurSig = blurRaw;
-
-      // Close gaps — boosted by Noise Reduction setting
-      let closeRaw = isPattern ? 1 : (parseInt($('vecClose').value)||0);
-      if(!isPattern){
-        if(VEC.noiseReduce==='low')  closeRaw = Math.max(closeRaw, 1);
-        else if(VEC.noiseReduce==='high') closeRaw = Math.max(closeRaw, 3);
-      }
-      const closeR = closeRaw;
-
-      const minLen  = parseInt($('vecMinLen2').value)||15;
-      const eps     = (parseInt($('vecEps2').value)/10)||0.8;
-
-      // Roundness → Chaikin iterations + bezier tension
-      const [chaikinIter, tension] = vecRoundnessParams(VEC.roundness);
-
-      const res=vecGetGray(1200);
-      if(!res){$('vecInfo').textContent='❌ อ่านรูปไม่ได้';return;}
-      const{gray,w,h}=res;
-      VEC.imgW=w; VEC.imgH=h;
-
-      const blurred=vecBlur(gray,w,h,blurSig);
-      let bin=vecBinarize(blurred,w,h,thresh,invert);
-      bin=vecMorphClose(bin,w,h,closeR);
-
-      let paths=[];
-
-      if(VEC.mode==='outline'){
-        paths=vecTraceContours(bin,w,h,minLen);
-        VEC.tileW=0; VEC.tileH=0;
-      } else {
-        // centerline or pattern: skeletonize first
-        const skel=vecThinZhangSuen(bin,w,h);
-        paths=vecTraceSkeleton(skel,w,h,minLen);
-        if(VEC.mode==='pattern'){
-          const tile=vecDetectTile(gray,w,h);
-          VEC.tileW=tile.tw; VEC.tileH=tile.th;
-          const conf=Math.round(Math.max(tile.cx,tile.cy)*100);
-          $('vecTileInfo').textContent=
-            (tile.cx>0.25||tile.cy>0.25)
-              ?`Tile: ${tile.tw}×${tile.th}px  (ความมั่นใจ ${conf}%)`
-              :'ไม่พบ pattern ซ้ำ — แสดงรูปทั้งหมด';
-        } else {VEC.tileW=0;VEC.tileH=0;}
-      }
-
-      const rawN=paths.length;
-      // Simplify → Chaikin smooth → Bezier path
-      VEC.contours=paths.map(p=>vecSimplify(p,eps));
-      const isClosed = VEC.mode==='outline';
-      VEC.svgPaths=VEC.contours.map(p=>{
-        const smoothed = chaikinIter>0 ? chaikinSmooth(p, isClosed, chaikinIter) : p;
-        return vecSmoothPath(smoothed, tension);
-      }).filter(d=>d.length>4);
-
-      vecDrawPreview(bin,w,h);
-      VEC.showMain=true;
-      updateViewCanvas();
-      $('vecInfo').textContent=`✅ พบ ${VEC.svgPaths.length} เส้น  (จาก ${rawN} paths)`;
-    }catch(e){
-      $('vecInfo').textContent='❌ Error: '+e.message;
-      console.error(e);
-    }
-  },20);
-}
-
-// ── Export SVG ────────────────────────────────────────────────
-function exportVectorSVG() {
-  if(!VEC.svgPaths.length){alert('กรุณาตรวจจับเส้นก่อน');return;}
-  const wMm=parseFloat($('workW').value)||100;
-  const hMm=parseFloat($('workH').value)||100;
-  const sx=wMm/VEC.imgW, sy=hMm/VEC.imgH;
-  // stroke-width from Advanced slider (default 1.5mm), clamped for small work areas
-  const swSlider = (parseInt(($('vecStrokeW')||{value:'15'}).value)/10) || 1.5;
-  const sw = swSlider.toFixed(2);
-  const gAttrs = `fill="none" stroke="#000000" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"`;
-  let body='';
-  if(VEC.mode==='pattern'&&VEC.tileW>0&&VEC.tileH>0){
-    const twMm=(VEC.tileW*sx).toFixed(4), thMm=(VEC.tileH*sy).toFixed(4);
-    let tp='';
-    VEC.contours.forEach((pts,i)=>{
-      if(pts.every(([x,y])=>x<VEC.tileW*1.05&&y<VEC.tileH*1.05))
-        tp+='        <path d="'+VEC.svgPaths[i]+'"/>\n';
-    });
-    body='  <defs>\n    <pattern id="vt" x="0" y="0" width="'+twMm+'" height="'+thMm+'" patternUnits="userSpaceOnUse">\n';
-    body+='      <g transform="scale('+sx.toFixed(6)+','+sy.toFixed(6)+')" '+gAttrs+'>\n';
-    body+=tp;
-    body+='      </g>\n    </pattern>\n  </defs>\n';
-    body+='  <rect width="'+wMm+'" height="'+hMm+'" fill="url(#vt)"/>\n';
-  } else {
-    body='  <g '+gAttrs+' transform="scale('+sx.toFixed(6)+','+sy.toFixed(6)+')">\n';
-    VEC.svgPaths.forEach(d=>{body+='    <path d="'+d+'"/>\n';});
-    body+='  </g>\n';
-  }
-  const svg='<?xml version="1.0" encoding="UTF-8"?>\n'
-    +'<!-- Generated by AI Vectorizer Engines — stroke="#000000" stroke-width="'+sw+'" -->\n'
-    +'<svg xmlns="http://www.w3.org/2000/svg" width="'+wMm+'mm" height="'+hMm+'mm" viewBox="0 0 '+wMm+' '+hMm+'">\n'
-    +body+'</svg>';
-  const blob=new Blob([svg],{type:'image/svg+xml'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='vector_trace.svg'; a.click();
-}
-
-// ── Export DXF ────────────────────────────────────────────────
-function exportVectorDXF() {
-  if(!VEC.contours.length){alert('กรุณาตรวจจับเส้นก่อน');return;}
-  const wMm=S.workW||100, hMm=S.workH||100;
-  const sx=wMm/VEC.imgW, sy=hMm/VEC.imgH;
-  let dxf='0\nSECTION\n2\nENTITIES\n';
-  VEC.contours.forEach(pts=>{
-    dxf+='0\nLWPOLYLINE\n8\n0\n70\n0\n90\n'+pts.length+'\n';
-    pts.forEach(([x,y])=>{
-      dxf+='10\n'+(x*sx).toFixed(4)+'\n20\n'+((hMm-y*sy)).toFixed(4)+'\n';
-    });
-  });
-  dxf+='0\nENDSEC\n0\nEOF\n';
-  const blob=new Blob([dxf],{type:'text/plain'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='vector_trace.dxf'; a.click();
+function closeLineTracer() {
+  $('ltModal').style.display = 'none';
 }
 </script>
 </body>
