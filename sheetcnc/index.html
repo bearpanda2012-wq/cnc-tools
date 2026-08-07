@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g39</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g40</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="exportExcel()">📊 Excel</button>
   <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ Print</button>
@@ -3990,6 +3990,19 @@ function _gridStamp(g, spans, gox, goy, ex){
   }
 }
 
+/** Minimum edge-to-edge distance between two polygons (0 when they touch/overlap). */
+function _polyClear(A, B){
+  const d=(a,b,c)=>{ const vx=c[0]-b[0], vy=c[1]-b[1], wx=a[0]-b[0], wy=a[1]-b[1];
+    const L=vx*vx+vy*vy; let t=L?((wx*vx+wy*vy)/L):0; t=Math.max(0,Math.min(1,t));
+    return Math.hypot(a[0]-(b[0]+t*vx), a[1]-(b[1]+t*vy)); };
+  let m=Infinity;
+  for(let i=0;i<A.length;i++){ const a1=A[i], a2=A[(i+1)%A.length];
+    for(let j=0;j<B.length;j++){ const b1=B[j], b2=B[(j+1)%B.length];
+      const s=Math.min(d(a1,b1,b2), d(a2,b1,b2), d(b1,a1,a2), d(b2,a1,a2));
+      if(s<m) m=s; if(m<=0) return 0; } }
+  return m;
+}
+
 function place(item, sheet, sw, sh, edgeMargin, pieceGap, rotMode){
   // Init grid for this sheet on first use
   if(!sheet.grid) sheet.grid=_gridInit(sw,sh,edgeMargin,pieceGap);
@@ -4142,6 +4155,39 @@ function deduplicateSheets(sheets) {
 /** Smallest real edge-to-edge gap between any two placed pieces (for verification). */
 /** Min & max edge-to-edge gap between each piece and its NEAREST neighbour (right/top).
  *  Returns {min,max} so any inconsistency (e.g. 10.0 vs 10.5) is visible, not hidden. */
+/** TRUE edge-to-edge clearance between placed outlines (not bounding boxes).
+ *  Rotated parts can have overlapping boxes while the real outlines are far apart —
+ *  and vice-versa — so this is what actually matters for cutting. */
+function auditRealGaps(sheets, gap){
+  const segD=(p,q,r,s)=>{ const d=(a,b,c)=>{ const vx=c[0]-b[0], vy=c[1]-b[1];
+      const wx=a[0]-b[0], wy=a[1]-b[1], L=vx*vx+vy*vy;
+      let t=L?((wx*vx+wy*vy)/L):0; t=Math.max(0,Math.min(1,t));
+      return Math.hypot(a[0]-(b[0]+t*vx), a[1]-(b[1]+t*vy)); };
+    return Math.min(d(p,r,s), d(q,r,s), d(r,p,q), d(s,p,q)); };
+  const polyOf=it=>{ const v=it.rotatedVerts||it.vertices||
+      [[0,0],[it.w,0],[it.w,it.h],[0,it.h]];
+    return v.map(([x,y])=>[x+it.x, y+it.y]); };
+  let min=Infinity, bad=0, checked=0;
+  sheets.forEach(sh=>{
+    const its=sh.items||[]; const P=its.map(polyOf);
+    for(let a=0;a<its.length;a++) for(let b=a+1;b<its.length;b++){
+      const A=its[a], B=its[b];
+      // cheap reject: boxes far apart can't violate the rule
+      const dx=Math.max(B.x-(A.x+A.w), A.x-(B.x+B.w));
+      const dy=Math.max(B.y-(A.y+A.h), A.y-(B.y+B.h));
+      if(Math.max(dx,dy) > gap*1.5) continue;
+      checked++;
+      let m=Infinity; const PA=P[a], PB=P[b];
+      for(let i=0;i<PA.length && m>0;i++){ const a1=PA[i], a2=PA[(i+1)%PA.length];
+        for(let j=0;j<PB.length;j++){ const b1=PB[j], b2=PB[(j+1)%PB.length];
+          const d=segD(a1,a2,b1,b2); if(d<m) m=d; if(m<=0) break; } }
+      if(m<min) min=m;
+      if(m < gap-0.05) bad++;
+    }
+  });
+  return { min:isFinite(min)?min:null, bad, checked };
+}
+
 function measuredMinGap(sheets){
   let mn=Infinity, mx=-Infinity;
   sheets.forEach(sh=>{
@@ -4185,12 +4231,12 @@ function renderResults(){
       return `<div class="stat" style="border:1px solid #a78bfa55;">
         <div class="sv" style="color:#a78bfa;font-size:1rem">🤖 ${rotName}</div>
         <div class="sl">AI เลือก · ${sortName} · ลอง ${a.tried} แบบ (${(a.ms/1000).toFixed(1)}s)</div></div>`; })()}
-    ${(()=>{ const g=measuredMinGap(sheets); const set=nestResult.pieceGap;
-      if(g===null) return '';
-      const ok=Math.abs(g.min-set)<0.3 && Math.abs(g.max-set)<0.3;
-      const lbl=(g.max-g.min<0.05)?g.min.toFixed(1):`${g.min.toFixed(1)}–${g.max.toFixed(1)}`;
-      return `<div class="stat"><div class="sv" style="color:${ok?'#10b981':'#ef4444'};font-size:${lbl.length>4?'1.1rem':''}">${lbl}<span style="font-size:.6em;color:var(--muted)"> / ${set}mm</span></div>
-        <div class="sl">ระยะห่างจริง ${ok?'✓':'✗'}</div></div>`; })()}
+    ${(()=>{ const set=nestResult.pieceGap;
+      const r=auditRealGaps(sheets, set);          // measured on the real outlines
+      if(r.min===null) return '';
+      const ok = r.bad===0;
+      return `<div class="stat"><div class="sv" style="color:${ok?'#10b981':'#ef4444'}">${r.min.toFixed(2)}<span style="font-size:.6em;color:var(--muted)"> / ${set}mm</span></div>
+        <div class="sl">ระยะห่างจริง ${ok?'✓ ผ่าน' : '✗ พบ '+r.bad+' คู่ชิดเกิน'}</div></div>`; })()}
   `;
 
   const fillEl=document.getElementById('effFill');
@@ -4728,7 +4774,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-g39';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-g40';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
