@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g31</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g32</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="exportExcel()">📊 Excel</button>
   <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ Print</button>
@@ -299,6 +299,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
           <option value="rot90" selected data-i18n="rot90Opt">หมุน 90°</option>
           <option value="rot45" data-i18n="rot45Opt">หมุน 45° & 90°</option>
           <option value="free" data-i18n="rotFree">อิสระ (ทุก 15°)</option>
+          <option value="free1" data-i18n="rotFree1">อิสระละเอียด (ทุก 1°) — ช้า</option>
         </select>
       </div>
       <div class="field">
@@ -472,7 +473,7 @@ const TR = {
     pricePerSheet:'ราคาต่อแผ่น (บาท)',
     laborLbl:'ค่าแรง CNC (บาท/m²)',
     allowRot:'อนุญาตหมุนชิ้น 90°',
-    rotMode:'การหมุนชิ้นงาน', rotNone:'ไม่หมุน', rot90Opt:'หมุน 90°', rot45Opt:'หมุน 45° & 90°', rotFree:'อิสระ (ทุก 15°)',
+    rotMode:'การหมุนชิ้นงาน', rotNone:'ไม่หมุน', rot90Opt:'หมุน 90°', rot45Opt:'หมุน 45° & 90°', rotFree:'อิสระ (ทุก 15°)', rotFree1:'อิสระละเอียด (ทุก 1°) — ช้า',
     startCorner:'จุดเริ่มจัดเรียงชิ้นงาน', cornerTL:'มุมซ้ายบน ↖', cornerTR:'มุมขวาบน ↗', cornerBL:'มุมซ้ายล่าง ↙', cornerBR:'มุมขวาล่าง ↘',
     dxfImportTitle:'📂 นำเข้า DXF หลายชิ้นงาน',
     dxfImportNotice:'🔍 อัปโหลด <b>DXF 1 ไฟล์ที่มีหลายชิ้นงาน</b> — แอปจะ<b>อ่านเฉพาะกรอบนอกสุด</b>ของแต่ละชิ้น และ<b>ตัด inner object (รู, ช่องเปิด, detail ภายใน) ออกอัตโนมัติ</b> แสดง preview พร้อมขนาด/พื้นที่ แล้วเลือกเพิ่มเข้าลิสต์ได้เลย',
@@ -538,7 +539,7 @@ const TR = {
     pricePerSheet:'Price per sheet (THB)',
     laborLbl:'CNC labor (THB/m²)',
     allowRot:'Allow 90° rotation',
-    rotMode:'Piece Rotation', rotNone:'No rotation', rot90Opt:'Rotate 90°', rot45Opt:'Rotate 45° & 90°', rotFree:'Free (every 15°)',
+    rotMode:'Piece Rotation', rotNone:'No rotation', rot90Opt:'Rotate 90°', rot45Opt:'Rotate 45° & 90°', rotFree:'Free (every 15°)', rotFree1:'Fine free (every 1°) — slow',
     startCorner:'Start corner', cornerTL:'Top-left ↖', cornerTR:'Top-right ↗', cornerBL:'Bottom-left ↙', cornerBR:'Bottom-right ↘',
     dxfImportTitle:'📂 Import Multi-piece DXF',
     dxfImportNotice:'🔍 Upload a <b>single DXF file with multiple pieces</b> — the app reads only <b>outer contours</b>, automatically <b>excludes inner objects (holes, openings)</b>, shows a preview with dimensions/area, then lets you add selected pieces to the list.',
@@ -3339,7 +3340,12 @@ function getOrientations(item, rotMode){
     addOri(45); addOri(135);
   } else if(rotMode==='free'){
     for(let a=15;a<180;a+=15) addOri(a);
+  } else if(rotMode==='free1'){
+    // Fine free rotation: every 1° (0…179). Many more candidates, so the smallest
+    // footprints are tried first — a fit is usually found long before the last angle.
+    for(let a=1;a<180;a++) addOri(a);
   }
+  if(rotMode==='free'||rotMode==='free1') orients.sort((p,q)=>(p.w*p.h)-(q.w*q.h));
   return orients;
 }
 
@@ -4228,7 +4234,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-g31';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-g32';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
