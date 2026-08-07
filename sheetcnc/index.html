@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g32</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g39</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="exportExcel()">📊 Excel</button>
   <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ Print</button>
@@ -295,8 +295,9 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       <div class="field">
         <label data-i18n="rotMode">การหมุนชิ้นงาน</label>
         <select id="rotMode" onchange="saveSettings()" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:.82rem;">
+          <option value="auto" selected data-i18n="rotAuto">🤖 AI จัดวางอัตโนมัติ (ดีที่สุด)</option>
           <option value="none" data-i18n="rotNone">ไม่หมุน</option>
-          <option value="rot90" selected data-i18n="rot90Opt">หมุน 90°</option>
+          <option value="rot90" data-i18n="rot90Opt">หมุน 90°</option>
           <option value="rot45" data-i18n="rot45Opt">หมุน 45° & 90°</option>
           <option value="free" data-i18n="rotFree">อิสระ (ทุก 15°)</option>
           <option value="free1" data-i18n="rotFree1">อิสระละเอียด (ทุก 1°) — ช้า</option>
@@ -331,8 +332,8 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       ondrop="handleMdxfDrop(event)">
       <div class="ico">📄</div>
       <p>คลิกหรือลากไฟล์มาวาง</p>
-      <p style="font-size:.74rem;margin-top:4px;">รองรับ <b>.dxf &nbsp;.svg &nbsp;.eps &nbsp;.ai</b> &nbsp;(AutoCAD / Illustrator / Inkscape / Rhino)</p>
-      <input type="file" id="mdxfFi" accept=".dxf,.svg,.eps,.ai" style="display:none" onchange="handleMdxfFile(this.files[0])">
+      <p style="font-size:.74rem;margin-top:4px;">รองรับ <b>.dxf &nbsp;.svg &nbsp;.eps &nbsp;.ai &nbsp;.pdf</b> &nbsp;(AutoCAD / Illustrator / Inkscape / Rhino)</p>
+      <input type="file" id="mdxfFi" accept=".dxf,.svg,.eps,.ai,.pdf" style="display:none" onchange="handleMdxfFile(this.files[0])">
     </div>
     <div id="mdxfResult" class="mdxf-result" style="display:none;"></div>
   </div>
@@ -473,7 +474,7 @@ const TR = {
     pricePerSheet:'ราคาต่อแผ่น (บาท)',
     laborLbl:'ค่าแรง CNC (บาท/m²)',
     allowRot:'อนุญาตหมุนชิ้น 90°',
-    rotMode:'การหมุนชิ้นงาน', rotNone:'ไม่หมุน', rot90Opt:'หมุน 90°', rot45Opt:'หมุน 45° & 90°', rotFree:'อิสระ (ทุก 15°)', rotFree1:'อิสระละเอียด (ทุก 1°) — ช้า',
+    rotMode:'การหมุนชิ้นงาน', rotAuto:'🤖 AI จัดวางอัตโนมัติ (ดีที่สุด)', rotNone:'ไม่หมุน', rot90Opt:'หมุน 90°', rot45Opt:'หมุน 45° & 90°', rotFree:'อิสระ (ทุก 15°)', rotFree1:'อิสระละเอียด (ทุก 1°) — ช้า',
     startCorner:'จุดเริ่มจัดเรียงชิ้นงาน', cornerTL:'มุมซ้ายบน ↖', cornerTR:'มุมขวาบน ↗', cornerBL:'มุมซ้ายล่าง ↙', cornerBR:'มุมขวาล่าง ↘',
     dxfImportTitle:'📂 นำเข้า DXF หลายชิ้นงาน',
     dxfImportNotice:'🔍 อัปโหลด <b>DXF 1 ไฟล์ที่มีหลายชิ้นงาน</b> — แอปจะ<b>อ่านเฉพาะกรอบนอกสุด</b>ของแต่ละชิ้น และ<b>ตัด inner object (รู, ช่องเปิด, detail ภายใน) ออกอัตโนมัติ</b> แสดง preview พร้อมขนาด/พื้นที่ แล้วเลือกเพิ่มเข้าลิสต์ได้เลย',
@@ -539,7 +540,7 @@ const TR = {
     pricePerSheet:'Price per sheet (THB)',
     laborLbl:'CNC labor (THB/m²)',
     allowRot:'Allow 90° rotation',
-    rotMode:'Piece Rotation', rotNone:'No rotation', rot90Opt:'Rotate 90°', rot45Opt:'Rotate 45° & 90°', rotFree:'Free (every 15°)', rotFree1:'Fine free (every 1°) — slow',
+    rotMode:'Piece Rotation', rotAuto:'🤖 AI auto-nest (best fit)', rotNone:'No rotation', rot90Opt:'Rotate 90°', rot45Opt:'Rotate 45° & 90°', rotFree:'Free (every 15°)', rotFree1:'Fine free (every 1°) — slow',
     startCorner:'Start corner', cornerTL:'Top-left ↖', cornerTR:'Top-right ↗', cornerBL:'Bottom-left ↙', cornerBR:'Bottom-right ↘',
     dxfImportTitle:'📂 Import Multi-piece DXF',
     dxfImportNotice:'🔍 Upload a <b>single DXF file with multiple pieces</b> — the app reads only <b>outer contours</b>, automatically <b>excludes inner objects (holes, openings)</b>, shows a preview with dimensions/area, then lets you add selected pieces to the list.',
@@ -1444,10 +1445,365 @@ function handleMdxfDrop(e) {
   if (f) handleMdxfFile(f);
 }
 
+// ─── Modern .AI / PDF support ──────────────────────────────────────────────
+// Illustrator CS+ saves .ai as a PDF with Flate-compressed content streams, so the
+// PostScript reader sees nothing. Here we locate the page content stream, inflate it
+// with the browser's DecompressionStream, and read the PDF path operators.
+/** Pure-JS DEFLATE decoder (RFC1951) — no browser API needed, so PDF/AI import
+ *  works everywhere (DecompressionStream is missing in some builds). */
+function _inflateRawJS(src, skip){
+  let pos=skip||0, bitBuf=0, bitCnt=0;
+  const out=[];
+  const bits=n=>{ while(bitCnt<n){ bitBuf|=src[pos++]<<bitCnt; bitCnt+=8; }
+    const v=bitBuf&((1<<n)-1); bitBuf>>>=n; bitCnt-=n; return v; };
+  const build=lens=>{                      // canonical Huffman → {counts, symbols}
+    const counts=new Array(16).fill(0); lens.forEach(l=>counts[l]++); counts[0]=0;
+    const offs=new Array(16).fill(0);
+    for(let i=1;i<16;i++) offs[i]=offs[i-1]+counts[i-1];
+    const symbols=new Array(lens.length);
+    lens.forEach((l,s)=>{ if(l) symbols[offs[l]++]=s; });
+    return {counts,symbols};
+  };
+  const decode=h=>{ let code=0,first=0,index=0;
+    for(let len=1;len<16;len++){
+      code|=bits(1); const count=h.counts[len];
+      if(code-first<count) return h.symbols[index+(code-first)];
+      index+=count; first=(first+count)<<1; code<<=1;
+    }
+    throw new Error('bad code');
+  };
+  const LBASE=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+  const LEXT =[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DBASE=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+  const DEXT =[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  let fixedL=null, fixedD=null;
+  for(;;){
+    const last=bits(1), type=bits(2);
+    if(type===0){                                   // stored
+      bitBuf=0; bitCnt=0;
+      const len=src[pos]|(src[pos+1]<<8); pos+=4;
+      for(let i=0;i<len;i++) out.push(src[pos++]);
+    } else {
+      let lh,dh;
+      if(type===1){
+        if(!fixedL){
+          const l=new Array(288); for(let i=0;i<288;i++) l[i]= i<144?8 : i<256?9 : i<280?7 : 8;
+          fixedL=build(l); fixedD=build(new Array(30).fill(5));
+        }
+        lh=fixedL; dh=fixedD;
+      } else if(type===2){
+        const nlen=bits(5)+257, ndist=bits(5)+1, ncode=bits(4)+4;
+        const ord=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+        const cl=new Array(19).fill(0);
+        for(let i=0;i<ncode;i++) cl[ord[i]]=bits(3);
+        const ch=build(cl); const lens=[];
+        while(lens.length<nlen+ndist){
+          const s=decode(ch);
+          if(s<16) lens.push(s);
+          else if(s===16){ const p=lens[lens.length-1], n=3+bits(2); for(let i=0;i<n;i++) lens.push(p); }
+          else if(s===17){ const n=3+bits(3); for(let i=0;i<n;i++) lens.push(0); }
+          else { const n=11+bits(7); for(let i=0;i<n;i++) lens.push(0); }
+        }
+        lh=build(lens.slice(0,nlen)); dh=build(lens.slice(nlen));
+      } else throw new Error('bad block type');
+      for(;;){
+        const s=decode(lh);
+        if(s<256) out.push(s);
+        else if(s===256) break;
+        else {
+          const li=s-257, len=LBASE[li]+bits(LEXT[li]);
+          const ds=decode(dh), dist=DBASE[ds]+bits(DEXT[ds]);
+          for(let i=0,st=out.length-dist;i<len;i++) out.push(out[st+i]);
+        }
+      }
+    }
+    if(last) break;
+  }
+  return new Uint8Array(out);
+}
+async function _inflate(bytes){
+  // 1) native (fast) when available
+  if (typeof DecompressionStream!=='undefined'){
+    for(const fmt of ['deflate','deflate-raw']){
+      try{
+        const ds=new DecompressionStream(fmt);
+        const buf=await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
+        const u=new Uint8Array(buf); if(u.length) return u;
+      }catch(e){}
+    }
+  }
+  // 2) built-in decoder — zlib header (0x78) is skipped, else treat as raw deflate
+  const zlibHdr = bytes.length>1 && (bytes[0]&0x0f)===8 && ((bytes[0]<<8|bytes[1])%31)===0;
+  try { return _inflateRawJS(bytes, zlibHdr?2:0); }
+  catch(e){ try { return _inflateRawJS(bytes, zlibHdr?0:2); } catch(e2){ throw new Error('decompress failed'); } }
+}
+async function parsePDFShapes(buf){
+  const bytes=new Uint8Array(buf);
+  let bin=''; const CH=0x8000;
+  for(let i=0;i<bytes.length;i+=CH) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
+  // object lookup: "N 0 obj … endobj"
+  const objAt=n=>{
+    const m=new RegExp('(?:^|[^0-9])'+n+'\\s+0\\s+obj').exec(bin);
+    if(!m) return null;
+    const s=m.index+m[0].length, e=bin.indexOf('endobj',s);
+    const body=bin.slice(s,e<0?bin.length:e);
+    const sm=/stream\r?\n/.exec(body);
+    return { dict: sm?body.slice(0,sm.index):body,
+             start: sm? s+sm.index+sm[0].length : -1,
+             end: sm? s+body.indexOf('endstream',sm.index+sm[0].length) : -1 };
+  };
+  // page → /Contents (single ref or array)
+  const pg=/\/ArtBox|\/MediaBox/.exec(bin);
+  let refs=[];
+  const around=bin.slice(Math.max(0,(pg?pg.index:0)-400), (pg?pg.index:0)+900);
+  const one=/\/Contents\s+(\d+)\s+0\s+R/.exec(around);
+  const arr=/\/Contents\s*\[([^\]]+)\]/.exec(around);
+  if(arr) refs=[...arr[1].matchAll(/(\d+)\s+0\s+R/g)].map(m=>+m[1]);
+  else if(one) refs=[+one[1]];
+  if(!refs.length) throw new Error('ไม่พบ page content ในไฟล์ PDF/AI');
+  let content='';
+  for(const r of refs){
+    const o=objAt(r); if(!o||o.start<0) continue;
+    const raw=bytes.subarray(o.start,o.end);
+    const txt = /FlateDecode/.test(o.dict) ? new TextDecoder('latin1').decode(await _inflate(raw))
+                                          : new TextDecoder('latin1').decode(raw);
+    content += txt + '\n';
+  }
+  return _parsePDFContent(content);
+}
+/** Read PDF content-stream path operators into closed shapes (units → mm). */
+function _parsePDFContent(txt){
+  const K=25.4/72;                       // PDF points → mm
+  // Pull literal/hex strings out first so whitespace inside them can't break the
+  // tokenizer; each becomes a §n§ placeholder that pdfStrAt() decodes later.
+  const strs=[];
+  let src=txt.replace(/\r/g,'\n')
+    .replace(/\((?:\\.|[^\\()])*\)/gs, s=>{
+      const raw=s.slice(1,-1).replace(/\\([nrtbf()\\])/g,(x,c)=>({n:'\n',r:'\r',t:'\t',b:'\b',f:'\f'}[c]||c))
+                             .replace(/\\([0-7]{1,3})/g,(x,o)=>String.fromCharCode(parseInt(o,8)));
+      strs.push(raw); return ` §${strs.length-1}§ `;
+    })
+    .replace(/<([0-9A-Fa-f\s]+)>/g, (s,h)=>{
+      const hex=h.replace(/\s/g,''); let out='';
+      for(let k=0;k+1<hex.length;k+=2) out+=String.fromCharCode(parseInt(hex.substr(k,2),16));
+      strs.push(out); return ` §${strs.length-1}§ `;
+    });
+  const toks=src.split(/\s+/).filter(Boolean);
+  const isStr=t=>/^§\d+§$/.test(t);
+  const strOf=t=>strs[+t.slice(1,-1)]||'';
+  /** Text operand(s) before operator index i: single string, or all strings in a TJ array. */
+  const pdfStrAt=i=>{
+    if(isStr(toks[i-1])) return strOf(toks[i-1]).trim();
+    if(toks[i-1]===']'){                       // TJ array → concatenate its pieces
+      let out=''; for(let k=i-2;k>=0&&toks[k]!=='[';k--) if(isStr(toks[k])) out=strOf(toks[k])+out;
+      return out.trim();
+    }
+    return '';
+  };
+  let inText=false, tm=[1,0,0,1,0,0], tlm=[1,0,0,1,0,0], fsize=12, tleading=0;
+  let m=[1,0,0,1,0,0]; const stack=[];   // CTM
+  const mul=(a,b)=>[a[0]*b[0]+a[2]*b[1], a[1]*b[0]+a[3]*b[1],
+                    a[0]*b[2]+a[2]*b[3], a[1]*b[2]+a[3]*b[3],
+                    a[0]*b[4]+a[2]*b[5]+a[4], a[1]*b[4]+a[3]*b[5]+a[5]];
+  const ap=(x,y)=>[ (m[0]*x+m[2]*y+m[4])*K, (m[1]*x+m[3]*y+m[5])*K ];
+  const shapes=[]; let cur=[], subs=[], cx=0, cy=0, sx=0, sy=0, clip=false;
+  const num=i=>+toks[i];
+  const flushSub=()=>{ if(cur.length>=2) subs.push(cur); cur=[]; };
+  const emit=()=>{ flushSub();
+    subs.forEach(pts=>{
+      if(pts.length<3) return;
+      const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+      const w=Math.max(...xs)-Math.min(...xs), h=Math.max(...ys)-Math.min(...ys);
+      if(w<0.05&&h<0.05) return;
+      shapes.push({ type:'polyline', layer:'0', closed:true, rawV:null, ...polyStats(xs,ys) });
+    });
+    subs=[]; };
+  const bez=(p0,p1,p2,p3)=>{ const out=[];
+    for(let t=1;t<=12;t++){ const u=t/12, v=1-u;
+      out.push([ v*v*v*p0[0]+3*v*v*u*p1[0]+3*v*u*u*p2[0]+u*u*u*p3[0],
+                 v*v*v*p0[1]+3*v*v*u*p1[1]+3*v*u*u*p2[1]+u*u*u*p3[1] ]); }
+    return out; };
+  for(let i=0;i<toks.length;i++){
+    const t=toks[i];
+    if(t==='q'){ stack.push(m.slice()); }
+    else if(t==='Q'){ m=stack.pop()||[1,0,0,1,0,0]; }
+    else if(t==='cm'){ m=mul(m,[num(i-6),num(i-5),num(i-4),num(i-3),num(i-2),num(i-1)]); }
+    else if(t==='m'){ flushSub(); cx=num(i-2); cy=num(i-1); sx=cx; sy=cy; cur=[ap(cx,cy)]; }
+    else if(t==='l'){ cx=num(i-2); cy=num(i-1); cur.push(ap(cx,cy)); }
+    else if(t==='c'||t==='v'||t==='y'){
+      let p1,p2,p3;
+      if(t==='c'){ p1=[num(i-6),num(i-5)]; p2=[num(i-4),num(i-3)]; p3=[num(i-2),num(i-1)]; }
+      else if(t==='v'){ p1=[cx,cy]; p2=[num(i-4),num(i-3)]; p3=[num(i-2),num(i-1)]; }
+      else { p1=[num(i-4),num(i-3)]; p3=[num(i-2),num(i-1)]; p2=p3; }
+      bez([cx,cy],p1,p2,p3).forEach(p=>cur.push(ap(p[0],p[1])));
+      cx=p3[0]; cy=p3[1];
+    }
+    else if(t==='re'){ flushSub();
+      const x=num(i-4), y=num(i-3), w=num(i-2), h=num(i-1);
+      subs.push([ap(x,y),ap(x+w,y),ap(x+w,y+h),ap(x,y+h)]);
+    }
+    else if(t==='h'){ if(cur.length){ cur.push(ap(sx,sy)); flushSub(); } }
+    // ── TEXT (BT … ET) ────────────────────────────────────────────────────
+    else if(t==='BT'){ inText=true; tm=[1,0,0,1,0,0]; tlm=tm.slice(); }
+    else if(t==='ET'){ inText=false; }
+    else if(t==='Tf'){ fsize=+toks[i-1]||fsize; }
+    else if(t==='Tm'){ tm=[num(i-6),num(i-5),num(i-4),num(i-3),num(i-2),num(i-1)]; tlm=tm.slice(); }
+    else if(t==='Td'){ tlm=mul(tlm,[1,0,0,1,num(i-2),num(i-1)]); tm=tlm.slice(); }
+    else if(t==='TD'){ tlm=mul(tlm,[1,0,0,1,num(i-2),num(i-1)]); tm=tlm.slice(); tleading=-num(i-1); }
+    else if(t==='TL'){ tleading=num(i-1); }
+    else if(t==='T*'){ tlm=mul(tlm,[1,0,0,1,0,-tleading]); tm=tlm.slice(); }
+    else if(t==='Tj'||t==='TJ'||t==="'"||t==='"'){
+      if(inText){
+        const str=pdfStrAt(i);                     // text drawn at the current matrix
+        if(str){
+          const M=mul(m,tm);                       // text space → device space
+          const px=(M[4])*K, py=(M[5])*K;
+          const sc=Math.hypot(M[0],M[1])||1;
+          const th=Math.max(0.5, fsize*sc*K);
+          const tw=Math.max(str.length*th*0.6, th*0.6);
+          shapes.push({ type:'text', layer:'0', isText:true,
+            text:{ str, h:th, angle:0, hj:0, vj:0, ent:'TEXT' },
+            vertices:[[px,py],[px,py],[px+tw,py],[px+tw,py+th],[px,py+th]],
+            area:Math.max(tw*th,1), w:tw, h:th, minX:px, minY:py, cx:px+tw/2, cy:py+th/2 });
+        }
+      }
+    }
+    else if(t==='W'||t==='W*'){ clip=true; }          // path is a CLIP region, not artwork
+    else if(t==='n'||t==='f'||t==='F'||t==='f*'||t==='S'||t==='s'||t==='B'||t==='B*'||t==='b'||t==='b*'){
+      if(clip){ cur=[]; subs=[]; clip=false; }        // drop clip paths (page frame etc.)
+      else emit();
+    }
+  }
+  emit();
+  return shapes;
+}
+
+/** Illustrator EPS (AGM shorthand) reader: mo/li/cv/cp paths, msf+xsh text,
+ *  gsave/grestore + scale/translate/ct transforms. Output is Y-up, in mm. */
+function parseAIEPS(text){
+  const K=25.4/72;
+  let src=text.replace(/\r/g,'\n');
+  // Only the PAGE body is artwork. The prologue defines PostScript procedures that
+  // also contain scale/translate/concat — running those corrupts the transform.
+  const bodyStart=Math.max(src.lastIndexOf('%%EndPageSetup'), src.lastIndexOf('%%EndSetup'));
+  if(bodyStart>0) src=src.slice(bodyStart);
+  const bodyEnd=src.search(/%%PageTrailer|%%Trailer|%%EOF/);
+  if(bodyEnd>0) src=src.slice(0,bodyEnd);
+  const strs=[];
+  const prepped=src.replace(/\((?:\\.|[^\\()])*\)/gs, s=>{
+    const raw=s.slice(1,-1).replace(/\\([nrtbf()\\])/g,(x,c)=>({n:'\n',r:'\r',t:'\t',b:'\b',f:'\f'}[c]||c))
+                           .replace(/\\([0-7]{1,3})/g,(x,o)=>String.fromCharCode(parseInt(o,8)));
+    strs.push(raw); return ` §${strs.length-1}§ `;
+  });
+  // Adobe glues brackets to operators ("]msf", "]xsh", "]ct") — separate them
+  const toks=prepped.replace(/\[/g,' [ ').replace(/\]/g,' ] ').split(/[\s]+/).filter(Boolean);
+  const num=i=>{ const v=parseFloat(toks[i]); return isFinite(v)?v:0; };
+  const mul=(a,b)=>[a[0]*b[0]+a[2]*b[1], a[1]*b[0]+a[3]*b[1],
+                    a[0]*b[2]+a[2]*b[3], a[1]*b[2]+a[3]*b[3],
+                    a[0]*b[4]+a[2]*b[5]+a[4], a[1]*b[4]+a[3]*b[5]+a[5]];
+  let m=[1,0,0,1,0,0]; const gstack=[];
+  const ap=(x,y)=>[ m[0]*x+m[2]*y+m[4], m[1]*x+m[3]*y+m[5] ];
+  const out=[];                              // {kind:'poly'|'text', …} in device space
+  let cur=[], subs=[], cx=0, cy=0, sx=0, sy=0, clip=false;
+  let fsize=12, tx=0, ty=0;
+  const bez=(p0,p1,p2,p3)=>{ const r=[];
+    for(let t=1;t<=12;t++){ const u=t/12, v=1-u;
+      r.push([ v*v*v*p0[0]+3*v*v*u*p1[0]+3*v*u*u*p2[0]+u*u*u*p3[0],
+               v*v*v*p0[1]+3*v*v*u*p1[1]+3*v*u*u*p2[1]+u*u*u*p3[1] ]); }
+    return r; };
+  const flush=()=>{ if(cur.length>=2) subs.push(cur); cur=[]; };
+  const emit=()=>{ flush();
+    if(!clip) subs.forEach(p=>{ if(p.length>=3) out.push({kind:'poly',pts:p}); });
+    subs=[]; clip=false; };
+  for(let i=0;i<toks.length;i++){
+    const t=toks[i];
+    if(t==='gsave'||t==='q'){ gstack.push(m.slice()); }
+    else if(t==='grestore'||t==='Q'){ m=gstack.pop()||[1,0,0,1,0,0]; }
+    else if(t==='scale'){ m=mul(m,[num(i-2),0,0,num(i-1),0,0]); }
+    else if(t==='translate'){ m=mul(m,[1,0,0,1,num(i-2),num(i-1)]); }
+    else if(t==='concat'||t==='ct'||t===']ct'){ // [a b c d e f] ct  (bracket tokens are separate)
+      const v=[]; for(let k=i-1;k>=0&&v.length<6;k--){ if(toks[k]==='[') break;
+        const f=parseFloat(toks[k].replace('[','')); if(isFinite(f)) v.unshift(f); }
+      if(v.length===6) m=mul(m,v);
+    }
+    else if(t==='mo'||t==='moveto'){ flush(); cx=num(i-2); cy=num(i-1); sx=cx; sy=cy;
+      tx=cx; ty=cy; cur=[ap(cx,cy)]; }
+    else if(t==='li'||t==='lineto'){ cx=num(i-2); cy=num(i-1); cur.push(ap(cx,cy)); }
+    else if(t==='cv'||t==='curveto'){
+      const p1=[num(i-6),num(i-5)], p2=[num(i-4),num(i-3)], p3=[num(i-2),num(i-1)];
+      bez([cx,cy],p1,p2,p3).forEach(p=>cur.push(ap(p[0],p[1]))); cx=p3[0]; cy=p3[1];
+    }
+    else if(t==='cp'||t==='closepath'){ if(cur.length){ cur.push(ap(sx,sy)); flush(); } }
+    else if(t==='clp'||t==='clip'||t==='eoclip'){ clip=true; emit(); }
+    else if(t==='@'||t==='f'||t==='F'||t==='S'||t==='B'||t==='b'||t==='n'||t==='N'||
+            t==='ef'||t==='sef'||t==='fill'||t==='stroke'){ emit(); }
+    else if(t==='msf'||t==='sf'){                       // font matrix → text size
+      for(let k=i-1;k>=Math.max(0,i-10);k--){ const f=Math.abs(parseFloat(toks[k].replace('[','')));
+        if(isFinite(f)&&f>0.5){ fsize=f; break; } }
+    }
+    else if(t==='xsh'||t==='ash'||t==='sh'||t==='xyshow'||t==='show'){
+      // the string appears just before the width array
+      let str='';
+      for(let k=i-1;k>=Math.max(0,i-40);k--){ const mm2=/^§(\d+)§$/.exec(toks[k]);
+        if(mm2){ str=strs[+mm2[1]]; break; } }
+      if(str && str.trim()) out.push({kind:'text',str:str.trim(),
+        at:ap(tx,ty), size:fsize*Math.hypot(m[0],m[1])});
+    }
+  }
+  emit();
+  if(!out.length) return [];
+  // The page CTM (e.g. "1 -1 scale 0 -780.25 translate") already maps Illustrator's
+  // Y-down artboard into PostScript's Y-up device space — do NOT flip again.
+  const shapes=[];
+  out.forEach(o=>{
+    if(o.kind==='poly'){
+      const xs=o.pts.map(p=>p[0]*K), ys=o.pts.map(p=>p[1]*K);
+      const w=Math.max(...xs)-Math.min(...xs), h=Math.max(...ys)-Math.min(...ys);
+      if(w<0.05&&h<0.05) return;
+      shapes.push({ type:'polyline', layer:'0', closed:true, rawV:null, ...polyStats(xs,ys) });
+    } else {
+      const px=o.at[0]*K, py=o.at[1]*K, th=Math.max(0.5,o.size*K);
+      const tw=Math.max(o.str.length*th*0.6, th*0.6);
+      shapes.push({ type:'text', layer:'0', isText:true,
+        text:{ str:o.str, h:th, angle:0, hj:0, vj:0, ent:'TEXT' },
+        vertices:[[px,py],[px,py],[px+tw,py],[px+tw,py+th],[px,py+th]],
+        area:Math.max(tw*th,1), w:tw, h:th, minX:px, minY:py, cx:px+tw/2, cy:py+th/2 });
+    }
+  });
+  return shapes;
+}
+
 function handleMdxfFile(file) {
   if (!file) return;
   inspFileName = file.name;
   const ext = file.name.split('.').pop().toLowerCase();
+  // .ai / .pdf / .eps can be PDF containers or binary (DOS) EPS → read as bytes
+  if (ext==='ai' || ext==='pdf' || ext==='eps') {
+    const rb=new FileReader();
+    rb.onload = async ev => {
+      try{
+        let bytes=new Uint8Array(ev.target.result);
+        const dec=new TextDecoder('latin1');
+        // DOS/binary EPS: 4-byte magic C5 D0 D3 C6, then offset+length of the PS part
+        if(bytes.length>30 && bytes[0]===0xC5 && bytes[1]===0xD0 && bytes[2]===0xD3 && bytes[3]===0xC6){
+          const dv=new DataView(ev.target.result);
+          const off=dv.getUint32(4,true), len=dv.getUint32(8,true);
+          bytes=bytes.subarray(off, off+len);
+        }
+        const head=dec.decode(bytes.subarray(0,5));
+        if(head.startsWith('%PDF')){
+          _finishInspImport(await parsePDFShapes(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset+bytes.length)));
+        } else {
+          const txt=dec.decode(bytes);
+          let all=parseAIEPS(txt);                 // Illustrator/AGM shorthand
+          if(!all.length) all=parseEPSShapes(txt); // plain PostScript fallback
+          _finishInspImport(all);
+        }
+      }catch(err){ showInspErr('อ่านไฟล์ไม่ได้: '+err.message); }
+    };
+    rb.readAsArrayBuffer(file);
+    return;
+  }
   const reader = new FileReader();
   reader.onload = ev => {
     try {
@@ -1462,21 +1818,7 @@ function handleMdxfFile(file) {
         showInspErr(`ไม่รองรับไฟล์ .${ext} — รองรับเฉพาะ DXF, SVG, EPS, AI`);
         return;
       }
-      // Keep closed contours (area) AND open line work (arcs / loose lines, even
-      // 2-point segments) so nothing from the drawing is dropped.
-      inspRaw = all.filter(s => s.vertices && ((s.vertices.length>=3 && s.area>=0.1) || (s.open && s.vertices.length>=2)))
-                   .sort((a,b) => b.area - a.area);
-      if (!inspRaw.length) {
-        showInspErr(lang==='en'
-          ? 'No closed contours found — make sure outlines are closed paths'
-          : 'ไม่พบ closed contour ในไฟล์ — ตรวจสอบว่า outline เป็น Closed Polyline / Path');
-        return;
-      }
-      autoClassify();
-      renderInspector();
-      // Report drawing problems right away (only when there ARE problems)
-      setTimeout(()=>{ computeDiag(); const c=diagCounts();
-        if(c.dup+c.open>0) showDiagPopup(); }, 120);
+      _finishInspImport(all);
     } catch(err) {
       showInspErr('อ่านไฟล์ไม่ได้: ' + err.message);
     }
@@ -1484,75 +1826,163 @@ function handleMdxfFile(file) {
   reader.readAsText(file);
 }
 
+/** Shared post-parse step for every import format. */
+function _finishInspImport(all){
+  // Keep closed contours (area) AND open line work (arcs / loose lines, even
+  // 2-point segments) so nothing from the drawing is dropped.
+  inspRaw = (all||[]).filter(s => s.vertices && ((s.vertices.length>=3 && s.area>=0.1) || (s.open && s.vertices.length>=2)))
+               .sort((a,b) => b.area - a.area);
+  if (!inspRaw.length) {
+    showInspErr(lang==='en'
+      ? 'No closed contours found — make sure outlines are closed paths'
+      : 'ไม่พบ closed contour ในไฟล์ — ตรวจสอบว่า outline เป็น Closed Polyline / Path');
+    return;
+  }
+  autoClassify();
+  renderInspector();
+  // Report drawing problems right away (only when there ARE problems)
+  setTimeout(()=>{ computeDiag(); const c=diagCounts();
+    if(c.dup+c.open>0) showDiagPopup(); }, 120);
+}
+
 // ─── SVG Parser ────────────────────────────────────────────────────────────
 function parseSVGShapes(text) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(text, 'image/svg+xml');
-  const shapes = [];
-
-  // Get viewBox / width for unit conversion
+  // Full SVG reader: rect / circle / ellipse / line / polyline / polygon / path / text,
+  // honouring nested <g transform> and viewBox scaling. Output is Y-UP, in mm.
+  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
   const svgEl = doc.querySelector('svg');
-  let svgW = parseFloat(svgEl?.getAttribute('width')) || 0;
-  let svgH = parseFloat(svgEl?.getAttribute('height')) || 0;
-  const vb = svgEl?.getAttribute('viewBox')?.trim().split(/[\s,]+/).map(Number);
-  const vbW = vb?.[2] || svgW || 100;
-  const vbH = vb?.[3] || svgH || 100;
-  // Assume viewBox units = mm (common from AI/Illustrator export)
-  const scaleX = svgW > 0 ? svgW / vbW : 1;
-  const scaleY = svgH > 0 ? svgH / vbH : 1;
-
-  function applyTransform(pts, el) {
-    const t = el.getAttribute('transform');
-    if (!t) return pts;
-    const m = t.match(/matrix\(([^)]+)\)/);
-    if (m) {
-      const [a,b,c,d,e,f] = m[1].split(/[\s,]+/).map(Number);
-      return pts.map(([x,y]) => [a*x+c*y+e, b*x+d*y+f]);
+  if(!svgEl) return [];
+  const vb = (svgEl.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(Number);
+  const vbW = vb.length===4 ? vb[2] : parseFloat(svgEl.getAttribute('width'))||100;
+  const vbH = vb.length===4 ? vb[3] : parseFloat(svgEl.getAttribute('height'))||100;
+  // Scale: if width/height carry real units use them, else treat user units as pt.
+  const dim = a => { const v=(svgEl.getAttribute(a)||'').trim(); const n=parseFloat(v);
+    if(!isFinite(n)||n<=0) return null;
+    if(/mm$/.test(v)) return n; if(/cm$/.test(v)) return n*10;
+    if(/in$/.test(v)) return n*25.4; if(/(pt)$/.test(v)) return n*25.4/72;
+    return n*25.4/96;                       // px / unitless → CSS px
+  };
+  const wmm=dim('width'), hmm=dim('height');
+  const K = wmm ? wmm/vbW : (hmm ? hmm/vbH : 25.4/72);
+  const mul=(a,b)=>[a[0]*b[0]+a[2]*b[1], a[1]*b[0]+a[3]*b[1],
+                    a[0]*b[2]+a[2]*b[3], a[1]*b[2]+a[3]*b[3],
+                    a[0]*b[4]+a[2]*b[5]+a[4], a[1]*b[4]+a[3]*b[5]+a[5]];
+  const parseTf=str=>{ let m=[1,0,0,1,0,0]; if(!str) return m;
+    const re=/(matrix|translate|scale|rotate)\s*\(([^)]*)\)/g; let g;
+    while((g=re.exec(str))){
+      const v=g[2].trim().split(/[\s,]+/).map(Number);
+      if(g[1]==='matrix'&&v.length>=6) m=mul(m,v);
+      else if(g[1]==='translate') m=mul(m,[1,0,0,1,v[0]||0,v[1]||0]);
+      else if(g[1]==='scale') m=mul(m,[v[0]||1,0,0,(v.length>1?v[1]:v[0])||1,0,0]);
+      else if(g[1]==='rotate'){ const a=(v[0]||0)*Math.PI/180, c=Math.cos(a), s2=Math.sin(a);
+        if(v.length>=3) m=mul(mul(mul(m,[1,0,0,1,v[1],v[2]]),[c,s2,-s2,c,0,0]),[1,0,0,1,-v[1],-v[2]]);
+        else m=mul(m,[c,s2,-s2,c,0,0]); }
     }
-    const tr = t.match(/translate\(([^)]+)\)/);
-    if (tr) {
-      const [tx,ty=0] = tr[1].split(/[\s,]+/).map(Number);
-      return pts.map(([x,y]) => [x+tx, y+ty]);
-    }
-    return pts;
-  }
-
-  function addShape(pts, el) {
-    if (!pts || pts.length < 3) return;
-    pts = applyTransform(pts, el);
-    const xs = pts.map(v=>v[0]), ys = pts.map(v=>v[1]);
-    const x1=Math.min(...xs), y1=Math.min(...ys);
-    const w=Math.max(...xs)-x1, h=Math.max(...ys)-y1;
-    if (w < 0.5 || h < 0.5) return;
-    const norm = pts.map(([x,y]) => [(x-x1)*scaleX, (y-y1)*scaleY]);
-    const nw = w*scaleX, nh = h*scaleY;
-    const area = Math.abs(shoelaceArea(norm));
-    shapes.push({type:'polygon', vertices:norm, w:nw, h:nh, area, layer:'0', holes:[]});
-  }
-
-  doc.querySelectorAll('path,rect,circle,ellipse,polygon,polyline').forEach(el => {
-    const tag = el.tagName.toLowerCase();
-    if (tag === 'rect') {
-      const x=+el.getAttribute('x')||0, y=+el.getAttribute('y')||0;
-      const w=+el.getAttribute('width')||0, h=+el.getAttribute('height')||0;
-      if (w>0 && h>0) addShape([[x,y],[x+w,y],[x+w,y+h],[x,y+h]], el);
-    } else if (tag === 'circle') {
-      const cx=+el.getAttribute('cx')||0, cy=+el.getAttribute('cy')||0, r=+el.getAttribute('r')||0;
-      if (r>0) addShape(circleToVerts(cx,cy,r,48), el);
-    } else if (tag === 'ellipse') {
-      const cx=+el.getAttribute('cx')||0, cy=+el.getAttribute('cy')||0;
-      const rx=+el.getAttribute('rx')||0, ry=+el.getAttribute('ry')||0;
-      if (rx>0 && ry>0) addShape(ellipseToVerts(cx,cy,rx,ry,48), el);
-    } else if (tag === 'polygon' || tag === 'polyline') {
-      const pts=(el.getAttribute('points')||'').trim().split(/\s+|,/).reduce((acc,v,i)=>{
-        if(i%2===0) acc.push([+v,0]); else acc[acc.length-1][1]=+v; return acc;
-      },[]);
-      addShape(pts, el);
-    } else if (tag === 'path') {
-      const subpaths = parseSVGPathD(el.getAttribute('d')||'');
-      subpaths.forEach(pts => addShape(pts, el));
+    return m; };
+  // class → font-size map from the <style> block (Illustrator exports sizes there)
+  const cssSize={};
+  (text.match(/<style[^>]*>[\s\S]*?<\/style>/gi)||[]).forEach(block=>{
+    const re=/\.([\w-]+)\s*\{([^}]*)\}/g; let g;
+    while((g=re.exec(block))){
+      const fs=/font-size:\s*([\d.]+)/.exec(g[2]);
+      if(fs) cssSize[g[1]]=parseFloat(fs[1]);
     }
   });
+  const shapes=[];
+  const ap=(m,x,y)=>[ (m[0]*x+m[2]*y+m[4])*K, (vbH-(m[1]*x+m[3]*y+m[5]))*K ];   // → mm, Y-up
+  const addPoly=pts=>{ if(pts.length<3) return;
+    const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+    const w=Math.max(...xs)-Math.min(...xs), h=Math.max(...ys)-Math.min(...ys);
+    if(w<0.05&&h<0.05) return;
+    shapes.push({ type:'polyline', layer:'0', closed:true, rawV:null, ...polyStats(xs,ys) }); };
+  const ell=(m,cx,cy,rx,ry)=>{ const pts=[];
+    for(let i=0;i<48;i++){ const a=i/48*Math.PI*2; pts.push(ap(m,cx+rx*Math.cos(a), cy+ry*Math.sin(a))); }
+    addPoly(pts); };
+  const bez=(p0,p1,p2,p3)=>{ const r=[];
+    for(let t=1;t<=12;t++){ const u=t/12, v=1-u;
+      r.push([ v*v*v*p0[0]+3*v*v*u*p1[0]+3*v*u*u*p2[0]+u*u*u*p3[0],
+               v*v*v*p0[1]+3*v*v*u*p1[1]+3*v*u*u*p2[1]+u*u*u*p3[1] ]); }
+    return r; };
+  const pathPts=d=>{                        // → array of sub-paths in USER space
+    const subs=[]; let cur=[], x=0,y=0,sx=0,sy=0, px=0,py=0, prev='';
+    const re=/([MmLlHhVvCcSsQqTtAaZz])|(-?\d*\.?\d+(?:e[-+]?\d+)?)/gi;
+    const tk=[]; let g; while((g=re.exec(d))) tk.push(g[1]||parseFloat(g[2]));
+    let i=0, cmd='';
+    const num=()=>tk[i++];
+    while(i<tk.length){
+      if(typeof tk[i]==='string'){ cmd=tk[i++]; }
+      const rel=cmd===cmd.toLowerCase();
+      const C=cmd.toUpperCase();
+      if(C==='M'){ if(cur.length>2) subs.push(cur); const nx=num(), ny=num();
+        x = rel? x+nx : nx; y = rel? y+ny : ny; sx=x; sy=y; cur=[[x,y]]; cmd = rel?'l':'L'; }
+      else if(C==='L'){ const nx=num(), ny=num(); x = rel? x+nx : nx; y = rel? y+ny : ny; cur.push([x,y]); }
+      else if(C==='H'){ const nx=num(); x = rel? x+nx : nx; cur.push([x,y]); }
+      else if(C==='V'){ const ny=num(); y = rel? y+ny : ny; cur.push([x,y]); }
+      else if(C==='C'||C==='S'){
+        let c1,c2,e2;
+        if(C==='C'){ c1=[rel?x+num():num(), rel?y+num():num()]; }
+        else { c1=[2*x-px, 2*y-py]; }
+        c2=[rel?x+num():num(), rel?y+num():num()];
+        e2=[rel?x+num():num(), rel?y+num():num()];
+        bez([x,y],c1,c2,e2).forEach(p=>cur.push(p)); px=c2[0]; py=c2[1]; x=e2[0]; y=e2[1];
+      }
+      else if(C==='Q'||C==='T'){
+        let q; if(C==='Q'){ q=[rel?x+num():num(), rel?y+num():num()]; } else { q=[2*x-px,2*y-py]; }
+        const e2=[rel?x+num():num(), rel?y+num():num()];
+        const c1=[x+2/3*(q[0]-x), y+2/3*(q[1]-y)], c2=[e2[0]+2/3*(q[0]-e2[0]), e2[1]+2/3*(q[1]-e2[1])];
+        bez([x,y],c1,c2,e2).forEach(p=>cur.push(p)); px=q[0]; py=q[1]; x=e2[0]; y=e2[1];
+      }
+      else if(C==='A'){ num();num();num();num();num();               // arc → straight to endpoint
+        const nx=num(), ny=num(); x = rel? x+nx : nx; y = rel? y+ny : ny; cur.push([x,y]); }
+      else if(C==='Z'){ if(cur.length){ cur.push([sx,sy]); subs.push(cur); cur=[]; } x=sx; y=sy; }
+      else { i++; }
+    }
+    if(cur.length>2) subs.push(cur);
+    return subs; };
+  const walk=(el, m)=>{
+    for(const ch of el.children){
+      const tf=mul(m, parseTf(ch.getAttribute('transform')));
+      const n=ch.tagName.toLowerCase();
+      const A=a=>parseFloat(ch.getAttribute(a))||0;
+      if(n==='g'||n==='svg'){ walk(ch, tf); continue; }
+      if(n==='rect'){ const x=A('x'),y=A('y'),w=A('width'),h=A('height');
+        if(w>0&&h>0) addPoly([ap(tf,x,y),ap(tf,x+w,y),ap(tf,x+w,y+h),ap(tf,x,y+h)]); }
+      else if(n==='circle'){ const r=A('r'); if(r>0) ell(tf,A('cx'),A('cy'),r,r); }
+      else if(n==='ellipse'){ const rx=A('rx'),ry=A('ry'); if(rx>0&&ry>0) ell(tf,A('cx'),A('cy'),rx,ry); }
+      else if(n==='line'){ const p=[ap(tf,A('x1'),A('y1')),ap(tf,A('x2'),A('y2'))];
+        const xs=p.map(q=>q[0]),ys=p.map(q=>q[1]);
+        shapes.push({type:'line',layer:'0',open:true,closed:false,vertices:p,area:0,
+          w:Math.abs(xs[1]-xs[0]),h:Math.abs(ys[1]-ys[0]),
+          minX:Math.min(...xs),minY:Math.min(...ys),cx:(xs[0]+xs[1])/2,cy:(ys[0]+ys[1])/2}); }
+      else if(n==='polygon'||n==='polyline'){
+        const v=(ch.getAttribute('points')||'').trim().split(/[\s,]+/).map(Number);
+        const pts=[]; for(let k=0;k+1<v.length;k+=2) pts.push(ap(tf,v[k],v[k+1]));
+        addPoly(pts); }
+      else if(n==='path'){ pathPts(ch.getAttribute('d')||'').forEach(sp=>addPoly(sp.map(p=>ap(tf,p[0],p[1])))); }
+      else if(n==='text'){
+        const str=(ch.textContent||'').trim(); if(!str) continue;
+        let fs=parseFloat(ch.getAttribute('font-size'))||0;
+        if(!fs){                                   // Illustrator puts sizes in <style> classes
+          const inline=/font-size:\s*([\d.]+)/.exec(ch.getAttribute('style')||'');
+          if(inline) fs=parseFloat(inline[1]);
+        }
+        if(!fs){
+          for(const c of (ch.getAttribute('class')||'').split(/\s+/).filter(Boolean)){
+            if(cssSize[c]){ fs=cssSize[c]; break; }
+          }
+        }
+        if(!fs) fs=12;
+        const at=ap(tf, A('x'), A('y'));
+        const th=Math.max(0.5, fs*Math.hypot(tf[0],tf[1])*K);
+        const tw=Math.max(str.length*th*0.6, th*0.6);
+        shapes.push({ type:'text', layer:'0', isText:true,
+          text:{ str, h:th, angle:0, hj:0, vj:0, ent:'TEXT' },
+          vertices:[[at[0],at[1]],[at[0],at[1]],[at[0]+tw,at[1]],[at[0]+tw,at[1]+th],[at[0],at[1]+th]],
+          area:Math.max(tw*th,1), w:tw, h:th, minX:at[0], minY:at[1], cx:at[0]+tw/2, cy:at[1]+th/2 });
+      }
+    }
+  };
+  walk(svgEl, [1,0,0,1,0,0]);
   return shapes;
 }
 
@@ -2976,7 +3406,7 @@ function mdxfAddSelected() {
 
   if (!selected.length) { alert(lang==='en'?'Please select at least 1 piece':'กรุณาเลือกชิ้นงานอย่างน้อย 1 ชิ้น'); return; }
 
-  const flip = /\.(dxf|eps|ai)$/i.test(inspFileName);
+  const flip = /\.(dxf|eps|ai|svg|pdf)$/i.test(inspFileName);
   // Normalize a hole to a piece's local (0,0) frame (Y-flip for Y-up sources).
   const normHole = (h, ref) => ({
     ...h,
@@ -3364,7 +3794,7 @@ function runNesting() {
   // Validate pieces fit sheet (needs edge margin on both sides)
   for(const p of pieces){
     const pw=Math.round(p.w*10)/10, ph=Math.round(p.h*10)/10;
-    const orients=getOrientations({w:pw,h:ph,vertices:p.vertices||null}, rotMode);
+    const orients=getOrientations({w:pw,h:ph,vertices:p.vertices||null}, rotMode==='auto'?'rot90':rotMode);
     const fits=orients.some(o=>o.w+edgeMargin*2<=sw && o.h+edgeMargin*2<=sh);
     if(!fits){
       const ans=confirm(lang==='en'?
@@ -3390,19 +3820,77 @@ function runNesting() {
         w:p.w, h:p.h, vertices:p.vertices||null, holes, rawV:p.rawV||null, open:p.open||false});
     }
   });
-  items.sort((a,b)=>(b.w*b.h)-(a.w*a.h));
+  // One packing pass with a given rotation mode + ordering strategy.
+  const SORTS={
+    area:  (a,b)=>(b.w*b.h)-(a.w*a.h),                       // biggest footprint first
+    long:  (a,b)=>Math.max(b.w,b.h)-Math.max(a.w,a.h),       // longest side first
+    tall:  (a,b)=>b.h-a.h,                                   // tallest first (column packing)
+    wide:  (a,b)=>b.w-a.w,                                   // widest first (row packing)
+    perim: (a,b)=>(b.w+b.h)-(a.w+a.h)
+  };
+  const runPass=(rot,sortKey)=>{
+    const list=items.slice().sort(SORTS[sortKey]||SORTS.area);
+    const out=[];
+    for(const item of list){
+      let placed=false;
+      for(const sheet of out){
+        if(place(item,sheet,sw,sh,edgeMargin,pieceGap,rot)){ placed=true; break; }
+      }
+      if(!placed){
+        const ns={ items:[] };
+        out.push(ns);
+        if(!place(item,ns,sw,sh,edgeMargin,pieceGap,rot)) out.pop();   // too large
+      }
+    }
+    return out;
+  };
+  // Score: fewest sheets wins; tie → tighter packing (smaller used bounding area).
+  const scoreOf=sheets=>{
+    let used=0, placed=0;
+    sheets.forEach(s=>{ s.items.forEach(it=>{ used+=it.w*it.h; placed++; }); });
+    const lastFill=sheets.length? (sheets[sheets.length-1].items.length/Math.max(1,items.length)) : 0;
+    return { sheets:sheets.length, placed, used, lastFill };
+  };
+  const better=(a,b)=>{                                   // is a better than b?
+    if(!b) return true;
+    if(a.placed!==b.placed) return a.placed>b.placed;     // place as many as possible
+    if(a.sheets!==b.sheets) return a.sheets<b.sheets;     // then fewer sheets
+    return a.lastFill<b.lastFill;                          // then emptier final sheet
+  };
 
-  const sheets=[];
-  for(const item of items){
-    let placed=false;
-    for(const sheet of sheets){
-      if(place(item,sheet,sw,sh,edgeMargin,pieceGap,rotMode)){ placed=true; break; }
+  let sheets, autoInfo=null;
+  if(rotMode==='auto'){
+    // 🤖 Try several strategies and keep the best. The search size adapts to the
+    // number of pieces so big jobs still finish quickly.
+    const n=items.length;
+    // Combos are ordered by expected pay-off so the best candidates run FIRST —
+    // if the time budget runs out, we still keep a strong result.
+    const combos=[];
+    const push=(r,s)=>combos.push([r,s]);
+    push('rot90','area');                                 // cheapest — always a result fast
+    push('free','area');
+    if(n<=60) push('free1','area');                       // 1° search only on smaller jobs
+    if(n<=200) push('rot45','area');
+    push('none','area');
+    for(const s of ['long','tall','wide']){               // alternative orderings
+      push('rot90',s);
+      if(n<=200) push('free',s);
+      if(n<=30)  push('free1',s);
+      if(n<=100) push('rot45',s);
     }
-    if(!placed){
-      const ns={ items:[] };
-      sheets.push(ns);
-      if(!place(item,ns,sw,sh,edgeMargin,pieceGap,rotMode)) sheets.pop(); // too large
+    let best=null, bestScore=null, tried=0;
+    const t0=Date.now(), BUDGET=20000;
+    for(const [r,s] of combos){
+      if(Date.now()-t0 > BUDGET) break;                   // stop starting new passes
+      const res=runPass(r,s); const sc=scoreOf(res); tried++;
+      if(better(sc,bestScore)){ bestScore=sc; best=res; autoInfo={rot:r,sort:s,...sc}; }
+      // Perfect result (everything on one sheet) → no need to keep searching
+      if(sc.sheets<=1 && sc.placed===items.length) break;
     }
+    sheets = best || runPass('rot90','area');
+    if(autoInfo){ autoInfo.tried=tried; autoInfo.ms=Date.now()-t0; }
+  } else {
+    sheets = runPass(rotMode,'area');
   }
 
   // ── START CORNER ──────────────────────────────────────────────────────────
@@ -3424,7 +3912,7 @@ function runNesting() {
   const totalSheetArea=sheets.length*sw*sh;
   const eff=totalSheetArea>0?totalPieceArea/totalSheetArea*100:0;
 
-  nestResult={sheets,sheetGroups,eff,totalPieceArea,sw,sh,edgeMargin,pieceGap};
+  nestResult={sheets,sheetGroups,eff,totalPieceArea,sw,sh,edgeMargin,pieceGap,autoInfo};
   activeSheet=0;
   renderResults();
   document.getElementById('resSection').style.display='';
@@ -3691,6 +4179,12 @@ function renderResults(){
     <div class="stat"><div class="sv">${eff.toFixed(1)}%</div><div class="sl">${t('stat_eff')}</div></div>
     <div class="stat"><div class="sv">${pieces.reduce((s,p)=>s+p.qty,0)}</div><div class="sl">${t('stat_pieces')}</div></div>
     <div class="stat"><div class="sv">${((sw/1000)*(sh/1000)).toFixed(3)}</div><div class="sl">${t('stat_sheetSz')}</div></div>
+    ${(()=>{ const a=nestResult.autoInfo; if(!a) return '';
+      const rotName={none:'ไม่หมุน',rot90:'90°',rot45:'45°/90°',free:'อิสระ 15°',free1:'อิสระ 1°'}[a.rot]||a.rot;
+      const sortName={area:'ใหญ่→เล็ก',long:'ด้านยาวสุด',tall:'สูงสุด',wide:'กว้างสุด',perim:'เส้นรอบรูป'}[a.sort]||a.sort;
+      return `<div class="stat" style="border:1px solid #a78bfa55;">
+        <div class="sv" style="color:#a78bfa;font-size:1rem">🤖 ${rotName}</div>
+        <div class="sl">AI เลือก · ${sortName} · ลอง ${a.tried} แบบ (${(a.ms/1000).toFixed(1)}s)</div></div>`; })()}
     ${(()=>{ const g=measuredMinGap(sheets); const set=nestResult.pieceGap;
       if(g===null) return '';
       const ok=Math.abs(g.min-set)<0.3 && Math.abs(g.max-set)<0.3;
@@ -4234,7 +4728,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-g32';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-g39';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
