@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g40</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g48</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="exportExcel()">📊 Excel</button>
   <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ Print</button>
@@ -795,9 +795,19 @@ function bulgePts(x0,y0,x1,y1,b,N=8){
   let sw=a1-a0;
   if(b>0){if(sw<0) sw+=2*Math.PI;}
   else   {if(sw>0) sw-=2*Math.PI;}
+  // ADAPTIVE: a fixed segment count let a long, shallow arc drift up to 0.12mm off
+  // the real curve, and the nesting then computed gaps against that drifted outline
+  // (measured gaps came out 9.71 instead of 10). Pick the count from the chord
+  // sagitta instead, so the polygon tracks the exported arc within 0.02mm.
+  const TOL=0.02;
+  let n=N;
+  if(r>TOL){
+    const dth=2*Math.sqrt(2*TOL/r);                 // sagitta ≈ r·Δθ²/8
+    n=Math.max(N, Math.min(512, Math.ceil(Math.abs(sw)/dth)));
+  }
   const pts=[];
-  for(let k=1;k<=N;k++){
-    const a=a0+sw*k/N;
+  for(let k=1;k<=n;k++){
+    const a=a0+sw*k/n;
     pts.push([cx2+r*Math.cos(a), cy2+r*Math.sin(a)]);
   }
   return pts;
@@ -3747,6 +3757,9 @@ function bboxAfterRotation(verts, origW, origH, angleDeg){
   return {w, h, rotatedVerts:rv};
 }
 
+// Angle step used by "หมุนอิสระทุก 1°" — widened automatically on large jobs.
+let NEST_ANGLE_STEP=1;
+
 function getOrientations(item, rotMode){
   const {w, h, vertices} = item;
   const orients=[];
@@ -3773,7 +3786,9 @@ function getOrientations(item, rotMode){
   } else if(rotMode==='free1'){
     // Fine free rotation: every 1° (0…179). Many more candidates, so the smallest
     // footprints are tried first — a fit is usually found long before the last angle.
-    for(let a=1;a<180;a++) addOri(a);
+    // Every extra angle costs a full sheet scan, so on big jobs the step is widened
+    // — 1° across 200 curved parts took minutes and looked like a freeze.
+    for(let a=NEST_ANGLE_STEP;a<180;a+=NEST_ANGLE_STEP) addOri(a);
   }
   if(rotMode==='free'||rotMode==='free1') orients.sort((p,q)=>(p.w*p.h)-(q.w*q.h));
   return orients;
@@ -3782,14 +3797,56 @@ function getOrientations(item, rotMode){
 // ═══════════════════════════════════════════════════════
 //  NESTING
 // ═══════════════════════════════════════════════════════
-function runNesting() {
+/** Entry point for the button: show a busy overlay, let the browser paint it, then
+ *  do the (blocking) nesting. Without the repaint the whole window just stops
+ *  responding for several seconds and looks like a crash. */
+function runNesting(){
   if(!pieces.length){ alert(lang==='en'?'Please add pieces first':'กรุณาเพิ่มชิ้นงานก่อน'); return; }
+  const n=pieces.reduce((a,p)=>a+p.qty,0);
+  let ov=document.getElementById('nestBusy');
+  if(!ov){
+    ov=document.createElement('div'); ov.id='nestBusy';
+    ov.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;'+
+      'justify-content:center;background:rgba(8,10,18,.72);backdrop-filter:blur(2px)';
+    ov.innerHTML='<div style="background:#1b1e2e;border:1px solid #3a3f5c;border-radius:14px;'+
+      'padding:26px 34px;text-align:center;color:#e6e8f2;font-weight:700;box-shadow:0 12px 40px #000a">'+
+      '<div style="font-size:1.6rem;margin-bottom:8px">⚙️</div>'+
+      '<div id="nestBusyMsg" style="font-size:1rem"></div>'+
+      '<div style="font-size:.8rem;opacity:.65;margin-top:8px;font-weight:500">'+
+      (lang==='en'?'this can take a few seconds — please wait':'อาจใช้เวลาสักครู่ กรุณารอ')+'</div></div>';
+    document.body.appendChild(ov);
+  }
+  ov.style.display='flex';
+  document.getElementById('nestBusyMsg').textContent =
+    (lang==='en'?`Nesting ${n} pieces…`:`กำลังจัดวาง ${n} ชิ้น…`);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(()=>{
+    try{ _runNestingSync(); }
+    finally{ ov.style.display='none'; }
+  },0)));
+}
+
+function _runNestingSync() {
 
   const sw=+document.getElementById('sw').value;
   const sh=+document.getElementById('sh').value;
   const edgeMargin=+document.getElementById('kerf').value;               // ระยะห่างขอบแผ่นวัสดุ
   const pieceGap=+(document.getElementById('pieceGap')?.value ?? edgeMargin); // ระยะห่างชิ้นงาน
   const rotMode=document.getElementById('rotMode').value;
+  // ── START CORNER ──────────────────────────────────────────────────────────
+  // The scan inside place() runs FROM this corner. (It used to nest top-left and
+  // mirror the positions afterwards — but the geometry was not mirrored, so any
+  // non-rectangular part ended up shifted inside its own box and real clearances
+  // broke. Packing from the corner keeps every gap exact for all four corners.)
+  const startCorner=document.getElementById('startCorner')?.value || 'TL';
+  NEST_FLIP_X = (startCorner==='TR'||startCorner==='BR');
+  NEST_FLIP_Y = (startCorner==='BL'||startCorner==='BR');
+  {
+    // Cost of free rotation grows with (angles × pieces × outline points). Keep the
+    // whole run in the seconds range instead of letting it look like a hang.
+    const nPc=pieces.reduce((a,p)=>a+p.qty,0);
+    const nPt=pieces.reduce((a,p)=>a+((p.vertices&&p.vertices.length)||4)*p.qty,0);
+    NEST_ANGLE_STEP = (nPc<=40 && nPt<=4000) ? 1 : (nPc<=100 && nPt<=12000) ? 3 : (nPc<=250) ? 10 : 15;
+  }
 
   // Validate pieces fit sheet (needs edge margin on both sides)
   for(const p of pieces){
@@ -3879,10 +3936,16 @@ function runNesting() {
       if(n<=100) push('rot45',s);
     }
     let best=null, bestScore=null, tried=0;
-    const t0=Date.now(), BUDGET=20000;
+    // The page cannot repaint while this runs, so a long search reads as a freeze.
+    // Budget the whole search, and stop starting passes that clearly will not fit.
+    const t0=Date.now(), BUDGET=8000;
+    let slowest=0;
     for(const [r,s] of combos){
-      if(Date.now()-t0 > BUDGET) break;                   // stop starting new passes
+      const left=BUDGET-(Date.now()-t0);
+      if(left<=0 || (tried>0 && slowest>left)) break;     // no time for another pass
+      const tp=Date.now();
       const res=runPass(r,s); const sc=scoreOf(res); tried++;
+      slowest=Math.max(slowest, Date.now()-tp);
       if(better(sc,bestScore)){ bestScore=sc; best=res; autoInfo={rot:r,sort:s,...sc}; }
       // Perfect result (everything on one sheet) → no need to keep searching
       if(sc.sheets<=1 && sc.placed===items.length) break;
@@ -3891,20 +3954,6 @@ function runNesting() {
     if(autoInfo){ autoInfo.tried=tried; autoInfo.ms=Date.now()-t0; }
   } else {
     sheets = runPass(rotMode,'area');
-  }
-
-  // ── START CORNER ──────────────────────────────────────────────────────────
-  // Nesting always packs from the top-left internally; mirror each piece's POSITION
-  // (not its geometry) so the whole layout originates from the chosen corner. Gaps
-  // and collisions are preserved exactly (reflection keeps distances).
-  const startCorner=document.getElementById('startCorner')?.value || 'TL';
-  const flipX = (startCorner==='TR'||startCorner==='BR');
-  const flipY = (startCorner==='BL'||startCorner==='BR');
-  if(flipX||flipY){
-    sheets.forEach(sheet=>sheet.items.forEach(it=>{
-      if(flipX) it.x = sw - it.x - it.w;
-      if(flipY) it.y = sh - it.y - it.h;
-    }));
   }
 
   const sheetGroups=deduplicateSheets(sheets);
@@ -3990,18 +4039,40 @@ function _gridStamp(g, spans, gox, goy, ex){
   }
 }
 
-/** Minimum edge-to-edge distance between two polygons (0 when they touch/overlap). */
-function _polyClear(A, B){
+/** Minimum edge-to-edge distance between two polygons (0 when they touch/overlap).
+ *  `limit` (optional): only distances below it matter — anything larger may be
+ *  reported as `limit`. Curved parts carry 100+ points each, so comparing every
+ *  edge against every edge was the main reason nesting felt frozen; skipping edge
+ *  pairs whose boxes are already farther apart than the best-so-far cuts the work
+ *  by an order of magnitude without changing the answer where it counts. */
+function _polyClear(A, B, limit){
   const d=(a,b,c)=>{ const vx=c[0]-b[0], vy=c[1]-b[1], wx=a[0]-b[0], wy=a[1]-b[1];
     const L=vx*vx+vy*vy; let t=L?((wx*vx+wy*vy)/L):0; t=Math.max(0,Math.min(1,t));
     return Math.hypot(a[0]-(b[0]+t*vx), a[1]-(b[1]+t*vy)); };
-  let m=Infinity;
+  let m = (limit===undefined) ? Infinity : limit;
+  const nb=B.length;
+  // per-edge boxes of B, computed once
+  const bx0=new Float64Array(nb), by0=new Float64Array(nb),
+        bx1=new Float64Array(nb), by1=new Float64Array(nb);
+  for(let j=0;j<nb;j++){ const p=B[j], q=B[(j+1)%nb];
+    bx0[j]=p[0]<q[0]?p[0]:q[0]; bx1[j]=p[0]>q[0]?p[0]:q[0];
+    by0[j]=p[1]<q[1]?p[1]:q[1]; by1[j]=p[1]>q[1]?p[1]:q[1]; }
   for(let i=0;i<A.length;i++){ const a1=A[i], a2=A[(i+1)%A.length];
-    for(let j=0;j<B.length;j++){ const b1=B[j], b2=B[(j+1)%B.length];
+    const ax0=a1[0]<a2[0]?a1[0]:a2[0], ax1=a1[0]>a2[0]?a1[0]:a2[0];
+    const ay0=a1[1]<a2[1]?a1[1]:a2[1], ay1=a1[1]>a2[1]?a1[1]:a2[1];
+    for(let j=0;j<nb;j++){
+      const gx=(bx0[j]-ax1)>(ax0-bx1[j])?(bx0[j]-ax1):(ax0-bx1[j]);
+      const gy=(by0[j]-ay1)>(ay0-by1[j])?(by0[j]-ay1):(ay0-by1[j]);
+      if(gx>=m||gy>=m) continue;                    // boxes already too far apart
+      if(gx>0&&gy>0&&gx*gx+gy*gy>=m*m) continue;
+      const b1=B[j], b2=B[(j+1)%nb];
       const s=Math.min(d(a1,b1,b2), d(a2,b1,b2), d(b1,a1,a2), d(b2,a1,a2));
       if(s<m) m=s; if(m<=0) return 0; } }
   return m;
 }
+
+// Direction of the placement scan, set from the "จุดเริ่มจัดเรียงชิ้นงาน" option.
+let NEST_FLIP_X=false, NEST_FLIP_Y=false;
 
 function place(item, sheet, sw, sh, edgeMargin, pieceGap, rotMode){
   // Init grid for this sheet on first use
@@ -4041,12 +4112,23 @@ function place(item, sheet, sw, sh, edgeMargin, pieceGap, rotMode){
       });
     }
 
-    // Bottom-left scan. Collision/spacing stay exact at 1mm; the scan steps in
+    // Corner scan. Collision/spacing stay exact at 1mm; the scan steps in
     // ~3mm increments so a fine grid stays fast (placement snaps to ~3mm).
     const ST=Math.max(1, Math.round(3/g.mm));
     const start=Math.ceil(edgeMargin/g.mm);   // keep pieces edgeMargin away from the sheet edge
-    for(let gy=start; gy*g.mm+h+edgeMargin<=sh; gy+=ST){
-      for(let gx=start; gx*g.mm+w+edgeMargin<=sw; gx+=ST){
+    const gyEnd=Math.floor((sh-edgeMargin-h)/g.mm);
+    const gxEnd=Math.floor((sw-edgeMargin-w)/g.mm);
+    if(gyEnd<start||gxEnd<start) continue;    // this orientation does not fit the sheet
+    const mkList=(a,b,rev)=>{ const L=[]; for(let v=a; v<=b; v+=ST) L.push(v);
+      if(L[L.length-1]!==b) L.push(b); if(rev) L.reverse(); return L; };
+    const gyList=mkList(start,gyEnd,NEST_FLIP_Y);
+    const gxList=mkList(start,gxEnd,NEST_FLIP_X);
+    // Step direction used by the tighten pass: always TOWARDS the chosen corner.
+    const sy=NEST_FLIP_Y?1:-1, sx=NEST_FLIP_X?1:-1;
+    const inY=v=>v>=start&&v<=gyEnd, inX=v=>v>=start&&v<=gxEnd;
+    for(const gy0 of gyList){
+      for(const gx0 of gxList){
+        let gy=gy0, gx=gx0;
         let hit=false;                                   // O(9) probe reject
         for(let k=0;k<probes.length;k++){
           const py=gy+probes[k][0], px=gx+probes[k][1];
@@ -4057,11 +4139,12 @@ function place(item, sheet, sw, sh, edgeMargin, pieceGap, rotMode){
         if(_gridCheck(g,spansCoarse,gx,gy)) continue;   // medium reject
         if(!_gridCheck(g,spans,gx,gy)){
           // Tighten to the EXACT gap: the coarse scan (ST≈3mm) only guarantees the
-          // gap is ≥ pieceGap; slide the piece down/left by 1 cell while still valid
-          // so it rests exactly pieceGap away from its neighbours (halo = pieceGap).
-          while(gy-1>=start && !_gridCheck(g,spans,gx,gy-1)) gy--;
-          while(gx-1>=start && !_gridCheck(g,spans,gx-1,gy)) gx--;
-          while(gy-1>=start && !_gridCheck(g,spans,gx,gy-1)) gy--;
+          // gap is ≥ pieceGap; slide the piece back towards the start corner by
+          // 1 cell while still valid so it rests exactly pieceGap from its
+          // neighbours (halo = pieceGap).
+          while(inY(gy+sy) && !_gridCheck(g,spans,gx,gy+sy)) gy+=sy;
+          while(inX(gx+sx) && !_gridCheck(g,spans,gx+sx,gy)) gx+=sx;
+          while(inY(gy+sy) && !_gridCheck(g,spans,gx,gy+sy)) gy+=sy;
           // ── SUB-CELL REFINEMENT ────────────────────────────────────────────
           // The 1mm grid quantises positions, so a piece with a fractional width
           // would leave a gap of pieceGap + (0…1mm). Snap the piece in CONTINUOUS
@@ -4070,35 +4153,75 @@ function place(item, sheet, sw, sh, edgeMargin, pieceGap, rotMode){
           const gX=gx*g.mm, gY=gy*g.mm;             // safe grid position (collision-free)
           let x=gX, y=gY;
           {
-            const EPS=1e-6;
-            // Verify a candidate: every already-placed piece must be either clear in X
-            // or clear in Y by AT LEAST pieceGap (never less → no 9.5 when 10 is set).
-            const ok=(cx,cy)=>{
-              if(cx<edgeMargin-EPS||cy<edgeMargin-EPS) return false;
-              if(cx+w>sw-edgeMargin+EPS||cy+h>sh-edgeMargin+EPS) return false;
-              return sheet.items.every(o=>{
-                const dx=Math.max(o.x-(cx+w), cx-(o.x+o.w));   // >0 = horizontal clearance
-                const dy=Math.max(o.y-(cy+h), cy-(o.y+o.h));   // >0 = vertical clearance
-                return Math.max(dx,dy) >= pieceGap-1e-4;
-              });
+            // ── TRUE-OUTLINE SLIDE ─────────────────────────────────────────────
+            // The old refinement compared BOUNDING BOXES. For a slanted or curved
+            // part the box says "too close" long before the real outlines are, so
+            // the piece stopped on the grid and the margin came out 6.2 / 7.07 /
+            // 7.45mm instead of the 5mm that was set. Now the piece is slid using
+            // the REAL outline distance: clearance drops by at most the distance
+            // moved, so "slide by (clearance − required)" is always safe, and a few
+            // passes converge onto exactly the requested gap / margin.
+            const nb=[];                                     // nearby placed outlines
+            for(const o of sheet.items){
+              if(o.x-(x+w) > pieceGap+400 || x-(o.x+o.w) > pieceGap+400) continue;
+              if(o.y-(y+h) > pieceGap+400 || y-(o.y+o.h) > pieceGap+400) continue;
+              const ov=o.rotatedVerts||o.vertices||[[0,0],[o.w,0],[o.w,o.h],[0,o.h]];
+              nb.push({p:ov.map(v=>[v[0]+o.x, v[1]+o.y]),
+                       x0:o.x, y0:o.y, x1:o.x+o.w, y1:o.y+o.h});
+            }
+            // slack(cx,cy,axis) = how far this piece may still travel.
+            // Only the edge it is heading TOWARDS can limit it. Measuring against
+            // all four edges meant a piece already resting on the bottom margin
+            // reported zero room and then refused to slide sideways too, leaving
+            // the 2mm grid error in place (gaps read 12.00 instead of 10.00).
+            const slack=(cx,cy,axis)=>{
+              let s = axis
+                ? (NEST_FLIP_X ? (sw-edgeMargin)-(cx+w) : cx-edgeMargin)
+                : (NEST_FLIP_Y ? (sh-edgeMargin)-(cy+h) : cy-edgeMargin);
+              if(s<=0) return s;
+              const me=verts.map(v=>[v[0]+cx, v[1]+cy]);
+              for(const o of nb){
+                // Boxes first: outlines can never be closer than their boxes, so a
+                // neighbour whose box is already farther than the current limit
+                // cannot tighten it — skip the (expensive) outline comparison.
+                const bx=Math.max(o.x0-(cx+w), cx-o.x1, 0);
+                const by=Math.max(o.y0-(cy+h), cy-o.y1, 0);
+                if(Math.sqrt(bx*bx+by*by)-pieceGap >= s) continue;
+                const d=_polyClear(me,o.p,pieceGap+s)-pieceGap;
+                if(d<s) s=d;
+                if(s<=0) return s;
+              }
+              return s;
             };
-            // Snap Y first (row), then X within that row — order matters because the
-            // X neighbours depend on the final Y band.
-            let cy=gY;
-            let maxT=-Infinity;
-            for(const o of sheet.items)
-              if(Math.min(x+w,o.x+o.w)-Math.max(x,o.x) > 0.5 && o.y+o.h <= cy+0.5)
-                maxT=Math.max(maxT, o.y+o.h);
-            if(maxT>-Infinity && ok(x, maxT+pieceGap)) cy=maxT+pieceGap;
-            let cx=x;
-            let maxR=-Infinity;
-            for(const o of sheet.items)
-              if(Math.min(cy+h,o.y+o.h)-Math.max(cy,o.y) > 0.5 && o.x+o.w <= cx+0.5)
-                maxR=Math.max(maxR, o.x+o.w);
-            if(maxR>-Infinity && ok(maxR+pieceGap, cy)) cx=maxR+pieceGap;
-            // Accept the refined spot when it satisfies the gap rule; otherwise keep
-            // the grid spot (the stamp below is conservative, so it is always ≥ gap).
-            if(ok(cx,cy)){ x=cx; y=cy; }
+            const tgtY = NEST_FLIP_Y ? sh-edgeMargin-h : edgeMargin;
+            const tgtX = NEST_FLIP_X ? sw-edgeMargin-w : edgeMargin;
+            // Fine-tuning only. The grid already chose the cell; this just removes
+            // the quantisation error. Letting it run free made pieces travel
+            // hundreds of mm and land on neighbours outside the lookup window.
+            // Y first (settle into the row), then X, alternating. Each step is at
+            // most the current slack, so the piece can never pass through a
+            // neighbour — a bisection search on "is this spot legal" looks faster
+            // but tunnels straight over parts and was rejected. Travel is capped to
+            // the grid cell the piece was found in.
+            const MAXT=3*g.mm+1;
+            for(let round=0; round<2; round++){
+              for(let pass=0; pass<3; pass++){
+                const s=slack(x,y,0); if(s<=0.02) break;
+                const my=Math.sign(tgtY-y)*Math.min(Math.abs(tgtY-y), s, MAXT-Math.abs(y-gY));
+                if(Math.abs(my)<=0.02) break;
+                y+=my;
+              }
+              for(let pass=0; pass<3; pass++){
+                const s=slack(x,y,1); if(s<=0.02) break;
+                const mx=Math.sign(tgtX-x)*Math.min(Math.abs(tgtX-x), s, MAXT-Math.abs(x-gX));
+                if(Math.abs(mx)<=0.02) break;
+                x+=mx;
+              }
+            }
+            // safety: never accept a slide that broke the gap or an edge margin
+            if(slack(x,y,0)<-1e-4 || slack(x,y,1)<-1e-4 ||
+               x<edgeMargin-1e-4 || y<edgeMargin-1e-4 ||
+               x+w>sw-edgeMargin+1e-4 || y+h>sh-edgeMargin+1e-4){ x=gX; y=gY; }
           }
           // Stamp at the FINAL position (keeps the grid in sync with reality; +1 cell
           // covers the sub-cell shift) — stamping the old grid spot caused wrong gaps.
@@ -4214,6 +4337,12 @@ function renderResults(){
   const labor=+document.getElementById('laborRate').value;
   const total=sheets.length;
   const totalLayouts=sheetGroups.length;
+  // Spell out on the button exactly what the download will contain, so it can't be
+  // confused with the single-layout button inside the detail card.
+  { const b=document.querySelector('[data-i18n="exportAllBtn"]');
+    if(b) b.textContent = (lang==='en'
+      ? `⬇️ Export DXF — all ${totalLayouts} layout${totalLayouts>1?'s':''}`
+      : `⬇️ Export DXF รวม ${totalLayouts} แบบ (ทุก Layout)`); }
   const tM2=(totalPieceArea/1e6).toFixed(4);
   const matC=total*priceS;
   const labC=(totalPieceArea/1e6)*labor;
@@ -4335,6 +4464,9 @@ function selSheet(i){
   detailCard.style.display = '';
   document.getElementById('sheetDetailTitle').textContent =
     `✂️ แบบ ${g.label}${g.count>1?' × '+g.count+' แผ่น':''} — ${g.sheet.items.length} ชิ้น/แผ่น`;
+  { const b=document.querySelector('[data-i18n="exportBtn"]');
+    if(b) b.textContent = (lang==='en' ? `⬇️ Export DXF — layout ${g.label} only`
+                                       : `⬇️ Export DXF เฉพาะแบบ ${g.label}`); }
   drawSheet(i);
   detailCard.scrollIntoView({behavior:'smooth', block:'start'});
 }
@@ -4774,7 +4906,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-g40';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-g48';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
@@ -4827,14 +4959,22 @@ function buildDXF(){
     entities+=_sheetTitle(offX, sw, sh, g);
     g.sheet.items.forEach(item=>{ entities+=dxfItemPaths(item,offX,offY,sh); });
   });
-  // One overall summary, left-aligned below the first sheet
-  entities+=_lbl(20, -150, 40, `TOTAL: ${totalSheets} sheet${totalSheets>1?'s':''}`, 0);
+  // One overall summary, left-aligned below the first sheet. Spelling out every
+  // layout makes it obvious at a glance whether the file is the combined export
+  // or a single layout — the two used to be indistinguishable once opened.
+  const brk=sheetGroups.map(g=>`${g.label} x${g.count}`).join(', ');
+  entities+=_lbl(20, -150, 40,
+    `TOTAL: ${totalSheets} sheet${totalSheets>1?'s':''}  |  ${sheetGroups.length} layout${sheetGroups.length>1?'s':''}  (${brk})`, 0);
   return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
 }
 function exportDXF(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
   const dxf=buildDXF(); if(!dxf) return;
-  dlText(dxf,(nestResult.sheetGroups.length===1?'layout_A':'all_layouts')+'_'+BUILD_TAG+'.dxf');
+  // ALWAYS "all_layouts…", even with a single layout. It used to fall back to
+  // "layout_A", which is byte-for-byte the name the single-layout button produces —
+  // so there was no way to tell the two downloads apart afterwards.
+  const n=nestResult.sheetGroups.length;
+  dlText(dxf,`all_layouts_${n}x_${BUILD_TAG}.dxf`);
 }
 function exportDXFCurrent(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
