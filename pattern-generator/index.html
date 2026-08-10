@@ -598,6 +598,7 @@ pre.gcode-content {
     <span class="hdr-div"></span>
     <button class="hdr-btn" id="btnSaveProj" title="บันทึกโปรเจกต์เป็นไฟล์ .cncproj" aria-label="Save project"><svg class="ic"><use href="#i-save"/></svg></button>
     <button class="hdr-btn" id="btnLoadProj" title="เปิดโปรเจกต์จากไฟล์" aria-label="Open project"><svg class="ic"><use href="#i-folder"/></svg></button>
+    <button class="hdr-btn" id="btnResetAll" title="ล้างค่าที่จำไว้ แล้วเริ่มใหม่จากค่าเริ่มต้น" aria-label="Reset"><svg class="ic"><use href="#i-refresh"/></svg></button>
     <input type="file" id="projFileInput" accept=".cncproj,.json" style="display:none">
   </div>
   <div class="header-sub">
@@ -917,23 +918,24 @@ pre.gcode-content {
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Spacing (ระยะห่าง)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nSpacing" value="5.0" min="0.5" max="30" step="0.1"><span class="unit-lbl">mm</span></div>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nSpacing" value="5.000" min="0.001" step="0.001"><span class="unit-lbl">mm</span></div>
         </div>
-        <input type="range" id="rSpacing" min="0.5" max="30" value="5.0" step="0.1">
+        <input type="range" id="rSpacing" min="0.001" max="50" value="5.000" step="0.001">
+        <div id="spacingNote" style="font-size:9px;color:#8e8e94;margin-top:3px;line-height:1.45"></div>
       </div>
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Min Diameter (เส้นผ่าศูนย์กลางต่ำสุด)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nMinR" value="0.0" min="0" max="999" step="0.1"><span class="unit-lbl">mm</span></div>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nMinR" value="0.0" min="0" step="0.1"><span class="unit-lbl">mm</span></div>
         </div>
         <input type="range" id="rMinR" min="0" max="100" value="0.0" step="0.1">
       </div>
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Max Diameter (เส้นผ่าศูนย์กลางสูงสุด)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nMaxR" value="4.0" min="0.1" max="999" step="0.1"><span class="unit-lbl">mm</span></div>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nMaxR" value="4.0" min="0.001" step="0.1"><span class="unit-lbl">mm</span></div>
         </div>
-        <input type="range" id="rMaxR" min="0.1" max="100" value="4.0" step="0.1">
+        <input type="range" id="rMaxR" min="0.001" max="100" value="4.0" step="0.1">
       </div>
 
       <!-- Quantize sizes -->
@@ -942,6 +944,7 @@ pre.gcode-content {
         <input type="text" id="quantSizes" placeholder="เช่น 2, 6, 10 (เส้นผ่า mm)"
                style="width:100%;background:#1a1a1c;border:1px solid #333;border-radius:6px;
                       color:#e0e0e0;padding:5px 8px;font-size:11px;box-sizing:border-box;margin-top:4px">
+        <div id="quantNote" style="font-size:9px;color:#8e8e94;margin-top:4px;line-height:1.5"></div>
       </div>
       <div class="tog-row" style="margin-bottom:10px">
         <span class="tog-label">🎲 สุ่มขนาด (Random Size)</span>
@@ -951,30 +954,31 @@ pre.gcode-content {
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Angle (มุมหมุน Grid)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nAngle" value="0" min="0" max="89" step="1"><span class="unit-lbl">°</span></div>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nAngle" value="0" step="1"><span class="unit-lbl">°</span></div>
         </div>
-        <input type="range" id="rAngle" min="0" max="89" value="0" step="1">
+        <input type="range" id="rAngle" min="-180" max="180" value="0" step="1">
       </div>
-      <div class="ctrl">
+      <div class="ctrl" id="patRotCtrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">หมุนรูปทรง (°)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nPatRot" value="0" min="0" max="359" step="1"><span class="unit-lbl">°</span></div>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nPatRot" value="0" step="1"><span class="unit-lbl">°</span></div>
         </div>
-        <input type="range" id="rPatRot" min="0" max="359" value="0" step="1">
+        <input type="range" id="rPatRot" min="-360" max="360" value="0" step="1">
+        <div id="patRotNote" style="font-size:9px;color:#8e8e94;margin-top:3px;line-height:1.45"></div>
       </div>
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Contrast (ความคมชัด)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nContrast" value="1.0" min="0.5" max="4.0" step="0.1"><span class="unit-lbl">×</span></div>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nContrast" value="1.0" min="0" step="0.1"><span class="unit-lbl">×</span></div>
         </div>
-        <input type="range" id="rContrast" min="0.5" max="4.0" value="1.0" step="0.1">
+        <input type="range" id="rContrast" min="0" max="10" value="1.0" step="0.05">
       </div>
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Gamma (โทนสี)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nGamma" value="1.0" min="0.3" max="3.0" step="0.05"><span class="unit-lbl"></span></div>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nGamma" value="1.0" min="0.01" step="0.05"><span class="unit-lbl"></span></div>
         </div>
-        <input type="range" id="rGamma" min="0.3" max="3.0" value="1.0" step="0.05">
+        <input type="range" id="rGamma" min="0.01" max="10" value="1.0" step="0.01">
       </div>
       <div class="tog-row" style="margin-top:10px">
         <span class="tog-label">🔄 Invert (กลับสี)</span>
@@ -987,6 +991,20 @@ pre.gcode-content {
       <div class="tog-row">
         <span class="tog-label">🌓 Dark Background</span>
         <div class="toggle" id="togDarkBg"></div>
+      </div>
+      <div class="tog-row">
+        <span class="tog-label">⬜ ข้ามพื้นที่ว่าง (Skip blank)</span>
+        <div class="toggle on" id="togSkipBlank"></div>
+      </div>
+      <div class="ctrl" id="blankLvlCtrl" style="margin-top:6px">
+        <div class="ctrl-row">
+          <span class="ctrl-lbl">ระดับที่ถือว่าว่าง</span>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nBlankLvl" value="97" min="1" max="100" step="1"><span class="unit-lbl">%</span></div>
+        </div>
+        <input type="range" id="rBlankLvl" min="1" max="100" value="97" step="1">
+        <div style="font-size:9px;color:#8e8e94;margin-top:3px;line-height:1.45">
+          พื้นที่โปร่งใสจะถูกข้ามเสมอ · ค่านี้คุมว่าสีอ่อนแค่ไหนถึงนับเป็นพื้นว่าง (100% = ข้ามเฉพาะสีขาวสนิท)
+        </div>
       </div>
     </div>
 
@@ -1008,21 +1026,48 @@ pre.gcode-content {
       <!-- Work size with aspect lock -->
       <div class="worksize-row">
         <div class="in-grp"><label>ขนาดงาน W</label>
-          <input type="number" class="num-in" id="workW" value="100" min="0.001" max="100000" step="0.1">
+          <input type="number" class="num-in" id="workW" value="" placeholder="จากรูป" min="0.001" step="0.1">
         </div>
         <button class="aspect-btn locked" id="aspectLock" title="Lock aspect ratio">🔒</button>
         <div class="in-grp"><label>ขนาดงาน H</label>
-          <input type="number" class="num-in" id="workH" value="100" min="0.001" max="100000" step="0.1">
+          <input type="number" class="num-in" id="workH" value="" placeholder="จากรูป" min="0.001" step="0.1">
         </div>
       </div>
 
-      <!-- hidden CNC defaults (used by pattern G-code engine) -->
-      <input type="hidden" id="toolDia"    value="3">
-      <input type="hidden" id="cutDepth"   value="-1.5">
-      <input type="hidden" id="feedRate"   value="800">
-      <input type="hidden" id="plungeRate" value="200">
-      <input type="hidden" id="safeZ"      value="5">
-      <input type="hidden" id="rpm"        value="12000">
+      <!-- Core CNC parameters. These drive the pattern G-code engine and used
+           to be hidden inputs, settable only through a preset — so there was
+           no way to type in the bit you actually have in the spindle. -->
+      <!-- Collapsed by default: these are set by the preset panel for most
+           jobs, so they only clutter the sidebar until you need them. -->
+      <div class="sect-hd cnc-adv-hd" style="margin-top:10px;cursor:pointer;user-select:none"
+           onclick="toggleCncAdvanced()">
+        <span id="cncAdvArrow">▸</span> ดอกกัด &amp; การตัด
+      </div>
+      <div id="cncAdvanced" style="display:none">
+      <div class="in-row" style="margin-bottom:6px">
+        <div class="in-grp"><label>ดอกกัด Ø (mm)</label>
+          <input type="number" class="num-in" id="toolDia" value="3" min="0.01" step="0.1">
+        </div>
+        <div class="in-grp"><label>ความลึกตัด (mm)</label>
+          <input type="number" class="num-in" id="cutDepth" value="-1.5" step="0.1">
+        </div>
+      </div>
+      <div class="in-row" style="margin-bottom:6px">
+        <div class="in-grp"><label>Feed XY (mm/min)</label>
+          <input type="number" class="num-in" id="feedRate" value="800" min="1" step="10">
+        </div>
+        <div class="in-grp"><label>Plunge Z (mm/min)</label>
+          <input type="number" class="num-in" id="plungeRate" value="200" min="1" step="10">
+        </div>
+      </div>
+      <div class="in-row" style="margin-bottom:8px">
+        <div class="in-grp"><label>Safe Z (mm)</label>
+          <input type="number" class="num-in" id="safeZ" value="5" min="0" step="0.5">
+        </div>
+        <div class="in-grp"><label>Spindle (RPM)</label>
+          <input type="number" class="num-in" id="rpm" value="12000" min="0" step="500">
+        </div>
+      </div>
       <div class="in-grp" style="margin-bottom:0">
         <label>Machine Format (G-code)</label>
         <select id="machineFormat">
@@ -1035,6 +1080,7 @@ pre.gcode-content {
           <option value="siemens">Siemens Sinumerik 840D</option>
         </select>
       </div>
+      </div><!-- /cncAdvanced -->
     </div>
 
 
@@ -1752,7 +1798,12 @@ pre.gcode-content {
         <button class="exp-btn" id="expDXF">
           <span class="exp-icon">📏</span>
           <span class="exp-name">.DXF</span>
-          <span class="exp-desc">AutoCAD / CAM</span>
+          <span class="exp-desc">AutoCAD / CAM (R12)</span>
+        </button>
+        <button class="exp-btn" id="expDXF2000">
+          <span class="exp-icon">📏</span>
+          <span class="exp-name">.DXF 2000</span>
+          <span class="exp-desc">สำรอง — AutoCAD อาจไม่เปิด</span>
         </button>
       </div>
     </div>
@@ -1798,6 +1849,7 @@ const S = {
   spacingMm: 5.0, minDmm: 0.0, maxDmm: 4.0,
   angle: 0, contrast: 1.0, gamma: 1.0, patRot: 0,
   invert: false, fill: true, darkBg: false, quantRandom: false,
+  skipBlank: true, blankLevel: 97,
   shapes: [], mixShapes: [], lineRows: [], lastGcode: '',
   machineFormat: 'grbl',
   aspectLocked: true, imgAspect: 1,
@@ -1817,8 +1869,11 @@ const $ = id => document.getElementById(id);
 // ── Unit conversion (workW/workH are entered in the currently selected unit) ──
 const UNIT_MM_FACTOR = { mm: 1, cm: 10, m: 1000, inch: 25.4 };
 function unitFactor() { return UNIT_MM_FACTOR[$('units').value] || 1; }
-function workWmm() { return (parseFloat($('workW').value) || 100) * unitFactor(); }
-function workHmm() { return (parseFloat($('workH').value) || 100) * unitFactor(); }
+// Blank boxes fall back to a fixed 100 MILLIMETRES, not "100 of whatever unit
+// is selected" — the old version turned an empty box into 100 m when the unit
+// happened to be metres.
+function workWmm() { const v = parseFloat($('workW').value); return v > 0 ? v * unitFactor() : 100; }
+function workHmm() { const v = parseFloat($('workH').value); return v > 0 ? v * unitFactor() : 100; }
 
 const pCanvas = $('previewCanvas');   // export canvas (hidden)
 const vCanvas = $('viewCanvas');      // display canvas (zoom-aware, vector-crisp)
@@ -1853,13 +1908,26 @@ function getDpi() {
   return parseFloat(v);
 }
 
+// Decimals that keep a millimetre-level value readable in the chosen unit:
+// 1249.4 mm is "1249.4" in mm but "1.2494" in metres, and rounding that to one
+// decimal would throw away 400 mm of real size.
+function _unitDecimals(f) {
+  return f >= 1000 ? 4 : f >= 25 ? 3 : f >= 10 ? 2 : 1;
+}
+
 function autoSetWorkSize() {
   if (!S.image) return;
   const dpi = getDpi();
   const wMm = S.image.width  / dpi * 25.4;
   const hMm = S.image.height / dpi * 25.4;
-  $('workW').value = wMm.toFixed(1);
-  $('workH').value = hMm.toFixed(1);
+  // The boxes hold values in the SELECTED unit, but this wrote raw millimetres
+  // into them. With the unit set to metres an image measuring 1249.4 mm showed
+  // up as "1249.4" and was then read back as 1249.4 metres — a work area 1000×
+  // too large, which is where the runaway sizes came from.
+  const f   = unitFactor();
+  const dec = _unitDecimals(f);
+  $('workW').value = (wMm / f).toFixed(dec);
+  $('workH').value = (hMm / f).toFixed(dec);
   S.imgAspect = wMm / hMm;
   $('imgSizeInfo').textContent =
     `รูป: ${S.image.width}×${S.image.height}px → ${wMm.toFixed(1)}×${hMm.toFixed(1)} mm @ ${dpi} dpi`;
@@ -1873,17 +1941,29 @@ $('aspectLock').addEventListener('click', () => {
   $('aspectLock').classList.toggle('locked', S.aspectLocked);
   $('aspectLock').textContent = S.aspectLocked ? '🔒' : '🔓';
 });
+// The aspect lock rewrites the OTHER box whenever one is edited. Restoring a
+// saved project replays an `input` event on every control, so without this
+// guard the restore itself would overwrite the height it had just put back —
+// using the default 1:1 ratio, because imgAspect is rebuilt from the image and
+// is 1 before one is loaded. That is what silently squared the work area (and
+// grew it) every time the page was reopened.
 $('workW').addEventListener('input', () => {
+  if (typeof PROJECT !== 'undefined' && PROJECT.restoring) return;
   if (S.aspectLocked && S.imgAspect) {
-    const w = parseFloat($('workW').value) || 1;
-    $('workH').value = (w / S.imgAspect).toFixed(1);
+    const w = parseFloat($('workW').value);
+    // Clearing the box must leave the partner box alone, otherwise emptying one
+    // field silently stuffs a made-up number into the other.
+    if (w > 0) $('workH').value = (w / S.imgAspect).toFixed(_unitDecimals(unitFactor()));
+    else $('workH').value = '';
   }
   scheduleRender();
 });
 $('workH').addEventListener('input', () => {
+  if (typeof PROJECT !== 'undefined' && PROJECT.restoring) return;
   if (S.aspectLocked && S.imgAspect) {
-    const h = parseFloat($('workH').value) || 1;
-    $('workW').value = (h * S.imgAspect).toFixed(1);
+    const h = parseFloat($('workH').value);
+    if (h > 0) $('workW').value = (h * S.imgAspect).toFixed(_unitDecimals(unitFactor()));
+    else $('workW').value = '';
   }
   scheduleRender();
 });
@@ -1899,10 +1979,13 @@ $('units').addEventListener('change', () => {
     return;
   }
   if (newFactor !== _prevUnitFactor) {
-    const w = parseFloat($('workW').value) || 100;
-    const h = parseFloat($('workH').value) || 100;
-    $('workW').value = (w * _prevUnitFactor / newFactor).toFixed(4).replace(/\.?0+$/, '') || '0';
-    $('workH').value = (h * _prevUnitFactor / newFactor).toFixed(4).replace(/\.?0+$/, '') || '0';
+    // Rescale each box on its own. A blank box stays blank instead of turning
+    // into "NaN" or a number the user never entered.
+    const conv = v => (v * _prevUnitFactor / newFactor).toFixed(4).replace(/\.?0+$/, '') || '0';
+    const w = parseFloat($('workW').value);
+    const h = parseFloat($('workH').value);
+    if (w > 0) $('workW').value = conv(w);
+    if (h > 0) $('workH').value = conv(h);
     _prevUnitFactor = newFactor;
   }
   scheduleRender();
@@ -2246,7 +2329,7 @@ function updateViewCanvas() {
     }
     // fallback to path drawing if stamp not available
     const np = IMGSHAPE.normPaths;
-    const rot = (parseInt($('shRot').value)||0) * Math.PI / 180;
+    const rot = ((parseInt($('shRot').value)||0) + (S.patRot||0)) * Math.PI / 180;
     const cosR = Math.cos(rot), sinR = Math.sin(rot);
     const useRot = Math.abs(rot) > 0.01;
     const isContour = !!IMGSHAPE.isContour;
@@ -2290,22 +2373,31 @@ function updateViewCanvas() {
     vCtx.fillStyle = fg;
     vCtx.textAlign = 'center';
     vCtx.textBaseline = 'middle';
+    const rotT = (S.patRot || 0) * Math.PI / 180;
     for (let i = 0; i < S.shapes.length; i++) {
       const s = S.shapes[i];
-      if (s.r < 0.5) continue;
+      const dr = Math.max(s.r, 0.5 / sc);
       const ch = S.textMode === 'rnd'
         ? chars[Math.floor(Math.random() * chars.length)]
         : chars[i % chars.length];
-      vCtx.font = `bold ${Math.max(1, s.r * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
-      vCtx.fillText(ch, s.x, s.y);
+      vCtx.font = `bold ${Math.max(1, dr * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
+      if (rotT) {
+        vCtx.save(); vCtx.translate(s.x, s.y); vCtx.rotate(rotT);
+        vCtx.fillText(ch, 0, 0); vCtx.restore();
+      } else {
+        vCtx.fillText(ch, s.x, s.y);
+      }
     }
     _applyMixLayer(vCtx, fg);
     vCtx.restore();
     return;
   }
 
+  // Floor the drawn radius at ~0.35 device pixels (the context is scaled by
+  // `sc`, so divide) — keeps very small shapes visible without touching s.r.
+  const _minDrawR = 0.35 / Math.max(0.0001, sc);
   vCtx.beginPath();
-  for (const s of S.shapes) shapePath(vCtx, s.x, s.y, s.r, S.pattern, S.patRot);
+  for (const s of S.shapes) shapePath(vCtx, s.x, s.y, Math.max(s.r, _minDrawR), S.pattern, S.patRot);
   if (S.fill) vCtx.fill(); else vCtx.stroke();
 
   _applyMixLayer(vCtx, fg);
@@ -2340,12 +2432,21 @@ function _applyMixLayer(ctx, fg) {
 // ── Controls wiring ───────────────────────────────────────
 function bindCtrl(rangeId, numId, stateKey, decimals, onChange) {
   const rng = $(rangeId), num = $(numId);
+  // The number box may allow a WIDER range than the slider — the slider covers
+  // the practical span, the box lets you type an extreme value when you need
+  // one. Clamp the value to the box's limits and only the thumb to the track.
+  // Omitting min/max on the number box means "no limit" — the slider still has
+  // its own practical span, it just stops being a ceiling on what you can type.
+  const rMin = parseFloat(rng.min), rMax = parseFloat(rng.max);
+  const nMin = num.min !== '' ? parseFloat(num.min) : -Infinity;
+  const nMax = num.max !== '' ? parseFloat(num.max) :  Infinity;
   const upd = (v, src) => {
-    const mn = parseFloat(rng.min), mx = parseFloat(rng.max);
-    v = Math.max(mn, Math.min(mx, parseFloat(v) || mn));
+    v = parseFloat(v);
+    if (!isFinite(v)) v = nMin;
+    v = Math.max(nMin, Math.min(nMax, v));
     v = parseFloat(v.toFixed(decimals));
     S[stateKey] = v;
-    if (src !== 'range') rng.value = v;
+    if (src !== 'range') rng.value = Math.max(rMin, Math.min(rMax, v));
     if (src !== 'num')   num.value = v.toFixed(decimals);
     updateRangeTrack(rng);
     onChange && onChange(v);
@@ -2375,7 +2476,7 @@ function bindCtrl_set(rId, nId, key, v, dec) {
   S[key] = v; $(rId).value = v; $(nId).value = v.toFixed(dec);
   updateRangeTrack($(rId));
 }
-bindCtrl('rSpacing','nSpacing','spacingMm',1,onSpacingChange);
+bindCtrl('rSpacing','nSpacing','spacingMm',3,onSpacingChange);
 bindCtrl('rMinR','nMinR','minDmm',1);
 bindCtrl('rMaxR','nMaxR','maxDmm',1);
 bindCtrl('rAngle','nAngle','angle',0);
@@ -2384,6 +2485,7 @@ bindCtrl('rContrast','nContrast','contrast',1);
 bindCtrl('rGamma','nGamma','gamma',2);
 bindCtrl('rMixDiam','nMixDiam','mixDiamMm',1);
 bindCtrl('rMixPatRot','nMixPatRot','mixPatRot',0);
+bindCtrl('rBlankLvl','nBlankLvl','blankLevel',0);
 ['rSpacing','rMinR','rMaxR','rAngle','rPatRot','rContrast','rGamma','rMixDiam','rMixPatRot'].forEach(id => updateRangeTrack($(id)));
 
 function tog(id, key) {
@@ -2394,7 +2496,7 @@ function tog(id, key) {
   });
 }
 tog('togInvert','invert'); tog('togFill','fill'); tog('togDarkBg','darkBg');
-tog('togQuantRandom','quantRandom');
+tog('togQuantRandom','quantRandom'); tog('togSkipBlank','skipBlank');
 // Mix Layer toggle (custom — shows/hides controls)
 $('togMixLayer').addEventListener('click', function() {
   S.mixEnabled = !S.mixEnabled;
@@ -2422,12 +2524,100 @@ $('quantSizes').addEventListener('input', () => {
   scheduleRender();
 });
 
+// "หมุนรูปทรง" turns each stamp on the spot. That is meaningless for shapes
+// with full rotational symmetry, and Line Raster is rotated by the grid Angle
+// control instead — so grey the slider out and say why rather than leaving the
+// user to wonder why dragging it changes nothing.
+const PATROT_NA = {
+  circle: 'วงกลมหมุนแล้วหน้าตาเหมือนเดิม — ใช้กับรูปทรงอื่นได้',
+  dot:    'จุดหมุนแล้วหน้าตาเหมือนเดิม — ใช้กับรูปทรงอื่นได้',
+  lineraster: 'ลายเส้นใช้ "Angle (มุมหมุน Grid)" ด้านบนแทน'
+};
+// Live preview of how many shapes the current spacing × work-area implies, so
+// the cap is visible BEFORE hitting Regenerate rather than as a surprise after.
+const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
+function updateSpacingNote() {
+  const note = $('spacingNote');
+  if (!note) return;
+  const wW = workWmm(), wH = workHmm(), sp = S.spacingMm;
+  if (!(sp > 0) || !(wW > 0) || !(wH > 0)) { note.textContent = ''; return; }
+  const total = (Math.floor(wW / sp) + 1) * (Math.floor(wH / sp) + 1);
+  if (total > MAX_SHAPES_UI) {
+    const fit = Math.sqrt((wW * wH) / MAX_SHAPES_UI);
+    note.style.color = '#d9a441';
+    note.textContent = `≈ ${total.toLocaleString()} จุด เกินขีดจำกัด ${MAX_SHAPES_UI.toLocaleString()} — ` +
+                       `จะถูกปรับเป็น ${fit.toFixed(3)} mm ให้อัตโนมัติ`;
+  } else {
+    const overlap = S.maxDmm > sp;
+    note.style.color = overlap ? '#d9a441' : '#8e8e94';
+    note.textContent = `≈ ${total.toLocaleString()} จุด บนพื้นที่ ${wW.toFixed(1)}×${wH.toFixed(1)} mm` +
+      (overlap ? ` · รูปกว้าง ${S.maxDmm} mm > ระยะห่าง ${sp} mm → รูปจะซ้อนทับกัน` : '');
+  }
+}
+
+// ── Suggest a spacing when the tool diameter is entered ──────────────────
+// Fires ONCE per tool change and then stays out of the way: everything it
+// writes is a normal editable value, and it never re-runs off the back of a
+// manual edit. Reasoning behind the numbers:
+//   • the smallest dot you can cut is a single plunge = the tool Ø
+//   • at full black the dots should just meet, so the largest dot = the pitch
+//   • a 1:4 size range reads well for photo halftones → pitch = tool Ø × 4
+function suggestSpacingFromTool() {
+  const tool = parseFloat($('toolDia').value) || 0;
+  if (!(tool > 0)) return;
+
+  let pitch = tool * 4;
+  const wW = workWmm(), wH = workHmm();
+  let widened = false;
+  if (wW > 0 && wH > 0) {                     // don't propose a grid that gets capped
+    const fitPitch = Math.sqrt((wW * wH) / MAX_SHAPES_UI);
+    if (pitch < fitPitch) { pitch = fitPitch; widened = true; }
+  }
+  pitch = parseFloat(pitch.toFixed(3));
+
+  bindCtrl_set('rSpacing', 'nSpacing', 'spacingMm', pitch, 3);
+  bindCtrl_set('rMinR',    'nMinR',    'minDmm',    parseFloat(tool.toFixed(3)), 3);
+  bindCtrl_set('rMaxR',    'nMaxR',    'maxDmm',    pitch, 3);
+
+  if (typeof updateSpacingNote === 'function') updateSpacingNote();
+  status2(`ตั้งระยะห่าง ${pitch} mm จากดอกกัด Ø${tool} mm` +
+          (widened ? ' (ขยายให้พอดีกับขีดจำกัดจุด)' : '') + ' — ปรับเองได้');
+  scheduleRender();
+}
+
+// Hidden, not removed: the fields still drive the G-code engine and the
+// tool-diameter box still feeds the spacing suggestion — they are just folded
+// away because presets fill them in for most jobs.
+function toggleCncAdvanced() {
+  const box = $('cncAdvanced'), arrow = $('cncAdvArrow');
+  if (!box) return;
+  const show = box.style.display === 'none';
+  box.style.display = show ? '' : 'none';
+  if (arrow) arrow.textContent = show ? '▾' : '▸';
+  if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+}
+
+function updatePatRotState() {
+  const na   = PATROT_NA[S.pattern];
+  const note = $('patRotNote'), rng = $('rPatRot'), num = $('nPatRot');
+  if (!note || !rng || !num) return;
+  // Deliberately NOT disabled: a greyed-out control reads as "broken", and the
+  // value still matters the moment you switch to a shape that can show it.
+  // The note carries the explanation instead.
+  rng.disabled = num.disabled = false;
+  const ctrl = $('patRotCtrl');
+  if (ctrl) ctrl.style.opacity = 1;
+  note.textContent = na || '';
+  note.style.color = na ? '#d9a441' : '#8e8e94';
+}
+
 $('patternGrid').addEventListener('click', e => {
   const btn = e.target.closest('[data-pat]');
   if (!btn) return;
   document.querySelectorAll('#patternGrid .pat-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   S.pattern = btn.dataset.pat;
+  updatePatRotState();
   const psh = $('panImgShape');
   if(psh) psh.style.display = (S.pattern==='imgshape') ? '' : 'none';
   const plr = $('panLineRaster');
@@ -2499,18 +2689,107 @@ function generatePattern() {
   });
 }
 
+// ── Design-canvas resolution ─────────────────────────────────────────────
+// pCanvas is the space every shape position and radius lives in, and it used
+// to be sized purely to the viewport. On a large work area that makes each
+// shape sub-pixel, so the preview showed a grey wash no matter which shape was
+// selected — the geometry and the G-code were right, the canvas simply had no
+// room to draw them. Scale the design canvas up until the smallest feature is
+// a few pixels across, bounded so memory stays sane.
+function ensureDesignResolution() {
+  if (!pCanvas.width || !pCanvas.height) return false;
+  const wWmm = workWmm();
+  if (!(wWmm > 0)) return false;
+
+  // Smallest feature we need to be able to draw, in mm
+  const qs = ($('quantSizes').value || '').split(',')
+              .map(v => parseFloat(v.trim())).filter(v => v > 0);
+  let featMm = qs.length ? Math.min(...qs)
+                         : Math.max(S.minDmm, S.maxDmm);
+  if (!(featMm > 0)) featMm = S.spacingMm;          // nothing else to go on
+  if (!(featMm > 0)) return false;
+
+  const TARGET_PX = 4;                               // enough to read a shape
+  const MAX_SIDE  = 6000;
+  const MAX_AREA  = 20e6;
+
+  const curPxPerMm = pCanvas.width / wWmm;
+  const needScale  = TARGET_PX / Math.max(1e-9, featMm * curPxPerMm);
+  if (needScale <= 1.02) return false;               // already fine enough
+
+  const aspect = pCanvas.height / pCanvas.width;
+  let newW = Math.round(pCanvas.width * needScale);
+  newW = Math.min(newW, MAX_SIDE, Math.round(Math.sqrt(MAX_AREA / Math.max(1e-6, aspect))));
+  let newH = Math.max(1, Math.round(newW * aspect));
+  if (newH > MAX_SIDE) { newH = MAX_SIDE; newW = Math.max(1, Math.round(newH / aspect)); }
+  if (newW <= pCanvas.width) return false;
+
+  pCanvas.width = newW;  pCanvas.height = newH;
+  iCanvas.width = newW;  iCanvas.height = newH;
+  if (S.image) iCtx.drawImage(S.image, 0, 0, newW, newH);
+  if (typeof zoom !== 'undefined' && zoom.fitToViewport) zoom.fitToViewport();
+  return true;
+}
+
 function _generate() {
+  ensureDesignResolution();
   const W = pCanvas.width, H = pCanvas.height;
   const bg = S.darkBg ? '#111111' : '#ffffff';
   pCtx.fillStyle = bg; pCtx.fillRect(0, 0, W, H);
 
   const workW_mm = workWmm();
+  const workH_mm = workHmm();
   const mmToPx   = W / workW_mm;
   let spacingPx = S.spacingMm * mmToPx;
   const minRpx    = (S.minDmm / 2) * mmToPx;
   const maxRpx    = (S.maxDmm / 2) * mmToPx;
   const angleRad  = S.angle * Math.PI / 180;
-  if (spacingPx < 1) { _generating = false; $('procOv').classList.remove('show'); return; }
+
+  // ── Grid feasibility, measured in real millimetres ─────────────────
+  // This used to bail out silently whenever the spacing worked out to less
+  // than one canvas pixel — which is exactly what happens with a fine spacing
+  // or a large work area, so the app looked broken instead of saying why.
+  // The limit that actually matters is the number of shapes, not the preview
+  // resolution, so decide on that and always tell the user what happened.
+  const MAX_SHAPES = MAX_SHAPES_UI;   // shared with the live note under Spacing
+  let _capMsg = '';
+  {
+    const reqCols = Math.floor(workW_mm / S.spacingMm) + 1;
+    const reqRows = Math.floor(workH_mm / S.spacingMm) + 1;
+    const reqTotal = reqCols * reqRows;
+    if (reqTotal > MAX_SHAPES) {
+      // Spacing that just fits inside the cap over this work area
+      const fitMm = Math.sqrt((workW_mm * workH_mm) / MAX_SHAPES);
+      spacingPx = fitMm * mmToPx;
+      _capMsg = `ระยะห่าง ${S.spacingMm} mm บนพื้นที่ ${workW_mm.toFixed(1)}×${workH_mm.toFixed(1)} mm ` +
+                `ต้องใช้ ${reqTotal.toLocaleString()} จุด เกินขีดจำกัด ${MAX_SHAPES.toLocaleString()} จุด — ` +
+                `ใช้ ${fitMm.toFixed(3)} mm แทนชั่วคราว`;
+    }
+  }
+  const _spacingNote = $('spacingNote');
+  if (_spacingNote) {
+    if (_capMsg) { _spacingNote.textContent = _capMsg; _spacingNote.style.color = '#d9a441'; }
+    else if (typeof updateSpacingNote === 'function') updateSpacingNote();
+  }
+  // Never let the step collapse to zero — that would spin forever below
+  if (!(spacingPx > 0) || !isFinite(spacingPx)) spacingPx = 1;
+
+  // Smallest feature worth emitting, expressed RELATIVE to the grid pitch.
+  // The old test was a fixed 0.25 canvas pixels, which silently deleted every
+  // shape once the work area got large. It cannot be an absolute millimetre
+  // value either, because shape radius is itself capped at 0.4 × spacing — an
+  // absolute floor would wipe out fine-pitch grids. 0.4% of the pitch works
+  // out to ~0.25 px at the default 100 mm / 5 mm settings, so existing results
+  // are unchanged while every other scale now behaves sensibly.
+  // Smallest feature worth emitting. Two independent notions of "too small"
+  // apply at opposite ends of the scale, and a shape only has to clear the
+  // easier one — hence Math.min, not Math.max:
+  //   • absolute — a dot under ~0.02 mm across is below any real tool
+  //   • relative — 0.4% of the grid pitch (≈ the old fixed 0.25 px default)
+  // Using either alone breaks a real case: absolute-only wipes out fine-pitch
+  // micro grids, relative-only wipes out normal dots on a huge work area.
+  const _minR = () => Math.max(1e-9, Math.min(0.01 * mmToPx, spacingPx * 0.004));
+  let minRealPx = _minR();
 
   // imgshape without source photo → use uniform brightness 0.5
   const imgData = S.image ? iCtx.getImageData(0, 0, W, H) : null;
@@ -2521,15 +2800,34 @@ function _generate() {
     const xi = Math.max(0, Math.min(W-1, Math.round(x)));
     const yi = Math.max(0, Math.min(H-1, Math.round(y)));
     const i  = (yi * W + xi) * 4;
+    // Transparent pixels are stored as (0,0,0,0). Reading only RGB made them
+    // look pure BLACK, so empty regions of a PNG came out with the LARGEST
+    // dots — the exact opposite of what they should get. Treat any transparent
+    // pixel as blank paper.
+    if (px[i+3] < 8) return 1;
     let lum = (0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]) / 255;
     lum = Math.pow(Math.max(0, lum), S.gamma);
     lum = 0.5 + (lum - 0.5) * S.contrast;
     return Math.max(0, Math.min(1, lum));
   }
 
+  // Should this spot be left completely bare? Separate from brightness so a
+  // blank area produces NO toolpath at all, rather than a very small dot.
+  const _skipBlank = !!S.skipBlank;
+  const _blankLvl  = (typeof S.blankLevel === 'number' ? S.blankLevel : 97) / 100;
+  function isBlank(x, y) {
+    if (!_skipBlank || !px) return false;
+    const xi = Math.max(0, Math.min(W-1, Math.round(x)));
+    const yi = Math.max(0, Math.min(H-1, Math.round(y)));
+    const i  = (yi * W + xi) * 4;
+    if (px[i+3] < 8) return true;                       // transparent
+    const raw = (0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]) / 255;
+    return S.invert ? raw <= (1 - _blankLvl) : raw >= _blankLvl;
+  }
+
   // ── Line Raster: completely different render path ──────────
   if (S.pattern === 'lineraster') {
-    _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright);
+    _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank);
     return;
   }
 
@@ -2549,31 +2847,107 @@ function _generate() {
   const jitter = 0; // No positional jitter — keeps dots on exact grid centres
 
   const cx = W/2, cy = H/2;
-  const diag  = Math.sqrt(W*W + H*H);
-  const steps = Math.ceil(diag / spacingPx) + 2;
   const shapes = [];
+  const _cosA = Math.cos(angleRad), _sinA = Math.sin(angleRad);
 
-  // Safety cap: if grid is extremely dense, auto-increase spacing to stay responsive
-  const MAX_SHAPES = 60000;
-  const estIterations = (2 * steps + 1) * (2 * steps + 1);
-  if (estIterations > MAX_SHAPES * 8) {
-    // Too dense — scale spacing up so estIterations ≈ MAX_SHAPES * 4
-    const safeSide = Math.sqrt(MAX_SHAPES * 4);
-    spacingPx = Math.ceil(diag / ((safeSide - 1) / 2));
+  // ── Exact grid bounds ──────────────────────────────────────────────
+  // This used to sweep a square big enough to hold the canvas DIAGONAL, then
+  // clamp the spacing whenever that square held too many cells. On a wide,
+  // short work area the square is enormous compared to the strip actually
+  // being filled, so the clamp fired constantly and every spacing below a few
+  // hundred mm collapsed to the same value — changing the slider did nothing.
+  // Mapping the four canvas corners back through the grid rotation gives the
+  // precise row/column span instead, so the loop visits only real cells.
+  let _c0 = Infinity, _c1 = -Infinity, _r0 = Infinity, _r1 = -Infinity;
+  for (const [qx, qy] of [[0,0],[W,0],[0,H],[W,H]]) {
+    const dx = qx - cx, dy = qy - cy;
+    const gcol = ( dx*_cosA + dy*_sinA) / spacingPx;   // inverse rotation
+    const grow = (-dx*_sinA + dy*_cosA) / spacingPx;
+    if (gcol < _c0) _c0 = gcol; if (gcol > _c1) _c1 = gcol;
+    if (grow < _r0) _r0 = grow; if (grow > _r1) _r1 = grow;
   }
-  const stepsAdj = Math.ceil(diag / spacingPx) + 2;
+  let colFrom = Math.floor(_c0) - 1, colTo = Math.ceil(_c1) + 1;
+  let rowFrom = Math.floor(_r0) - 1, rowTo = Math.ceil(_r1) + 1;
+
+  // Backstop: only bites if the exact span is still unreasonable (e.g. a 45°
+  // grid roughly doubles the cell count over the axis-aligned estimate).
+  {
+    const iters = (colTo - colFrom + 1) * (rowTo - rowFrom + 1);
+    if (iters > MAX_SHAPES * 6) {
+      const k = Math.sqrt(iters / (MAX_SHAPES * 6));
+      spacingPx *= k;
+      colFrom = Math.floor(colFrom / k) - 1; colTo = Math.ceil(colTo / k) + 1;
+      rowFrom = Math.floor(rowFrom / k) - 1; rowTo = Math.ceil(rowTo / k) + 1;
+    }
+  }
+  minRealPx = _minR();   // spacing may have moved again
+
+  // Whatever pitch actually got used goes back into the box. Leaving the typed
+  // value on screen while quietly generating at a different pitch means the
+  // number you read is not the number you cut.
+  {
+    const effMm = spacingPx / mmToPx;
+    if (isFinite(effMm) && effMm > 0 && Math.abs(effMm - S.spacingMm) > 1e-4) {
+      const wanted = S.spacingMm;
+      bindCtrl_set('rSpacing', 'nSpacing', 'spacingMm', parseFloat(effMm.toFixed(3)), 3);
+      const sn = $('spacingNote');
+      if (sn) {
+        sn.style.color = '#d9a441';
+        sn.textContent = `ปรับให้อัตโนมัติ: ${wanted} → ${effMm.toFixed(3)} mm ` +
+          `(ค่าเดิมจะได้ ${Math.round((workW_mm/wanted+1)*(workH_mm/wanted+1)).toLocaleString()} จุด ` +
+          `เกินขีดจำกัด ${MAX_SHAPES.toLocaleString()} จุด)`;
+      }
+    }
+  }
+
+  // ── Tonal range of the image, measured over the actual grid ──────────
+  // Quantize mode maps brightness onto the listed diameters. Mapping the fixed
+  // 0..1 range means the largest diameter only appears where the image is very
+  // nearly black — most photos never get there, so the biggest size the user
+  // asked for silently never gets cut. Measure the range this image really
+  // covers and stretch it across the list, so every listed size is reachable.
+  let _tLo = 0, _tHi = 1;
+  if (useQuant && !S.quantRandom && px) {
+    let lo = Infinity, hi = -Infinity;
+    const stride = Math.max(1, Math.floor((colTo-colFrom+1)*(rowTo-rowFrom+1) / 20000));
+    let k = 0;
+    for (let row = rowFrom; row <= rowTo; row++) {
+      for (let col = colFrom; col <= colTo; col++) {
+        if ((k++ % stride) !== 0) continue;
+        const gx = col * spacingPx, gy = row * spacingPx;
+        const rx = gx * _cosA - gy * _sinA + cx;
+        const ry = gx * _sinA + gy * _cosA + cy;
+        if (rx < 0 || rx > W || ry < 0 || ry > H) continue;
+        if (isBlank(rx, ry)) continue;
+        let bb = bright(rx, ry);
+        if (S.invert) bb = 1 - bb;
+        const tt = 1 - bb;
+        if (tt < lo) lo = tt;
+        if (tt > hi) hi = tt;
+      }
+    }
+    // Only stretch when there is a real range to stretch; a flat image stays flat.
+    if (isFinite(lo) && isFinite(hi) && hi - lo > 0.02) { _tLo = lo; _tHi = hi; }
+  }
+  const _tSpan = Math.max(1e-6, _tHi - _tLo);
 
   let limitHit = false;
-  outer: for (let row = -stepsAdj; row <= stepsAdj; row++) {
-    for (let col = -stepsAdj; col <= stepsAdj; col++) {
+  outer: for (let row = rowFrom; row <= rowTo; row++) {
+    for (let col = colFrom; col <= colTo; col++) {
       const gx = col * spacingPx, gy = row * spacingPx;
       // Add position jitter when random mode is on — randomises spacing
       const jx = jitter ? (Math.random() - 0.5) * 2 * jitter : 0;
       const jy = jitter ? (Math.random() - 0.5) * 2 * jitter : 0;
-      const rx = gx * Math.cos(angleRad) - gy * Math.sin(angleRad) + cx + jx;
-      const ry = gx * Math.sin(angleRad) + gy * Math.cos(angleRad) + cy + jy;
-      const guard = (useQuant ? _qPx[_qPx.length - 1] : maxRpx) + 1;
-      if (rx < -guard || rx > W+guard || ry < -guard || ry > H+guard) continue;
+      const rx = gx * _cosA - gy * _sinA + cx + jx;
+      const ry = gx * _sinA + gy * _cosA + cy + jy;
+      // Keep a shape only when its CENTRE lies inside the work area. The old
+      // test allowed centres up to one shape-radius outside so the halftone
+      // would bleed to the border, but on a real machine that means plunging
+      // into the table beside the stock — with large shapes it put centres
+      // tens of millimetres past the edge. Edges may still overhang by the
+      // radius; the pre-export check reports that as a margin to allow for.
+      if (rx < 0 || rx > W || ry < 0 || ry > H) continue;
+      if (isBlank(rx, ry)) continue;          // leave empty areas of the image bare
       let b = bright(rx, ry);
       if (S.invert) b = 1 - b;
       const t = 1 - b;
@@ -2586,18 +2960,29 @@ function _generate() {
         r = _qPx[qi]; rMm = _qMm[qi] / 2;           // store radius = diameter/2
       } else {
         if (useQuant) {
-          // Quantize mode: map brightness to size — dark → large, bright → small
-          // All grid positions get a dot (no brightness skip); size is determined by brightness
-          const qi = Math.min(Math.round(t * (_qPx.length - 1)), _qPx.length - 1);
+          // Map brightness to size — dark → large, bright → small.
+          // floor(t*n) gives every listed size an EQUAL slice of the tonal
+          // range. The old round(t*(n-1)) gave the middle size a slice twice as
+          // wide as the ends and pushed the largest size out to t >= 0.75, i.e.
+          // only where the image is almost black — which is why an 80 mm entry
+          // could be listed and never appear.
+          const tn = (t - _tLo) / _tSpan;               // stretched to this image
+          const qi = Math.max(0, Math.min(_qPx.length - 1, Math.floor(tn * _qPx.length)));
           r = _qPx[qi]; rMm = _qMm[qi] / 2;             // store radius = diameter/2
         } else {
           r = minRpx + t * (maxRpx - minRpx);
-          if (r < 0.25) continue;                        // non-quantize: skip near-invisible dots
+          if (r < minRealPx) continue;                   // skip features below MIN_R_MM
         }
       }
-      // Hard cap for non-quantize mode only — quantize sizes are always exact
-      if (!useQuant) r = Math.min(r, spacingPx * 0.40);
-      if (r < 0.25) continue;
+      // No size cap. This used to clamp r to 0.40 × spacing, which quietly
+      // turned "Max Diameter" into a lie: at the default 5 mm pitch anything
+      // above 4 mm was clipped, so the exported G-code did not match the
+      // number on screen. Diameters larger than the pitch simply overlap —
+      // that is a legitimate choice for fills, and the note under Spacing
+      // says so rather than the generator overriding the user.
+      // Threshold in real millimetres, not canvas pixels: on a large work area
+      // every dot is sub-pixel on screen yet still perfectly valid G-code.
+      if (r < minRealPx) continue;
       shapes.push({ x: rx, y: ry, r, rMm, frac: t });
       if (shapes.length >= MAX_SHAPES) { limitHit = true; break outer; }
     }
@@ -2613,18 +2998,26 @@ function _generate() {
     pCtx.fillStyle = fg;
     pCtx.textAlign = 'center';
     pCtx.textBaseline = 'middle';
+    const rot = (S.patRot || 0) * Math.PI / 180;   // "หมุนรูปทรง" now rotates glyphs too
     for (let i = 0; i < shapes.length; i++) {
       const s = shapes[i];
-      if (s.r < 0.5) continue;
+      const dr = Math.max(s.r, 0.5);
       const ch = S.textMode === 'rnd'
         ? chars[Math.floor(Math.random() * chars.length)]
         : chars[i % chars.length];
-      pCtx.font = `bold ${Math.max(1, s.r * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
-      pCtx.fillText(ch, s.x, s.y);
+      pCtx.font = `bold ${Math.max(1, dr * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
+      if (rot) {
+        pCtx.save(); pCtx.translate(s.x, s.y); pCtx.rotate(rot);
+        pCtx.fillText(ch, 0, 0); pCtx.restore();
+      } else {
+        pCtx.fillText(ch, s.x, s.y);
+      }
     }
   } else {
+    // Draw radius is floored so sub-pixel geometry still shows in the preview;
+    // s.r itself stays exact because that is what the exporters read.
     pCtx.beginPath();
-    for (const s of shapes) shapePath(pCtx, s.x, s.y, s.r, S.pattern, S.patRot);
+    for (const s of shapes) shapePath(pCtx, s.x, s.y, Math.max(s.r, 0.35), S.pattern, S.patRot);
     if (S.fill) pCtx.fill(); else pCtx.stroke();
   }
 
@@ -2637,13 +3030,17 @@ function _generate() {
     const mixShapes = [];
     for (const s of shapes) {
       const mx = s.x + offX, my = s.y + offY;
-      if (mx < -maxRpx - 1 || mx > W + maxRpx + 1 || my < -maxRpx - 1 || my > H + maxRpx + 1) continue;
+      // Mix-layer dots follow the same rule as the main grid: centre inside
+      // the work area, never parked outside the stock.
+      if (mx < 0 || mx > W || my < 0 || my > H) continue;
+      if (isBlank(mx, my)) continue;        // mix layer honours blank areas too
       let mb = bright(mx, my);
       if (S.invert) mb = 1 - mb;
       const mt = 1 - mb;
       let mr = minRpx + mt * (maxRpx - minRpx);
-      if (!useQuant) mr = Math.min(mr, spacingPx * 0.40);
-      if (mr < 0.25) continue;
+      // Same reasoning as the main grid: no silent 0.40 x pitch clamp, and the
+      // "too small" test is scale-relative instead of a fixed 0.25 canvas px.
+      if (mr < minRealPx) continue;
       mixShapes.push({ x: mx, y: my, r: mr });
     }
     S.mixShapes = mixShapes;
@@ -2702,7 +3099,10 @@ function _drawLineRows(ctx, lineRows, nx, ny) {
 }
 
 // ── Line Raster renderer ──────────────────────────────────
-function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright) {
+function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
+  // Same "too small to bother with" rule as the main grid — recomputed here
+  // because this runs in its own scope and only receives spacingPx.
+  const _lrMinR = Math.max(1e-9, Math.min(0.01 * (W / workWmm()), spacingPx * 0.004));
   const waveAmp    = S.lrWaveAmp * spacingPx;
   const waveFreq   = S.lrWaveFreq;
   const waveAngle  = (S.lrWaveAngle || 90) * Math.PI / 180; // 2D wave propagation direction
@@ -2780,13 +3180,13 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright) {
       for (let t = -halfDiag - spacingPx; t <= halfDiag + spacingPx; t += spacingPx) {
         const mx = cx0 + midD * nx + t * lx;
         const my = cy0 + midD * ny + t * ly;
-        if (mx < -maxRpx - 1 || mx > W + maxRpx + 1 || my < -maxRpx - 1 || my > H + maxRpx + 1) continue;
+        if (mx < 0 || mx > W || my < 0 || my > H) continue;
+        if (isBlank(mx, my)) continue;
         let mb = bright(mx, my);
         if (S.invert) mb = 1 - mb;
         const mt = 1 - mb;
         let mr = minRpx + mt * (maxRpx - minRpx);
-        mr = Math.min(mr, spacingPx * 0.40);
-        if (mr < 0.25) continue;
+        if (mr < _lrMinR) continue;
         mixShapes.push({ x: mx, y: my, r: mr });
       }
     }
@@ -2902,6 +3302,41 @@ function updateStats() {
   $('stTravel').textContent = trav.saved > 0 ? `−${trav.saved.toFixed(0)}%` : '—';
 
   COST.update(timeSec, wW, wH);
+  updateQuantNote();
+}
+
+// Report which of the listed diameters actually made it into the pattern.
+// Brightness picks the size, so with no source photo every dot gets the SAME
+// middle size — list 80/50/25 and only the 50 appears, with no hint as to why.
+function updateQuantNote() {
+  const note = $('quantNote');
+  if (!note) return;
+  const listed = ($('quantSizes').value || '').split(',')
+    .map(v => parseFloat(v.trim())).filter(v => v > 0).sort((a,b) => a-b);
+  if (!listed.length) { note.textContent = ''; return; }
+  if (!S.shapes.length) { note.textContent = ''; return; }
+
+  const sc = workWmm() / pCanvas.width;
+  const used = new Set();
+  for (const s of S.shapes) {
+    const d = s.r * 2 * sc;
+    let best = listed[0], bd = Infinity;
+    for (const L of listed) { const e = Math.abs(L - d); if (e < bd) { bd = e; best = L; } }
+    if (bd < Math.max(0.05, best * 0.02)) used.add(best);
+  }
+  const missing = listed.filter(v => !used.has(v));
+  if (!missing.length) {
+    note.style.color = '#8e8e94';
+    note.textContent = `ใช้ครบทุกขนาด: ${listed.join(', ')} mm`;
+  } else {
+    note.style.color = '#d9a441';
+    const why = !S.image
+      ? 'ยังไม่ได้โหลดรูป — ไม่มีความสว่างมาไล่ขนาด ทุกจุดจึงได้ขนาดกลางเท่ากันหมด'
+      : 'ภาพไม่มีโทนสว่าง/มืดครบพอจะไล่ถึงขนาดเหล่านี้';
+    note.innerHTML = `ใช้จริงแค่ <b>${[...used].sort((a,b)=>a-b).join(', ') || '—'} mm</b> · ` +
+      `ไม่ได้ใช้: <b>${missing.join(', ')} mm</b><br>${why} — ` +
+      `เปิด “สุ่มขนาด” หรือโหลดรูปเพื่อให้ใช้ครบทุกขนาด`;
+  }
 }
 function patName(p) {
   return {circle:'Circle',square:'Square',diamond:'Diamond',cross:'Cross',
@@ -6541,6 +6976,1128 @@ EOF
 
 
 
+// ════════════════════════════════════════════════════════════════════════
+// buildDXF12 — minimal AutoCAD R12 (AC1009) writer
+// ════════════════════════════════════════════════════════════════════════
+// The AC1015 writer below wraps the geometry in a large boilerplate copied
+// from ezdxf (CLASSES, OBJECTS, DICTIONARYVAR, MLEADERSTYLE, …) and leaves
+// $EXTMIN/$EXTMAX at the ±1e20 "unset" sentinel. ezdxf reads that back fine,
+// but AutoCAD is far stricter about its own format and will reject the whole
+// file with "Invalid or incomplete DXF input -- drawing discarded".
+//
+// R12 is the lowest common denominator every CAD/CAM package accepts: no
+// handles, no owner pointers, no object dictionary, only HEADER/TABLES/
+// ENTITIES. Curves become POLYLINEs, which is exactly what the preview draws
+// anyway, so nothing is lost.
+// A complete, known-good R12 skeleton: HEADER plus all eight required tables
+// (VPORT, LTYPE, LAYER, STYLE, VIEW, UCS, APPID, DIMSTYLE) and an empty BLOCKS
+// section. Hand-writing this was the mistake in the first attempt — the
+// hand-rolled version had only LTYPE and LAYER and no BLOCKS section at all,
+// which is exactly the kind of omission AutoCAD rejects outright while more
+// forgiving parsers shrug at. Extents are patched in at export time.
+const DXF12_SKELETON = `  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1009
+  9
+$DWGCODEPAGE
+  3
+ANSI_1252
+  9
+$INSBASE
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$EXTMIN
+ 10
+@@EXTMIN0@@
+ 20
+@@EXTMIN1@@
+ 30
+@@EXTMIN2@@
+  9
+$EXTMAX
+ 10
+@@EXTMAX0@@
+ 20
+@@EXTMAX1@@
+ 30
+@@EXTMAX2@@
+  9
+$LIMMIN
+ 10
+@@LIMMIN0@@
+ 20
+@@LIMMIN1@@
+  9
+$LIMMAX
+ 10
+@@LIMMAX0@@
+ 20
+@@LIMMAX1@@
+  9
+$ORTHOMODE
+ 70
+0
+  9
+$REGENMODE
+ 70
+1
+  9
+$FILLMODE
+ 70
+1
+  9
+$DRAGMODE
+ 70
+2
+  9
+$QTEXTMODE
+ 70
+0
+  9
+$MIRRTEXT
+ 70
+1
+  9
+$OSMODE
+ 70
+20583
+  9
+$LTSCALE
+ 40
+1.0
+  9
+$ATTMODE
+ 70
+1
+  9
+$TEXTSIZE
+ 40
+2.5
+  9
+$TRACEWID
+ 40
+1.0
+  9
+$TEXTSTYLE
+  7
+Standard
+  9
+$CLAYER
+  8
+0
+  9
+$CELTYPE
+  6
+ByLayer
+  9
+$CECOLOR
+ 62
+256
+  9
+$DIMSCALE
+ 40
+1.0
+  9
+$DIMASZ
+ 40
+2.5
+  9
+$DIMEXO
+ 40
+0.625
+  9
+$DIMDLI
+ 40
+3.75
+  9
+$DIMRND
+ 40
+0.0
+  9
+$DIMDLE
+ 40
+0.0
+  9
+$DIMEXE
+ 40
+1.25
+  9
+$DIMTP
+ 40
+0.0
+  9
+$DIMTM
+ 40
+0.0
+  9
+$DIMTXT
+ 40
+2.5
+  9
+$DIMCEN
+ 40
+2.5
+  9
+$DIMTSZ
+ 40
+0.0
+  9
+$DIMTOL
+ 70
+0
+  9
+$DIMLIM
+ 70
+0
+  9
+$DIMTIH
+ 70
+0
+  9
+$DIMTOH
+ 70
+0
+  9
+$DIMSE1
+ 70
+0
+  9
+$DIMSE2
+ 70
+0
+  9
+$DIMTAD
+ 70
+1
+  9
+$DIMZIN
+ 70
+8
+  9
+$DIMBLK
+  1
+
+  9
+$DIMASO
+ 70
+1
+  9
+$DIMSHO
+ 70
+1
+  9
+$DIMPOST
+  1
+
+  9
+$DIMAPOST
+  1
+
+  9
+$DIMALT
+ 70
+0
+  9
+$DIMALTD
+ 70
+3
+  9
+$DIMALTF
+ 40
+0.03937007874
+  9
+$DIMLFAC
+ 40
+1.0
+  9
+$DIMTOFL
+ 70
+1
+  9
+$DIMTVP
+ 40
+0.0
+  9
+$DIMTIX
+ 70
+0
+  9
+$DIMSOXD
+ 70
+0
+  9
+$DIMSAH
+ 70
+0
+  9
+$DIMBLK1
+  1
+
+  9
+$DIMBLK2
+  1
+
+  9
+$DIMSTYLE
+  2
+ISO-25
+  9
+$DIMCLRD
+ 70
+0
+  9
+$DIMCLRE
+ 70
+0
+  9
+$DIMCLRT
+ 70
+0
+  9
+$DIMTFAC
+ 40
+1.0
+  9
+$DIMGAP
+ 40
+0.625
+  9
+$COORDS
+ 70
+1
+  9
+$ATTDIA
+ 70
+0
+  9
+$ATTREQ
+ 70
+1
+  9
+$HANDLING
+ 70
+1
+  9
+$LUNITS
+ 70
+2
+  9
+$LUPREC
+ 70
+4
+  9
+$SKETCHINC
+ 40
+1.0
+  9
+$FILLETRAD
+ 40
+10.0
+  9
+$AUNITS
+ 70
+0
+  9
+$AUPREC
+ 70
+2
+  9
+$MENU
+  1
+.
+  9
+$ELEVATION
+ 40
+0.0
+  9
+$PELEVATION
+ 40
+0.0
+  9
+$THICKNESS
+ 40
+0.0
+  9
+$LIMCHECK
+ 70
+0
+  9
+$CHAMFERA
+ 40
+0.0
+  9
+$CHAMFERB
+ 40
+0.0
+  9
+$SKPOLY
+ 70
+0
+  9
+$TDCREATE
+ 40
+2461261.503599537
+  9
+$TDUPDATE
+ 40
+2461261.503599537
+  9
+$TDINDWG
+ 40
+0.0
+  9
+$TDUSRTIMER
+ 40
+0.0
+  9
+$USRTIMER
+ 70
+1
+  9
+$ANGBASE
+ 50
+0.0
+  9
+$ANGDIR
+ 70
+0
+  9
+$PDMODE
+ 70
+0
+  9
+$PDSIZE
+ 40
+0.0
+  9
+$PLINEWID
+ 40
+0.0
+  9
+$SPLFRAME
+ 70
+0
+  9
+$SPLINETYPE
+ 70
+6
+  9
+$SPLINESEGS
+ 70
+8
+  9
+$HANDSEED
+  5
+@@HANDSEED@@
+  9
+$SURFTAB1
+ 70
+6
+  9
+$SURFTAB2
+ 70
+6
+  9
+$SURFTYPE
+ 70
+6
+  9
+$SURFU
+ 70
+6
+  9
+$SURFV
+ 70
+6
+  9
+$UCSNAME
+  2
+
+  9
+$UCSORG
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSXDIR
+ 10
+1.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSYDIR
+ 10
+0.0
+ 20
+1.0
+ 30
+0.0
+  9
+$PUCSNAME
+  2
+
+  9
+$PUCSORG
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSXDIR
+ 10
+1.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSYDIR
+ 10
+0.0
+ 20
+1.0
+ 30
+0.0
+  9
+$USERI1
+ 70
+0
+  9
+$USERI2
+ 70
+0
+  9
+$USERI3
+ 70
+0
+  9
+$USERI4
+ 70
+0
+  9
+$USERI5
+ 70
+0
+  9
+$USERR1
+ 40
+0.0
+  9
+$USERR2
+ 40
+0.0
+  9
+$USERR3
+ 40
+0.0
+  9
+$USERR4
+ 40
+0.0
+  9
+$USERR5
+ 40
+0.0
+  9
+$WORLDVIEW
+ 70
+1
+  9
+$SHADEDGE
+ 70
+3
+  9
+$SHADEDIF
+ 70
+70
+  9
+$TILEMODE
+ 70
+1
+  9
+$MAXACTVP
+ 70
+64
+  9
+$PLIMCHECK
+ 70
+0
+  9
+$PEXTMIN
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PEXTMAX
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PLIMMIN
+ 10
+0.0
+ 20
+0.0
+  9
+$PLIMMAX
+ 10
+420.0
+ 20
+297.0
+  9
+$UNITMODE
+ 70
+0
+  9
+$VISRETAIN
+ 70
+1
+  9
+$PLINEGEN
+ 70
+0
+  9
+$PSLTSCALE
+ 70
+1
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+VPORT
+ 70
+1
+  0
+VPORT
+  5
+23
+  2
+*Active
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 11
+1.0
+ 21
+1.0
+ 12
+0.0
+ 22
+0.0
+ 13
+0.0
+ 23
+0.0
+ 14
+0.5
+ 24
+0.5
+ 15
+0.5
+ 25
+0.5
+ 16
+0.0
+ 26
+0.0
+ 36
+1.0
+ 17
+0.0
+ 27
+0.0
+ 37
+0.0
+ 40
+1000.0
+ 41
+1.34
+ 42
+50.0
+ 43
+0.0
+ 44
+0.0
+ 50
+0.0
+ 51
+0.0
+ 71
+0
+ 72
+1000
+ 73
+1
+ 74
+3
+ 75
+0
+ 76
+0
+ 77
+0
+ 78
+0
+  0
+ENDTAB
+  0
+TABLE
+  2
+LTYPE
+ 70
+3
+  0
+LTYPE
+  5
+24
+  2
+ByBlock
+ 70
+0
+  3
+
+ 72
+65
+ 73
+0
+ 40
+0.0
+  0
+LTYPE
+  5
+25
+  2
+ByLayer
+ 70
+0
+  3
+
+ 72
+65
+ 73
+0
+ 40
+0.0
+  0
+LTYPE
+  5
+26
+  2
+Continuous
+ 70
+0
+  3
+
+ 72
+65
+ 73
+0
+ 40
+0.0
+  0
+ENDTAB
+  0
+TABLE
+  2
+LAYER
+ 70
+2
+  0
+LAYER
+  5
+27
+  2
+0
+ 70
+0
+ 62
+7
+  6
+Continuous
+  0
+LAYER
+  5
+28
+  2
+Defpoints
+ 70
+0
+ 62
+7
+  6
+Continuous
+  0
+ENDTAB
+  0
+TABLE
+  2
+STYLE
+ 70
+1
+  0
+STYLE
+  5
+29
+  2
+Standard
+ 70
+0
+ 40
+0.0
+ 41
+1.0
+ 50
+0.0
+ 71
+0
+ 42
+2.5
+  3
+txt
+  4
+
+  0
+ENDTAB
+  0
+TABLE
+  2
+VIEW
+ 70
+0
+  0
+ENDTAB
+  0
+TABLE
+  2
+UCS
+ 70
+0
+  0
+ENDTAB
+  0
+TABLE
+  2
+APPID
+ 70
+3
+  0
+APPID
+  5
+2A
+  2
+ACAD
+ 70
+0
+  0
+APPID
+  5
+2D
+  2
+HATCHBACKGROUNDCOLOR
+ 70
+0
+  0
+APPID
+  5
+2E
+  2
+EZDXF
+ 70
+0
+  0
+ENDTAB
+  0
+TABLE
+  2
+DIMSTYLE
+ 70
+1
+  0
+DIMSTYLE
+105
+2B
+  2
+Standard
+ 70
+0
+  3
+
+  4
+
+  5
+
+  6
+
+  7
+
+ 40
+1.0
+ 41
+2.5
+ 42
+0.625
+ 43
+3.75
+ 44
+1.25
+ 45
+0.0
+ 46
+0.0
+ 47
+0.0
+ 48
+0.0
+140
+2.5
+141
+2.5
+142
+0.0
+143
+0.03937007874
+144
+1.0
+145
+0.0
+146
+1.0
+147
+0.625
+ 71
+0
+ 72
+0
+ 73
+0
+ 74
+0
+ 75
+0
+ 76
+0
+ 77
+1
+ 78
+8
+170
+0
+171
+3
+172
+1
+173
+0
+174
+0
+175
+0
+176
+0
+177
+0
+178
+0
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+BLOCKS
+  0
+BLOCK
+  5
+18
+  8
+0
+  2
+$Model_Space
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+$Model_Space
+  1
+
+1001
+EZDXF
+1000
+CREATED_BY_EZDXF
+1000
+1.4.4 @ 2026-08-08T05:05:11.425470+00:00
+1000
+WRITTEN_BY_EZDXF
+1000
+1.4.4 @ 2026-08-08T05:05:11.426195+00:00
+  0
+ENDBLK
+  5
+19
+  8
+0
+  0
+BLOCK
+  5
+1C
+  8
+0
+  2
+$Paper_Space
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+$Paper_Space
+  1
+
+  0
+ENDBLK
+  5
+1D
+  8
+0
+  0
+ENDSEC
+`;
+
+function buildDXF12() {
+  const W = pCanvas.width, H = pCanvas.height;
+  const wW = workWmm();
+  const sc = wW / W;
+  const f = v => (Math.round(v * 1e6) / 1e6).toFixed(6);   // plain decimal, never 1e+20
+  // Group codes are right-justified in a 3-character field. That is what
+  // AutoCAD's own writer emits, and mixing padded header lines with unpadded
+  // entity lines gave a file whose two halves were formatted differently.
+  const g = (code, val) => `${String(code).padStart(3)}\n${val}\n`;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const track = (x, y, r = 0) => {
+    if (x - r < minX) minX = x - r; if (x + r > maxX) maxX = x + r;
+    if (y - r < minY) minY = y - r; if (y + r > maxY) maxY = y + r;
+  };
+
+  const rot = S.patRot || 0;
+  // Collected as chunks, not one growing string. At 200,000 entities the old
+  // `ents += ...` built a 16 MB string by repeated reallocation, which is both
+  // slow and a memory spike right before the Blob is created.
+  const ents = [];
+
+  // The skeleton's header sets $HANDLING = 1 and every table entry carries a
+  // code-5 handle, which tells AutoCAD this drawing uses handles — so every
+  // entity must have one too. Omitting them is what produced
+  //   "No database handle specified for object on line NNNN"
+  // followed by the whole drawing being discarded. Table handles run to ~0x2E,
+  // so entity handles start well clear at 0x100.
+  let _hnd = 0x100;
+  const nh = () => (_hnd++).toString(16).toUpperCase();
+
+  const polyline = pts => {
+    // getShapePoints() repeats the first point at the end so the canvas can
+    // stroke a closed outline. In a POLYLINE flagged closed (70=1) that repeat
+    // is a zero-length segment — harmless on screen, but it makes CAM emit a
+    // redundant move, so drop it.
+    if (pts.length > 2) {
+      const a = pts[0], b = pts[pts.length-1];
+      if (Math.abs(a[0]-b[0]) < 1e-9 && Math.abs(a[1]-b[1]) < 1e-9) pts = pts.slice(0, -1);
+    }
+    if (pts.length < 2) return '';
+    // 10/20/30 on the POLYLINE header is the mandatory "dummy" point — it was
+    // missing in the first version. 70=1 marks the polyline closed.
+    let s = g(0,'POLYLINE') + g(5,nh()) + g(8,'0') + g(66,'1') +
+            g(10,'0.0') + g(20,'0.0') + g(30,'0.0') + g(70,'1');
+    for (const [x, y] of pts) {
+      track(x, y);
+      s += g(0,'VERTEX') + g(5,nh()) + g(8,'0') +
+           g(10,f(x)) + g(20,f(y)) + g(30,'0.0') + g(70,'0');
+    }
+    return s + g(0,'SEQEND') + g(5,nh()) + g(8,'0');
+  };
+
+  if (S.pattern === 'imgshape' && IMGSHAPE.normPaths && IMGSHAPE.normPaths.length) {
+    const cosR = Math.cos(rot*Math.PI/180), sinR = Math.sin(rot*Math.PI/180);
+    for (const s of S.shapes) {
+      const cxm = s.x*sc, cym = (H - s.y)*sc, rr = s.r*sc;
+      for (const path of IMGSHAPE.normPaths) {
+        if (!path || path.length < 2) continue;
+        ents.push(polyline(path.map(p => [
+          cxm + (p.x*cosR - p.y*sinR)*rr,
+          cym - (p.x*sinR + p.y*cosR)*rr     // canvas Y is down, DXF Y is up
+        ])));
+      }
+    }
+  } else if (S.pattern === 'circle' || S.pattern === 'dot') {
+    for (const s of S.shapes) {
+      const x = s.x*sc, y = (H - s.y)*sc, r = s.r*sc;
+      if (!(r > 0)) continue;                       // AutoCAD rejects a zero-radius circle
+      track(x, y, r);
+      ents.push(g(0,'CIRCLE') + g(5,nh()) + g(8,'0') + g(10,f(x)) + g(20,f(y)) + g(30,'0.0') + g(40,f(r)));
+    }
+  } else {
+    for (const s of S.shapes) {
+      const pts = getShapePoints(s.x, s.y, s.r, S.pattern, rot);
+      if (!pts || pts.length < 2) continue;
+      ents.push(polyline(pts.map(p => [p[0]*sc, (H - p[1])*sc])));
+    }
+  }
+
+  if (!isFinite(minX)) { minX = minY = 0; maxX = wW; maxY = workHmm(); }
+
+  const head = DXF12_SKELETON
+    .replace('@@EXTMIN0@@', f(minX)).replace('@@EXTMIN1@@', f(minY)).replace('@@EXTMIN2@@', '0.0')
+    .replace('@@EXTMAX0@@', f(maxX)).replace('@@EXTMAX1@@', f(maxY)).replace('@@EXTMAX2@@', '0.0')
+    .replace('@@LIMMIN0@@', '0.0').replace('@@LIMMIN1@@', '0.0')
+    .replace('@@LIMMAX0@@', f(wW)).replace('@@LIMMAX1@@', f(workHmm()))
+    // $HANDSEED must sit ABOVE every handle used, it is the next free one
+    .replace('@@HANDSEED@@', _hnd.toString(16).toUpperCase());
+
+  return head +
+         g(0,'SECTION') + g(2,'ENTITIES') + ents.join('') + g(0,'ENDSEC') +
+         g(0,'EOF');
+}
+
 function buildDXF() {
   const W = pCanvas.width, H = pCanvas.height;
   const wW = workWmm();
@@ -6578,7 +8135,7 @@ function buildDXF() {
   // Pre-compute imgshape representation (once, reused for all instances)
   let _ishArcs = null;
   if (S.pattern === 'imgshape' && IMGSHAPE.normPaths && IMGSHAPE.normPaths.length) {
-    const rot    = (parseInt($('shRot').value) || 0) * Math.PI / 180;
+    const rot    = ((parseInt($('shRot').value) || 0) + (S.patRot || 0)) * Math.PI / 180;
     const isCont = !!IMGSHAPE.isContour;
 
     if (isCont && IMGSHAPE.normPaths[0]) {
@@ -6977,10 +8534,41 @@ $('expAI').addEventListener('click', () => {
   status2('✅ AI-compatible SVG exported');
 });
 
+// A DXF is one entity per shape, so the shape count decides whether any CAD
+// package can actually open the result. AutoCAD LT starts struggling well
+// before 100k; 200k circles is a ~16 MB file that will hang it. Say so before
+// spending a minute writing a file that cannot be used.
+function _confirmHugeExport(kind) {
+  const n = S.shapes.length;
+  const est = n * 82;
+  // Opened straight off the disk, Chrome turns off the File System Access API,
+  // so saving falls back to a blob download — and a large blob download from a
+  // file:// page is exactly the case Chrome drops on the floor, leaving a
+  // 0-byte file behind with no error anywhere. Say so up front.
+  const viaFile = location.protocol === 'file:' && !FILESAVE.supported();
+  if (n <= 50000 && !(viaFile && est > 4e6)) return true;
+  return confirm(
+    `ลายนี้มี ${n.toLocaleString()} รูป → ไฟล์ ${kind} ประมาณ ${_fmtBytes(est)}\n\n` +
+    (viaFile
+      ? `⚠ หน้านี้เปิดจากไฟล์ในเครื่องโดยตรง (file://) เบราว์เซอร์จึงบันทึกไฟล์ใหญ่ไม่ได้\n` +
+        `   มักได้ไฟล์ขนาด 0 ไบต์โดยไม่แจ้งเตือน — นี่คือสาเหตุที่ AutoCAD เปิดไม่ได้\n\n`
+      : '') +
+    `AutoCAD และ CAM ส่วนใหญ่เปิดไฟล์ขนาดนี้ไม่ไหวอยู่แล้ว\n` +
+    `แนะนำ: เพิ่มค่า Spacing ให้เหลือไม่เกิน ~20,000 รูป แล้วส่งออกใหม่\n\n` +
+    `ต้องการส่งออกต่อไปหรือไม่?`);
+}
+
 $('expDXF').addEventListener('click', () => {
   if (!requireShapes()) return;
-  download('cnc-pattern.dxf', buildDXF(), 'application/dxf');
-  status2('✅ DXF exported');
+  if (!_confirmHugeExport('DXF')) { status2('ยกเลิกการส่งออก'); return; }
+  // R12 by default — the widest-compatibility flavour, and the one AutoCAD
+  // actually accepts. The AC1015 writer stays available on the button below.
+  download('cnc-pattern.dxf', buildDXF12(), 'application/dxf');
+});
+const _expDxf2000 = $('expDXF2000');
+if (_expDxf2000) _expDxf2000.addEventListener('click', () => {
+  if (!requireShapes()) return;
+  download('cnc-pattern-2000.dxf', buildDXF(), 'application/dxf');
 });
 
 $('expPNG').addEventListener('click', () => {
@@ -7117,6 +8705,12 @@ function status2(msg) {
 // dialog instead of dumping into the Downloads folder. Browsers that don't
 // implement it (Firefox, Safari, and any non-secure origin) fall back to the
 // classic anchor download — the file still saves, the OS just picks where.
+function _fmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n/1024).toFixed(1) + ' KB';
+  return (n/1048576).toFixed(1) + ' MB';
+}
+
 const FILESAVE = {
   _dirHandle: null,
 
@@ -7172,10 +8766,23 @@ const FILESAVE = {
       if (handle) {
         try {
           const blob = await toBlob();
+          if (!blob.size) { status2('❌ ไม่มีข้อมูลให้บันทึก (ไฟล์จะว่าง) — ยกเลิกแล้ว'); return false; }
           const w = await handle.createWritable();
           await w.write(blob);
           await w.close();
-          status2('✅ บันทึกแล้ว: ' + (handle.name || name));
+          // Read the file back. The picker truncates the target the moment the
+          // user confirms, so a failed or half-finished write leaves a 0-byte
+          // file behind — which is exactly what "Invalid or incomplete DXF
+          // input" looks like from the CAD side. Never claim success blindly.
+          try {
+            const check = await handle.getFile();
+            if (check.size !== blob.size) {
+              status2(`❌ เขียนไฟล์ไม่ครบ: ได้ ${check.size.toLocaleString()} จาก ` +
+                      `${blob.size.toLocaleString()} ไบต์ — ไฟล์ใช้ไม่ได้ กรุณาลองใหม่`);
+              return false;
+            }
+          } catch (e) { /* verification unsupported — fall through */ }
+          status2(`✅ บันทึกแล้ว: ${handle.name || name} (${_fmtBytes(blob.size)})`);
           return true;
         } catch (e) {
           status2('❌ บันทึกไม่สำเร็จ: ' + e.message);
@@ -7187,13 +8794,24 @@ const FILESAVE = {
     // ── Fallback: classic download ──
     try {
       const blob = await toBlob();
+      if (!blob.size) { status2('❌ ไม่มีข้อมูลให้บันทึก (ไฟล์จะว่าง) — ยกเลิกแล้ว'); return false; }
       const url = URL.createObjectURL(blob);
       const a = Object.assign(document.createElement('a'), { href: url, download: name });
       document.body.appendChild(a);
       a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
-      status2('✅ บันทึกแล้ว: ' + name);
+      // Keep the anchor and the blob URL alive well past the click. Removing
+      // them immediately can abort a large download before the browser has
+      // finished reading the blob.
+      setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
+      // No way to read the result back on this path, so never claim more than
+      // "handed to the browser" — and on file:// with a big blob, say plainly
+      // that the download can come out empty.
+      if (location.protocol === 'file:' && blob.size > 4e6) {
+        status2(`⚠ ส่งไฟล์ ${_fmtBytes(blob.size)} ให้เบราว์เซอร์แล้ว — ` +
+                `เปิดจาก file:// ไฟล์ใหญ่อาจได้ 0 ไบต์ กรุณาเช็คขนาดไฟล์ก่อนใช้`);
+      } else {
+        status2(`✅ บันทึกแล้ว: ${name} (${_fmtBytes(blob.size)})`);
+      }
       return true;
     } catch (e) {
       status2('❌ บันทึกไม่สำเร็จ: ' + e.message);
@@ -7535,7 +9153,9 @@ let _ishStamp = null, _ishStampKey = '';
 function _rebuildImgshapeStamp() {
   const np = IMGSHAPE.normPaths;
   if (!np || !np.length) { _ishStamp = null; return; }
-  const rot    = (parseInt($('shRot').value) || 0) * Math.PI / 180;
+  // Two rotations stack: the Shape Image panel's own dial, plus the global
+  // "หมุนรูปทรง" slider, which previously had no effect on image shapes at all.
+  const rot    = ((parseInt($('shRot').value) || 0) + (S.patRot || 0)) * Math.PI / 180;
   const fg     = S.darkBg ? '#ffffff' : '#000000';
   const key    = `${IMGSHAPE.version}|${rot.toFixed(4)}|${S.fill ? 1 : 0}|${fg}`;
   if (_ishStamp && _ishStampKey === key) return; // already current — skip rebuild
@@ -8425,11 +10045,25 @@ const GCHECK = {
         if (x - r < minX) minX = x - r; if (x + r > maxX) maxX = x + r;
         if (y - r < minY) minY = y - r; if (y + r > maxY) maxY = y + r;
       }
+      // Two different failures share this boundary, and conflating them makes
+      // the report useless: a shape whose CENTRE sits outside the work area is
+      // a genuine mistake, whereas a halftone field that bleeds a tool-radius
+      // past the edge is normal and only worth a warning.
+      let cMinX = Infinity, cMinY = Infinity, cMaxX = -Infinity, cMaxY = -Infinity;
+      for (const s of S.shapes) {
+        const x = s.x * sc, y = (H - s.y) * sc;
+        if (x < cMinX) cMinX = x; if (x > cMaxX) cMaxX = x;
+        if (y < cMinY) cMinY = y; if (y > cMaxY) cMaxY = y;
+      }
       const tol = 0.01;
-      if (minX < -tol || minY < -tol || maxX > wW + tol || maxY > wH + tol) {
-        add('error', 'เส้นทางออกนอกพื้นที่ทำงาน',
-            `ขอบเขตลาย ${minX.toFixed(1)}…${maxX.toFixed(1)} × ${minY.toFixed(1)}…${maxY.toFixed(1)} mm ` +
+      const overhang = Math.max(0, -minX, -minY, maxX - wW, maxY - wH);
+      if (cMinX < -tol || cMinY < -tol || cMaxX > wW + tol || cMaxY > wH + tol) {
+        add('error', 'มีรูปอยู่นอกพื้นที่ทำงาน',
+            `จุดศูนย์กลางอยู่ที่ ${cMinX.toFixed(1)}…${cMaxX.toFixed(1)} × ${cMinY.toFixed(1)}…${cMaxY.toFixed(1)} mm ` +
             `เทียบกับพื้นที่ 0…${wW.toFixed(1)} × 0…${wH.toFixed(1)} mm`);
+      } else if (overhang > tol) {
+        add('warn', `ขอบลายล้นออกนอกพื้นที่ ${overhang.toFixed(2)} mm`,
+            `รวมรัศมีดอก Ø${toolDia} mm แล้ว — ปกติสำหรับลายที่ชนขอบ แต่ต้องเผื่อวัสดุอย่างน้อยเท่านี้`);
       } else {
         add('ok', 'เส้นทางอยู่ในพื้นที่ทำงานทั้งหมด',
             `${maxX.toFixed(1)} × ${maxY.toFixed(1)} mm ภายใน ${wW.toFixed(1)} × ${wH.toFixed(1)} mm`);
@@ -8620,12 +10254,17 @@ const PROJECT = {
   KEY: 'cncpat.autosave.v2',
   MAX_LS_BYTES: 4_000_000,
   restoring: false,
+  // Set just before a deliberate wipe. location.reload() fires beforeunload,
+  // which used to run autosave() and write the very state we had just deleted
+  // straight back into storage — making the reset button a no-op.
+  suppressed: false,
   _saveTimer: null,
 
   // Toggle buttons carry their state in a CSS class, not a form value
   TOGGLES: {
     togInvert: 'invert', togFill: 'fill', togDarkBg: 'darkBg',
-    togQuantRandom: 'quantRandom', togMixLayer: 'mixEnabled'
+    togQuantRandom: 'quantRandom', togMixLayer: 'mixEnabled',
+    togSkipBlank: 'skipBlank'
   },
 
   collect(withImages = true) {
@@ -8645,6 +10284,9 @@ const PROJECT = {
       v: 2, savedAt: new Date().toISOString(),
       ctrls, toggles, panels,
       pattern: S.pattern, mixPat: S.mixPat,
+      // imgAspect is derived from the loaded image, so without saving it the
+      // aspect lock falls back to 1:1 on reload and squares the work area.
+      aspectLocked: S.aspectLocked, imgAspect: S.imgAspect,
       shapeMode: IMGSHAPE.mode, traceMode: IMGSHAPE.traceMode,
       profToolType, acToolTypeVal
     };
@@ -8655,16 +10297,26 @@ const PROJECT = {
     return st;
   },
 
-  apply(st) {
+  // Fields the automatic session restore deliberately leaves alone. The work
+  // size belongs to the image that is loaded, and the diameter list is a
+  // per-job choice — carrying either across sessions means a bad value sticks
+  // forever with no obvious way to get rid of it. Opening a saved .cncproj
+  // file DOES restore them, because that is an explicit request.
+  VOLATILE: ['workW', 'workH', 'quantSizes'],
+
+  apply(st, opts) {
     if (!st || !st.ctrls) return false;
+    const skip = (opts && opts.skipVolatile) ? this.VOLATILE : [];
     this.restoring = true;
     try {
       for (const [id, val] of Object.entries(st.ctrls)) {
+        if (skip.includes(id)) continue;
         const el = $(id); if (!el || el.type === 'file') continue;
         if (el.type === 'checkbox') el.checked = !!val; else el.value = val;
       }
       // Fire events once per control so every existing handler syncs S
       for (const id of Object.keys(st.ctrls)) {
+        if (skip.includes(id)) continue;
         const el = $(id); if (!el || el.type === 'file') continue;
         el.dispatchEvent(new Event('input',  { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -8676,6 +10328,12 @@ const PROJECT = {
       }
       for (const [id, closed] of Object.entries(st.panels || {})) {
         const el = $(id); if (el) el.classList.toggle('closed', !!closed);
+      }
+      if (typeof st.imgAspect === 'number' && st.imgAspect > 0) S.imgAspect = st.imgAspect;
+      if (typeof st.aspectLocked === 'boolean') {
+        S.aspectLocked = st.aspectLocked;
+        const lk = $('aspectLock');
+        if (lk) { lk.classList.toggle('locked', S.aspectLocked); lk.textContent = S.aspectLocked ? '🔒' : '🔓'; }
       }
       if (st.pattern) {
         const b = document.querySelector(`#patternGrid [data-pat="${st.pattern}"]`);
@@ -8717,7 +10375,7 @@ const PROJECT = {
   },
 
   markDirty() {
-    if (this.restoring) return;
+    if (this.restoring || this.suppressed) return;
     const ind = $('autosaveInd');
     if (ind) { ind.textContent = 'กำลังบันทึก…'; ind.className = 'autosave-ind saving'; }
     clearTimeout(this._saveTimer);
@@ -8725,6 +10383,7 @@ const PROJECT = {
   },
 
   autosave() {
+    if (this.suppressed) return;
     const ind = $('autosaveInd');
     try {
       let st = this.collect(true);
@@ -8751,7 +10410,7 @@ const PROJECT = {
     if (!raw) return false;
     try {
       const st = JSON.parse(raw);
-      const ok = this.apply(st);
+      const ok = this.apply(st, { skipVolatile: true });
       if (ok) {
         const when = st.savedAt ? new Date(st.savedAt).toLocaleString('th-TH') : '';
         status2(`↩ กู้คืนงานล่าสุดแล้ว${when ? ' (' + when + ')' : ''}`);
@@ -8915,6 +10574,21 @@ const HISTORY = {
     });
 
     // ── Project save / load ──
+    // Escape hatch: the autosave restores the previous session, which is
+    // usually what you want — but not when that session ended in a state you
+    // no longer want (a huge work area, an odd pattern). Without this the only
+    // way out is clearing site data in the browser settings.
+    $('btnResetAll').addEventListener('click', () => {
+      if (!confirm('ล้างค่าที่จำไว้ทั้งหมด แล้วเริ่มใหม่จากค่าเริ่มต้น?\n\n' +
+                   'รูปที่โหลดไว้และค่าที่ตั้งไว้จะหายทั้งหมด\n' +
+                   '(บันทึกโปรเจกต์เป็นไฟล์ไว้ก่อนได้ด้วยปุ่มรูปแผ่นดิสก์)')) return;
+      PROJECT.suppressed = true;              // stop beforeunload re-saving it
+      clearTimeout(PROJECT._saveTimer);
+      PROJECT.clear();
+      try { localStorage.removeItem(PRESETS.CUSTOM_KEY); } catch (e) {}
+      location.reload();
+    });
+
     $('btnSaveProj').addEventListener('click', () => PROJECT.saveFile());
     $('btnLoadProj').addEventListener('click', () => $('projFileInput').click());
     $('projFileInput').addEventListener('change', e => {
@@ -8935,6 +10609,38 @@ const HISTORY = {
         PROJECT.markDirty(); HISTORY.schedule();
       }
     }, true);
+
+    // Entering a tool diameter proposes a matching spacing, once. Debounced
+    // so typing "12" doesn't fire on the intermediate "1", and skipped while a
+    // saved project is being restored.
+    // Starts as null, not the field's boot value, so the very first edit always
+    // fires — otherwise someone whose bit really is the default 3 mm would type
+    // "3", see nothing happen, and conclude the feature is broken.
+    let _toolTimer = null, _lastTool = null;
+    $('toolDia').addEventListener('input', () => {
+      if (PROJECT.restoring) return;
+      clearTimeout(_toolTimer);
+      _toolTimer = setTimeout(() => {
+        const v = $('toolDia').value;
+        if (v === _lastTool) return;
+        _lastTool = v;
+        suggestSpacingFromTool();
+      }, 500);
+    });
+
+    // Refresh the "which sizes are actually used" note as the list is typed,
+    // not only after a re-render — otherwise it sits there showing stale sizes.
+    const _qs = $('quantSizes');
+    if (_qs) _qs.addEventListener('input', () => {
+      if (typeof updateQuantNote === 'function') updateQuantNote();
+    });
+
+    updatePatRotState();
+    ['workW','workH','units','nSpacing','rSpacing'].forEach(id => {
+      const el = $(id);
+      if (el) el.addEventListener('input', () => updateSpacingNote());
+    });
+    updateSpacingNote();
 
     // ── Restore last session, then seed the history baseline ──
     const restored = PROJECT.restore();
