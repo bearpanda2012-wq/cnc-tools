@@ -469,6 +469,49 @@ pre.gcode-content {
   font-family: ui-monospace, Menlo, Consolas, monospace;
 }
 
+/* ══ Design / CNC mode switch ══ */
+.mode-switch {
+  display: flex; gap: 4px; padding: 4px;
+  background: #141416; border: 1px solid #2a2a2a; border-radius: 9px;
+  position: sticky; top: -12px; z-index: 5; margin-bottom: 2px;
+}
+.mode-btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: transparent; border: none; border-radius: 7px;
+  color: #8e8e94; font-size: 11px; font-weight: 700; font-family: inherit;
+  padding: 8px 6px; cursor: pointer; transition: background .12s, color .12s;
+}
+.mode-btn:hover { color: #d4d4da; }
+.mode-btn.active { background: #0a7aff; color: #fff; }
+.mode-btn .ic { width: 14px; height: 14px; }
+
+/* !important so it wins over the inline display the pattern picker sets on
+   the shape/line/text panels — a panel hidden by mode must stay hidden. */
+.restore-bar  { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:9000;
+                display:flex; align-items:center; gap:10px; padding:10px 12px;
+                background:#1b1d23; border:1px solid #34363f; border-radius:10px;
+                box-shadow:0 10px 30px rgba(0,0,0,.55); max-width:min(92vw,620px); }
+.restore-txt  { display:flex; flex-direction:column; line-height:1.35; margin-right:4px; }
+.restore-txt b    { font-size:12.5px; color:#e8e9ee; font-weight:600; }
+.restore-txt span { font-size:11px; color:#8e8e94; }
+.restore-bar button { padding:7px 12px; font-size:12px; border-radius:7px; cursor:pointer;
+                      white-space:nowrap; border:1px solid #34363f; }
+.restore-yes  { background:#2563eb; color:#fff; border-color:#2563eb !important; font-weight:600; }
+.restore-yes:hover { background:#1d4ed8; }
+.restore-no   { background:#24262d; color:#c9cad1; }
+.restore-no:hover  { background:#2e3038; color:#fff; }
+.cnc-size-box   { background:#15161a; border:1px solid #2c2e36; border-radius:8px;
+                  padding:9px 10px; margin-top:8px; }
+.cnc-size-row   { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.cnc-size-lbl   { font-size:11px; color:#8e8e94; letter-spacing:.3px; }
+.cnc-size-val   { font-size:15px; font-weight:700; color:#4da3ff; font-variant-numeric:tabular-nums; }
+.cnc-size-sub   { font-size:10.5px; color:#8e8e94; margin-top:3px; line-height:1.45; }
+.cnc-size-btn   { width:100%; margin-top:8px; padding:5px 8px; font-size:11px; cursor:pointer;
+                  background:#22242b; color:#c9cad1; border:1px solid #33353e; border-radius:6px; }
+.cnc-size-btn:hover { background:#2b2e37; color:#fff; border-color:#4da3ff; }
+.sidebar.mode-design [data-mode="cnc"]    { display: none !important; }
+.sidebar.mode-cnc    [data-mode="design"] { display: none !important; }
+
 /* ══ Preset library ══ */
 .preset-row { display: flex; gap: 5px; margin-bottom: 6px; }
 .preset-row select { flex: 1; min-width: 0; font-size: 10px; padding: 4px 6px; }
@@ -610,10 +653,23 @@ pre.gcode-content {
 <div class="app-body">
 
   <!-- ═══ SIDEBAR ═══ -->
-  <div class="sidebar">
+  <div class="sidebar mode-design">
 
-    <!-- Image Upload -->
-    <div class="panel">
+    <!-- Two jobs, two toolsets: deciding what the artwork looks like, and
+         deciding how the machine cuts it. Mixing them in one 17-panel column
+         made both harder to find. -->
+    <div class="mode-switch" role="tablist">
+      <button id="modeDesign" class="mode-btn active" role="tab" onclick="setMode('design')">
+        <svg class="ic"><use href="#i-pen"/></svg> ออกแบบลาย
+      </button>
+      <button id="modeCnc" class="mode-btn" role="tab" onclick="setMode('cnc')">
+        <svg class="ic"><use href="#i-cpu"/></svg> งาน CNC
+      </button>
+    </div>
+
+
+        <!-- Image Upload -->
+    <div class="panel" data-mode="design">
       <div class="panel-title"><svg class="ic"><use href="#i-image"/></svg> รูปภาพ (Image Source)</div>
       <div class="upload-area" id="uploadArea">
         <div class="upload-icon"><svg class="ic ic-lg"><use href="#i-image"/></svg></div>
@@ -632,6 +688,7 @@ pre.gcode-content {
       <div style="display:flex;align-items:center;gap:6px;margin-top:7px">
         <span style="font-size:10px;color:#666;white-space:nowrap">ความละเอียด DPI:</span>
         <select id="dpiPreset" style="flex:1;font-size:10px;padding:3px 6px">
+          <option value="file">ตามขนาดในไฟล์</option>
           <option value="96">Screen 96 dpi</option>
           <option value="150">Medium 150 dpi</option>
           <option value="300" selected>Print 300 dpi</option>
@@ -644,7 +701,35 @@ pre.gcode-content {
     </div>
 
     <!-- Pattern Type -->
-    <div class="panel">
+    <!-- ══ Size & units — a DESIGN decision: it defines how big the artwork is,
+         not how the machine cuts it. Lives on the design side. ══ -->
+    <div class="panel" data-mode="design">
+      <div class="panel-title"><svg class="ic"><use href="#i-ruler"/></svg> ขนาดงาน &amp; หน่วย</div>
+      <div class="ctrl" style="margin-bottom:8px">
+        <div class="in-grp">
+          <label>หน่วย (Units)</label>
+          <select id="units">
+            <option value="mm">มิลลิเมตร (mm)</option>
+            <option value="cm">เซนติเมตร (cm)</option>
+            <option value="m">เมตร (m)</option>
+            <option value="inch">นิ้ว (inch)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Work size with aspect lock -->
+      <div class="worksize-row">
+        <div class="in-grp"><label>ขนาดงาน W</label>
+          <input type="number" class="num-in" id="workW" value="" placeholder="จากรูป" min="0.001" step="0.1">
+        </div>
+        <button class="aspect-btn locked" id="aspectLock" title="Lock aspect ratio">🔒</button>
+        <div class="in-grp"><label>ขนาดงาน H</label>
+          <input type="number" class="num-in" id="workH" value="" placeholder="จากรูป" min="0.001" step="0.1">
+        </div>
+      </div>
+    </div>
+
+<div class="panel" data-mode="design">
       <div class="panel-title"><svg class="ic"><use href="#i-grid"/></svg> รูปแบบ Pattern</div>
       <div class="pattern-grid" id="patternGrid">
         <button class="pat-btn active" data-pat="circle">
@@ -684,7 +769,7 @@ pre.gcode-content {
     </div>
 
     <!-- ImgShape upload (shown only when imgshape pattern selected) -->
-    <div class="panel" id="panImgShape" style="display:none">
+    <div class="panel" id="panImgShape" data-mode="design" style="display:none">
       <div class="panel-title"><svg class="ic"><use href="#i-pen"/></svg> รูปลาย (Shape Image)</div>
       <div style="padding:8px 10px 10px">
         <div id="shapeUploadArea" class="upload-area" style="padding:10px;min-height:60px"
@@ -759,7 +844,7 @@ pre.gcode-content {
     </div>
 
     <!-- Line Raster settings (shown when lineraster selected) -->
-    <div class="panel" id="panLineRaster" style="display:none">
+    <div class="panel" id="panLineRaster" data-mode="design" style="display:none">
       <div class="panel-title"><svg class="ic"><use href="#i-route"/></svg> ลายเส้น (Line Raster)</div>
       <div style="padding:8px 10px 10px">
         <div style="margin-bottom:6px">
@@ -802,7 +887,7 @@ pre.gcode-content {
     </div>
 
     <!-- Text Raster settings (shown when textraster selected) -->
-    <div class="panel" id="panTextRaster" style="display:none">
+    <div class="panel" id="panTextRaster" data-mode="design" style="display:none">
       <div class="panel-title"><svg class="ic"><use href="#i-grid"/></svg> ลาย Text (Text Raster)</div>
       <div style="padding:8px 10px 10px">
         <div style="margin-bottom:8px">
@@ -841,7 +926,7 @@ pre.gcode-content {
     </div>
 
     <!-- Mix Layer panel -->
-    <div class="panel collap-panel closed" id="panMixLayer">
+    <div class="panel collap-panel closed" id="panMixLayer" data-mode="design">
       <div class="panel-title" onclick="togglePanel('panMixLayer')"><svg class="ic"><use href="#i-layers"/></svg> ลายผสม (Mix Layer) <span class="collap-arrow">▾</span></div>
       <div class="collap-body" style="padding:0 0 4px">
         <div class="tog-row" style="margin-bottom:10px">
@@ -913,8 +998,9 @@ pre.gcode-content {
     </div>
 
     <!-- Pattern Settings -->
-    <div class="panel">
+    <div class="panel" data-mode="design">
       <div class="panel-title"><svg class="ic"><use href="#i-sliders"/></svg> ตั้งค่า Pattern</div>
+
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Spacing (ระยะห่าง)</span>
@@ -1009,29 +1095,21 @@ pre.gcode-content {
     </div>
 
     <!-- CNC Parameters -->
-    <div class="panel">
+    <div class="panel" data-mode="cnc">
       <div class="panel-title"><svg class="ic"><use href="#i-cpu"/></svg> ตั้งค่า CNC</div>
-      <div class="ctrl" style="margin-bottom:8px">
-        <div class="in-grp">
-          <label>หน่วย (Units)</label>
-          <select id="units">
-            <option value="mm">มิลลิเมตร (mm)</option>
-            <option value="cm">เซนติเมตร (cm)</option>
-            <option value="m">เมตร (m)</option>
-            <option value="inch">นิ้ว (inch)</option>
-          </select>
-        </div>
-      </div>
 
-      <!-- Work size with aspect lock -->
-      <div class="worksize-row">
-        <div class="in-grp"><label>ขนาดงาน W</label>
-          <input type="number" class="num-in" id="workW" value="" placeholder="จากรูป" min="0.001" step="0.1">
+      <!-- The work size lives on the design tab, but you need to SEE it while
+           setting up the cut. Read-only here so there is exactly one place it
+           can be edited; the button jumps back there. -->
+      <div class="cnc-size-box">
+        <div class="cnc-size-row">
+          <span class="cnc-size-lbl">ขนาดงาน</span>
+          <span class="cnc-size-val" id="cncSizeVal">—</span>
         </div>
-        <button class="aspect-btn locked" id="aspectLock" title="Lock aspect ratio">🔒</button>
-        <div class="in-grp"><label>ขนาดงาน H</label>
-          <input type="number" class="num-in" id="workH" value="" placeholder="จากรูป" min="0.001" step="0.1">
-        </div>
+        <div class="cnc-size-sub" id="cncSizeSub"></div>
+        <button type="button" class="cnc-size-btn" onclick="setMode('design')">
+          ✎ แก้ขนาดงาน (ไปหน้าออกแบบลาย)
+        </button>
       </div>
 
       <!-- Core CNC parameters. These drive the pattern G-code engine and used
@@ -1086,7 +1164,7 @@ pre.gcode-content {
 
 
     <!-- ══ Procedural Pattern Generator ══ -->
-    <div class="panel collap-panel closed" id="panProcGen">
+    <div class="panel collap-panel closed" id="panProcGen" data-mode="design">
       <div class="panel-title" onclick="togglePanel('panProcGen')">
         <svg class="ic"><use href="#i-wand"/></svg> สร้างลาย (Procedural) <span class="collap-arrow">▾</span>
       </div>
@@ -1238,7 +1316,7 @@ pre.gcode-content {
     </div>
 
     <!-- ══ AI Vectorizer (LineTracer Pro, embedded) ══ -->
-    <div class="panel collap-panel closed" id="panVec">
+    <div class="panel collap-panel closed" id="panVec" data-mode="design">
       <div class="panel-title" onclick="togglePanel('panVec')">
         <svg class="ic"><use href="#i-wand"/></svg> AI Vectorizer Engines <span class="collap-arrow">▾</span>
       </div>
@@ -1255,7 +1333,7 @@ pre.gcode-content {
     </div>
 
     <!-- ══ Profiling Panel ══ -->
-    <div class="panel collap-panel closed" id="panProfiling">
+    <div class="panel collap-panel closed" id="panProfiling" data-mode="cnc">
       <div class="panel-title" onclick="togglePanel('panProfiling')">
         <svg class="ic"><use href="#i-route"/></svg> Profiling (กินใน / กินนอก) <span class="collap-arrow">▾</span>
       </div>
@@ -1396,7 +1474,7 @@ pre.gcode-content {
     </div>
 
     <!-- ══ 2D Area Clearance Panel ══ -->
-    <div class="panel collap-panel closed" id="panAreaClear">
+    <div class="panel collap-panel closed" id="panAreaClear" data-mode="cnc">
       <div class="panel-title" onclick="togglePanel('panAreaClear')">
         <svg class="ic"><use href="#i-layers"/></svg> 2D Area Clearance (เซาะงาน) <span class="collap-arrow">▾</span>
       </div>
@@ -1531,7 +1609,7 @@ pre.gcode-content {
     </div>
 
     <!-- ══ Machine × Material presets ══ -->
-    <div class="panel collap-panel" id="panPresets">
+    <div class="panel collap-panel" id="panPresets" data-mode="cnc">
       <div class="panel-title" onclick="togglePanel('panPresets')">
         <svg class="ic"><use href="#i-sliders"/></svg> พรีเซ็ต เครื่อง × วัสดุ <span class="collap-arrow">▾</span>
       </div>
@@ -1554,7 +1632,7 @@ pre.gcode-content {
     </div>
 
     <!-- ══ Cost estimate ══ -->
-    <div class="panel collap-panel closed" id="panCost">
+    <div class="panel collap-panel closed" id="panCost" data-mode="cnc">
       <div class="panel-title" onclick="togglePanel('panCost')">
         <svg class="ic"><use href="#i-coin"/></svg> ประมาณต้นทุนงาน <span class="collap-arrow">▾</span>
       </div>
@@ -1580,7 +1658,7 @@ pre.gcode-content {
     </div>
 
     <!-- ══ Tiling / panelisation ══ -->
-    <div class="panel collap-panel closed" id="panTiling">
+    <div class="panel collap-panel closed" id="panTiling" data-mode="cnc">
       <div class="panel-title" onclick="togglePanel('panTiling')">
         <svg class="ic"><use href="#i-tiles"/></svg> แบ่งงานเป็นแผ่น (Tiling) <span class="collap-arrow">▾</span>
       </div>
@@ -1613,7 +1691,7 @@ pre.gcode-content {
     </div>
 
     <!-- Sheet / Nesting -->
-    <div class="panel">
+    <div class="panel" data-mode="cnc">
       <div class="panel-title"><svg class="ic"><use href="#i-clipboard"/></svg> แผ่นงาน (Sheet / Nesting)</div>
       <div class="in-row" style="margin-bottom:7px">
         <div class="in-grp"><label>แผ่น W (mm)</label>
@@ -1850,6 +1928,8 @@ const S = {
   angle: 0, contrast: 1.0, gamma: 1.0, patRot: 0,
   invert: false, fill: true, darkBg: false, quantRandom: false,
   skipBlank: true, blankLevel: 97,
+  fileMm: null,
+  mode: 'design',
   shapes: [], mixShapes: [], lineRows: [], lastGcode: '',
   machineFormat: 'grbl',
   aspectLocked: true, imgAspect: 1,
@@ -1918,8 +1998,11 @@ function _unitDecimals(f) {
 function autoSetWorkSize() {
   if (!S.image) return;
   const dpi = getDpi();
-  const wMm = S.image.width  / dpi * 25.4;
-  const hMm = S.image.height / dpi * 25.4;
+  // Prefer the size the file states about itself. Only fall back to the DPI
+  // dropdown when the file carries no physical size at all.
+  const fm = ($('dpiPreset').value === 'file') ? S.fileMm : null;
+  const wMm = fm ? fm.wMm : S.image.width  / dpi * 25.4;
+  const hMm = fm ? fm.hMm : S.image.height / dpi * 25.4;
   // The boxes hold values in the SELECTED unit, but this wrote raw millimetres
   // into them. With the unit set to metres an image measuring 1249.4 mm showed
   // up as "1249.4" and was then read back as 1249.4 metres — a work area 1000×
@@ -1929,10 +2012,70 @@ function autoSetWorkSize() {
   $('workW').value = (wMm / f).toFixed(dec);
   $('workH').value = (hMm / f).toFixed(dec);
   S.imgAspect = wMm / hMm;
-  $('imgSizeInfo').textContent =
-    `รูป: ${S.image.width}×${S.image.height}px → ${wMm.toFixed(1)}×${hMm.toFixed(1)} mm @ ${dpi} dpi`;
-  $('imgSizeInfo').style.display = 'block';
+  updateSourceInfo();
   scheduleRender();
+}
+
+// ── The "what am I working from" line under the source panel ─────────────
+// Used to be written only by autoSetWorkSize(), so it appeared for imported
+// photos and never for a pattern you generated yourself. It also froze at the
+// size computed on load; reading the work size live keeps it honest after an
+// edit.
+function updateSourceInfo() {
+  updateCncSizeInfo();
+  const el = $('imgSizeInfo');
+  if (!el) return;
+  const wMm = workWmm(), hMm = workHmm();
+  const mm = `${wMm.toFixed(1)}×${hMm.toFixed(1)} mm`;
+
+  if (S.image && S.imageFromProc) {
+    const btn  = document.querySelector('#panProcGen .tool-type-btn.active');
+    const name = btn ? btn.textContent.replace(/\s+/g, ' ').trim() : 'สร้างเอง';
+    el.textContent = `ลายสร้างเอง "${name}" · ${S.image.width}×${S.image.height}px → ${mm} (ขนาดตามที่ตั้งไว้)`;
+  } else if (S.image) {
+    const dpi = getDpi();
+    const fm  = ($('dpiPreset').value === 'file') ? S.fileMm : null;
+    el.textContent =
+      `รูป: ${S.image.width}×${S.image.height}px → ${mm} ` +
+      (fm ? `(ขนาดจากไฟล์ · ${fm.src})`
+          : (S.fileMm ? `@ ${dpi} dpi — ไฟล์นี้ระบุ ${S.fileMm.wMm.toFixed(1)}×${S.fileMm.hMm.toFixed(1)} mm`
+                      : `@ ${dpi} dpi — ไฟล์ไม่ได้ระบุขนาดจริง`));
+  } else if (S.shapes && S.shapes.length) {
+    // Line raster / text raster / shape image can run with no source photo
+    el.textContent = `ลาย: ${patName(S.pattern)} → ${mm} (ไม่ใช้รูปต้นฉบับ)`;
+  } else {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+}
+
+// Mirrors the work size onto the CNC tab. Read-only: the inputs stay on the
+// design tab so there is only ever one source of truth.
+function updateCncSizeInfo() {
+  const v = $('cncSizeVal'); if (!v) return;
+  const sub = $('cncSizeSub');
+  const f = unitFactor(), dec = _unitDecimals(f);
+  const uname = ($('units').selectedOptions[0] || {}).text || '';
+  const unit = (uname.match(/\(([^)]+)\)/) || [, uname])[1];
+  const wU = workWmm() / f, hU = workHmm() / f;
+  if (!(wU > 0 && hU > 0)) { v.textContent = '—'; if (sub) sub.textContent = 'ยังไม่ได้ตั้งขนาดงาน'; return; }
+  v.textContent = `${wU.toFixed(dec)} × ${hU.toFixed(dec)} ${unit}`;
+  if (!sub) return;
+  const parts = [];
+  // An empty box still cuts — workWmm() falls back to 100 mm — so say so
+  // rather than showing a number the user never typed as if they had.
+  if (!(parseFloat($('workW').value) > 0) || !(parseFloat($('workH').value) > 0))
+    parts.push('⚠ ค่าเริ่มต้น — ยังไม่ได้ตั้งขนาดงาน');
+  if (unit !== 'mm') parts.push(`${workWmm().toFixed(1)}×${workHmm().toFixed(1)} mm`);
+  const n = (S.shapes && S.shapes.length) || 0;
+  if (n) parts.push(`${n.toLocaleString()} ชิ้น · ${patName(S.pattern)}`);
+  const sheetW = parseFloat(($('sheetW') || {}).value), sheetH = parseFloat(($('sheetH') || {}).value);
+  if (sheetW > 0 && sheetH > 0) {
+    const fits = workWmm() <= sheetW && workHmm() <= sheetH;
+    parts.push(fits ? `พอดีแผ่น ${sheetW}×${sheetH} mm` : `⚠ ใหญ่กว่าแผ่น ${sheetW}×${sheetH} mm`);
+  }
+  sub.textContent = parts.join(' · ');
 }
 
 // ── Aspect lock ───────────────────────────────────────────
@@ -1956,6 +2099,7 @@ $('workW').addEventListener('input', () => {
     if (w > 0) $('workH').value = (w / S.imgAspect).toFixed(_unitDecimals(unitFactor()));
     else $('workH').value = '';
   }
+  updateSourceInfo();
   scheduleRender();
 });
 $('workH').addEventListener('input', () => {
@@ -1965,6 +2109,7 @@ $('workH').addEventListener('input', () => {
     if (h > 0) $('workW').value = (h * S.imgAspect).toFixed(_unitDecimals(unitFactor()));
     else $('workW').value = '';
   }
+  updateSourceInfo();
   scheduleRender();
 });
 
@@ -1988,6 +2133,7 @@ $('units').addEventListener('change', () => {
     if (h > 0) $('workH').value = conv(h);
     _prevUnitFactor = newFactor;
   }
+  updateSourceInfo();
   scheduleRender();
 });
 
@@ -2018,34 +2164,170 @@ function _applyLoadedImage(img) {
   $('uploadArea').style.display = 'none';
   $('statsOv').style.display = 'block';
   S.imgAspect = img.width / img.height;
-  autoSetWorkSize();
+  // A file that states its own physical size should win by default; if it
+  // says nothing, drop back to whatever DPI is selected.
+  // ...unless a saved project is being restored. The image arrives from an
+  // async onload long after apply() has finished, and autoSetWorkSize() would
+  // then overwrite the work size the user actually saved with whatever the
+  // image declares about itself. PROJECT._finishRestore() re-asserts the saved
+  // numbers instead.
+  if (!(typeof PROJECT !== 'undefined' && PROJECT.restoring)) {
+    const dp = $('dpiPreset');
+    if (S.fileMm && S.fileMm.wMm > 0) dp.value = 'file';
+    else if (dp.value === 'file')     dp.value = '300';
+    autoSetWorkSize();
+  }
   fitCanvases();
   zoom.show();
   scheduleRender();
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// Real-world size declared INSIDE the file
+// ════════════════════════════════════════════════════════════════════════
+// A pixel count alone says nothing about physical size — it only becomes
+// millimetres once you pick a DPI. But most files already carry their own
+// answer: PNGs have a pHYs chunk, JPEGs a JFIF density, SVGs a width/height
+// in real units, and a DXF has true drawing extents. Reading that is far more
+// faithful to "use the size of the file I imported" than applying whatever
+// happens to be selected in the DPI dropdown.
+const FILESIZE = {
+  // ── PNG: pHYs chunk, pixels per unit, unit 1 = metre ──
+  png(buf) {
+    const b = new DataView(buf);
+    if (b.byteLength < 8 || b.getUint32(0) !== 0x89504E47) return null;
+    let p = 8;
+    while (p + 8 <= b.byteLength) {
+      const len = b.getUint32(p);
+      const type = String.fromCharCode(b.getUint8(p+4), b.getUint8(p+5), b.getUint8(p+6), b.getUint8(p+7));
+      if (type === 'pHYs' && len >= 9) {
+        const ppuX = b.getUint32(p+8), ppuY = b.getUint32(p+12), unit = b.getUint8(p+16);
+        if (unit === 1 && ppuX > 0 && ppuY > 0) return { ppmX: ppuX, ppmY: ppuY, src: 'PNG pHYs' };
+        return null;
+      }
+      if (type === 'IDAT' || type === 'IEND') return null;   // pHYs must precede IDAT
+      p += 12 + len;
+    }
+    return null;
+  },
+
+  // ── JPEG: JFIF APP0 density ──
+  jpeg(buf) {
+    const b = new DataView(buf);
+    if (b.byteLength < 4 || b.getUint16(0) !== 0xFFD8) return null;
+    let p = 2;
+    while (p + 4 <= b.byteLength) {
+      if (b.getUint8(p) !== 0xFF) break;
+      const marker = b.getUint8(p+1);
+      if (marker === 0xD8 || marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7)) { p += 2; continue; }
+      const len = b.getUint16(p+2);
+      if (marker === 0xE0 && len >= 14) {
+        const units = b.getUint8(p+11);
+        const dx = b.getUint16(p+12), dy = b.getUint16(p+14);
+        if (dx > 0 && dy > 0) {
+          if (units === 1) return { ppmX: dx / 0.0254, ppmY: dy / 0.0254, src: 'JPEG ' + dx + ' dpi' };
+          if (units === 2) return { ppmX: dx * 100,    ppmY: dy * 100,    src: 'JPEG ' + dx + ' dpcm' };
+        }
+        return null;
+      }
+      if (marker === 0xDA) break;      // start of scan — no more headers
+      p += 2 + len;
+    }
+    return null;
+  },
+
+  // ── SVG: width/height carrying a real unit ──
+  svg(text) {
+    const head = text.slice(0, 4000);
+    const grab = a => {
+      const m = head.match(new RegExp(a + '\\s*=\\s*["\']\\s*([\\d.]+)\\s*(mm|cm|in|pt|pc|px)?\\s*["\']', 'i'));
+      return m ? { v: parseFloat(m[1]), u: (m[2] || 'px').toLowerCase() } : null;
+    };
+    const w = grab('width'), h = grab('height');
+    if (!w || !h || !(w.v > 0) || !(h.v > 0)) return null;
+    const K = { mm: 1, cm: 10, in: 25.4, pt: 25.4/72, pc: 25.4/6, px: 25.4/96 };
+    if (w.u === 'px' && h.u === 'px') return null;   // px is not a real size
+    return { wMm: w.v * K[w.u], hMm: h.v * K[h.u], src: 'SVG ' + w.u };
+  },
+
+  // ── DXF: header extents, in drawing units ($INSUNITS: 1=in, 4=mm) ──
+  dxf(text) {
+    const L = text.replace(/\r/g, '').split('\n').map(s => s.trim());
+    const val = (name, code) => {
+      const i = L.indexOf(name);
+      if (i < 0) return null;
+      for (let k = i + 1; k < Math.min(i + 12, L.length); k++)
+        if (L[k] === String(code)) return parseFloat(L[k+1]);
+      return null;
+    };
+    const x0 = val('$EXTMIN', 10), y0 = val('$EXTMIN', 20);
+    const x1 = val('$EXTMAX', 10), y1 = val('$EXTMAX', 20);
+    if ([x0,y0,x1,y1].some(v => v === null || !isFinite(v))) return null;
+    const w = x1 - x0, h = y1 - y0;
+    if (!(w > 0) || !(h > 0) || w > 1e9 || h > 1e9) return null;   // 1e20 sentinel
+    const iu = val('$INSUNITS', 70);
+    const k = (iu === 1) ? 25.4 : 1;                 // inches or millimetres
+    return { wMm: w * k, hMm: h * k, src: 'DXF extents' };
+  },
+
+  // Normalise whatever was found into millimetres for this image
+  toMm(info, pxW, pxH) {
+    if (!info) return null;
+    if (info.wMm) return { wMm: info.wMm, hMm: info.hMm, src: info.src };
+    if (info.ppmX) return { wMm: pxW / info.ppmX * 1000, hMm: pxH / info.ppmY * 1000, src: info.src };
+    return null;
+  }
+};
+
 function loadImg(file) {
-  const ext = file.name.split('.').pop().toLowerCase();
+  const ext = (file.name || '').split('.').pop().toLowerCase();
 
   // ── DXF / DWG → render to canvas → image ──────────────────
   if (ext === 'dxf' || ext === 'dwg') {
     const reader = new FileReader();
     reader.onload = e => {
-      const imgEl = dxfToImage(e.target.result, 1200, 1200);
-      imgEl.onload = () => { _applyLoadedImage(imgEl); };
+      const txt = e.target.result;
+      const imgEl = dxfToImage(txt, 1200, 1200);
+      imgEl.onload = () => { S.fileMm = FILESIZE.dxf(txt); _applyLoadedImage(imgEl); };
     };
     reader.readAsText(file);
     return;
   }
 
-  // ── SVG / raster image ─────────────────────────────────────
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => { _applyLoadedImage(img); };
-    img.src = e.target.result;
+  if (ext === 'svg') {
+    const rt = new FileReader();
+    rt.onload = te => {
+      const svgMm = FILESIZE.svg(te.target.result);
+      const rd = new FileReader();
+      rd.onload = de => {
+        const img = new Image();
+        img.onload = () => { S.fileMm = svgMm; _applyLoadedImage(img); };
+        img.src = de.target.result;
+      };
+      rd.readAsDataURL(file);
+    };
+    rt.readAsText(file);
+    return;
+  }
+
+  // ── Raster: read the bytes once for metadata, once for the data URL ──
+  const rb = new FileReader();
+  rb.onload = be => {
+    let info = null;
+    try { info = FILESIZE.png(be.target.result) || FILESIZE.jpeg(be.target.result); } catch (e) {}
+    const rd = new FileReader();
+    rd.onload = de => {
+      const img = new Image();
+      img.onload = () => {
+        S.fileMm = FILESIZE.toMm(info, img.width, img.height);
+        _applyLoadedImage(img);
+      };
+      img.src = de.target.result;
+    };
+    rd.readAsDataURL(file);
   };
-  reader.readAsDataURL(file);
+  rb.onerror = () => { S.fileMm = null; };
+  rb.readAsArrayBuffer(file);
 }
 
 // ── DXF parser → HTMLImageElement (PNG data URL) ──────────────
@@ -2594,6 +2876,22 @@ function toggleCncAdvanced() {
   const show = box.style.display === 'none';
   box.style.display = show ? '' : 'none';
   if (arrow) arrow.textContent = show ? '▾' : '▸';
+  if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+}
+
+// ── Design / CNC mode ────────────────────────────────────────────────────
+// Purely a view filter: every panel stays in the DOM and every control keeps
+// working, so switching modes never changes the pattern or the G-code.
+function setMode(m) {
+  m = (m === 'cnc') ? 'cnc' : 'design';
+  S.mode = m;
+  const sb = document.querySelector('.sidebar');
+  if (sb) { sb.classList.toggle('mode-cnc', m === 'cnc'); sb.classList.toggle('mode-design', m === 'design'); }
+  const d = $('modeDesign'), c = $('modeCnc');
+  if (d) d.classList.toggle('active', m === 'design');
+  if (c) c.classList.toggle('active', m === 'cnc');
+  if (sb) sb.scrollTop = 0;
+  if (m === 'cnc' && typeof updateCncSizeInfo === 'function') updateCncSizeInfo();
   if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
 }
 
@@ -3277,6 +3575,15 @@ function shapePath(ctx, x, y, r, pat, rot) {
 // ── Stats update ──────────────────────────────────────────
 function updateStats() {
   if (!S.shapes.length) return;
+  // The stats panel used to be revealed only when a photo was imported, so a
+  // procedural / line-raster / text pattern produced a drawing with no size,
+  // shape count, time or cost shown anywhere.
+  // Set unconditionally. The panel is hidden by a CSS rule on .stats-ov, so on
+  // a fresh load el.style.display is "" — testing it against "none" never
+  // matched and the panel stayed hidden for every non-photo pattern.
+  const _ov = $('statsOv');
+  if (_ov) _ov.style.display = 'block';
+  updateSourceInfo();
   const W = pCanvas.width, H = pCanvas.height;
   const wW = workWmm();
   const wH = workHmm();
@@ -8743,11 +9050,61 @@ const FILESAVE = {
   // `source` may be a Blob, a string, or a function returning Blob/Promise<Blob>.
   // Passing a function matters for canvas exports: the picker must be opened
   // while the click's user-activation is still live, before the slow encode.
+  // Trigger a download with NO await anywhere before the click. Every `await`
+  // yields the microtask queue, and Chrome then no longer counts the click as
+  // user-initiated — from a file:// page it drops the download silently and
+  // leaves a 0-byte file. Whenever the content is already in hand (a string or
+  // a Blob) there is nothing to wait for, so do it synchronously.
+  // `text` (optional) is the same content as `blob` in string form.
+  // On a page opened from file:// the document origin is "null", and Chrome
+  // refuses to download blob: URLs from a null origin — it writes a 0-byte
+  // file and reports nothing. A data: URL carries no origin at all, so it is
+  // the only thing that works there. Every text export (project, DXF, SVG,
+  // G-code, CSV) can take that route; binary canvas exports cannot.
+  _clickDownload(name, blob, text, mime) {
+    const fileProto = location.protocol === 'file:';
+    let url, isBlobUrl = true;
+    if (fileProto && typeof text === 'string') {
+      url = 'data:' + (mime || 'application/octet-stream') + ';charset=utf-8,' +
+            encodeURIComponent(text);
+      isBlobUrl = false;
+    } else {
+      url = URL.createObjectURL(blob);
+    }
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { a.remove(); if (isBlobUrl) URL.revokeObjectURL(url); }, 60000);
+    return isBlobUrl && fileProto;   // true = the unreliable route was used
+  },
+
   async save(name, source, mime) {
     const toBlob = async () => {
       const v = (typeof source === 'function') ? await source() : source;
       return (v instanceof Blob) ? v : new Blob([v], { type: mime || 'application/octet-stream' });
     };
+
+    // Fast path: no picker available and the content is ready — keep the whole
+    // thing synchronous so the click still carries the user gesture.
+    if (!this.supported() && typeof source !== 'function') {
+      try {
+        const blob = (source instanceof Blob) ? source
+                   : new Blob([source], { type: mime || 'application/octet-stream' });
+        if (!blob.size) { status2('❌ ไม่มีข้อมูลให้บันทึก (ไฟล์จะว่าง) — ยกเลิกแล้ว'); return false; }
+        const risky = this._clickDownload(name, blob,
+                        (typeof source === 'string') ? source : null, mime);
+        if (risky) {
+          status2(`⚠ ${name} (${_fmtBytes(blob.size)}) — เปิดจาก file:// เบราว์เซอร์อาจได้ไฟล์ 0 ไบต์ ` +
+                  `กรุณาเช็คขนาดไฟล์ หรือเปิดผ่าน localhost (ดับเบิลคลิก "เปิดโปรแกรม.bat")`);
+        } else {
+          status2(`✅ บันทึกแล้ว: ${name} (${_fmtBytes(blob.size)})`);
+        }
+        return true;
+      } catch (e) {
+        status2('❌ บันทึกไม่สำเร็จ: ' + e.message);
+        return false;
+      }
+    }
 
     if (this.supported()) {
       let handle;
@@ -8795,14 +9152,7 @@ const FILESAVE = {
     try {
       const blob = await toBlob();
       if (!blob.size) { status2('❌ ไม่มีข้อมูลให้บันทึก (ไฟล์จะว่าง) — ยกเลิกแล้ว'); return false; }
-      const url = URL.createObjectURL(blob);
-      const a = Object.assign(document.createElement('a'), { href: url, download: name });
-      document.body.appendChild(a);
-      a.click();
-      // Keep the anchor and the blob URL alive well past the click. Removing
-      // them immediately can abort a large download before the browser has
-      // finished reading the blob.
-      setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
+      this._clickDownload(name, blob, (typeof source === 'string') ? source : null, mime);
       // No way to read the result back on this path, so never claim more than
       // "handed to the browser" — and on file:// with a big blob, say plainly
       // that the download can come out empty.
@@ -9116,12 +9466,26 @@ function applyProcPattern(keepSize = false) {
   ctx.putImageData(id, 0, 0);
 
   const isFirstApply = !S.image;
+  // A generated pattern has no physical size of its own — it is just a 1024 px
+  // square. If a work size has already been entered, that is the real answer
+  // and must survive; otherwise typing 300 mm and then picking a pattern threw
+  // the 300 away and replaced it with 1024 px ÷ dpi.
+  const userW = parseFloat($('workW').value), userH = parseFloat($('workH').value);
+  const hasUserSize = (userW > 0) || (userH > 0);
+
   const img = new Image();
   img.onload = () => {
     S.image         = img;
     S.imageFromProc = true;
-    S.imgAspect     = 1;
-    if (!keepSize && isFirstApply) autoSetWorkSize();
+    if (hasUserSize) {
+      // Keep the sheet the user asked for, and take the aspect from it so the
+      // lock does not square the work area on the next edit.
+      const w = workWmm(), h = workHmm();
+      S.imgAspect = (w > 0 && h > 0) ? w / h : 1;
+    } else {
+      S.imgAspect = 1;
+      if (!keepSize && isFirstApply) autoSetWorkSize();
+    }
     fitCanvases();
     zoom.show();
     scheduleRender();
@@ -10254,6 +10618,8 @@ const PROJECT = {
   KEY: 'cncpat.autosave.v2',
   MAX_LS_BYTES: 4_000_000,
   restoring: false,
+  _pendingImgs: 0,
+  _sizeSnap: null,
   // Set just before a deliberate wipe. location.reload() fires beforeunload,
   // which used to run autosave() and write the very state we had just deleted
   // straight back into storage — making the reset button a no-op.
@@ -10283,7 +10649,7 @@ const PROJECT = {
     const st = {
       v: 2, savedAt: new Date().toISOString(),
       ctrls, toggles, panels,
-      pattern: S.pattern, mixPat: S.mixPat,
+      pattern: S.pattern, mixPat: S.mixPat, mode: S.mode,
       // imgAspect is derived from the loaded image, so without saving it the
       // aspect lock falls back to 1:1 on reload and squares the work area.
       aspectLocked: S.aspectLocked, imgAspect: S.imgAspect,
@@ -10343,22 +10709,63 @@ const PROJECT = {
         const b = document.querySelector(`#mixPatGrid [data-mixpat="${st.mixPat}"]`);
         if (b) b.click();
       }
+      if (st.mode) setMode(st.mode);
       if (st.shapeMode) setShapeMode(st.shapeMode);
       if (st.traceMode) setShapeTraceMode(st.traceMode);
+      // Images load asynchronously, so the restore is NOT over when this
+      // function returns. Hold the guard until every image has landed.
+      this._sizeSnap = {
+        workW: st.ctrls.workW, workH: st.ctrls.workH, units: st.ctrls.units,
+        dpiPreset: st.ctrls.dpiPreset, dpiCustom: st.ctrls.dpiCustom
+      };
+      this._pendingImgs = (st.image ? 1 : 0) + (st.shapeImage ? 1 : 0);
       if (st.image)      this._restoreImage(st.image, false);
       if (st.shapeImage) this._restoreImage(st.shapeImage, true);
     } catch (e) {
       console.error('Project restore failed:', e);
-      return false;
-    } finally {
+      this._pendingImgs = 0;
       this.restoring = false;
+      return false;
     }
+    if (!this._pendingImgs) this.restoring = false;
     scheduleRender(50);
     return true;
   },
 
+  // Called once the last restored image has loaded. Puts the saved work size
+  // back, because loading an image rewrites it from the file's own metadata.
+  _finishRestore() {
+    const s = this._sizeSnap;
+    this._sizeSnap = null;
+    try {
+      if (s) {
+        for (const id of ['units', 'dpiPreset', 'dpiCustom', 'workW', 'workH']) {
+          const el = $(id);
+          if (el && s[id] !== undefined && s[id] !== null) el.value = s[id];
+        }
+        _prevUnitFactor = unitFactor();
+        const w = parseFloat(s.workW), hh = parseFloat(s.workH);
+        if (w > 0 && hh > 0) S.imgAspect = w / hh;
+      }
+    } catch (e) { console.warn('size restore:', e); }
+    this.restoring = false;
+    if (typeof updateSourceInfo === 'function') updateSourceInfo();
+    if (typeof updateSpacingNote === 'function') updateSpacingNote();
+    fitCanvases();
+    scheduleRender(50);
+  },
+
   _restoreImage(dataUrl, isShape) {
     const img = new Image();
+    // Whether it loads or fails, the pending count must reach zero — otherwise
+    // `restoring` stays true forever and autosave is silently disabled.
+    let settled = false;
+    const done = () => {
+      if (settled) return; settled = true;
+      if (--this._pendingImgs <= 0) { this._pendingImgs = 0; this._finishRestore(); }
+    };
+    img.onerror = () => { console.warn('restored image failed to decode'); done(); };
+    setTimeout(done, 15000);
     img.onload = () => {
       if (isShape) {
         IMGSHAPE.img = img; IMGSHAPE.dirty = true;
@@ -10369,6 +10776,7 @@ const PROJECT = {
       } else {
         _applyLoadedImage(img);
       }
+      done();
       scheduleRender(50);
     };
     img.src = dataUrl;
@@ -10417,6 +10825,54 @@ const PROJECT = {
       }
       return ok;
     } catch (e) { console.warn('Restore failed:', e); return false; }
+  },
+
+  // Autosave used to be replayed the moment the page opened, so launching the
+  // app dropped you straight back into the previous job — no way to tell it
+  // apart from a fresh start, and no way to just begin something new. Open
+  // clean and offer the recovery instead of forcing it.
+  _worthRestoring(st) {
+    if (!st || !st.ctrls) return false;
+    if (st.image || st.shapeImage) return true;
+    const c = st.ctrls;
+    if (c.textRaster && String(c.textRaster).trim()) return true;
+    // Any work size the user actually typed counts as work in progress.
+    const w = parseFloat(c.workW), hh = parseFloat(c.workH);
+    return (w > 0 && hh > 0 && !(Math.abs(w - 100) < 0.001 && Math.abs(hh - 100) < 0.001));
+  },
+
+  offerRestore() {
+    let st;
+    try { st = JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (e) { return false; }
+    if (!this._worthRestoring(st)) return false;
+
+    const when = st.savedAt ? new Date(st.savedAt).toLocaleString('th-TH', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    const what = st.image ? 'มีรูปภาพ' : (st.ctrls.textRaster ? 'ลาย Text' : 'ตั้งค่าลาย');
+
+    const bar = document.createElement('div');
+    bar.className = 'restore-bar';
+    bar.innerHTML =
+      `<div class="restore-txt"><b>มีงานค้างจากครั้งที่แล้ว</b>` +
+      `<span>${when ? when + ' · ' : ''}${what}</span></div>` +
+      `<button class="restore-yes">↩ กู้คืนงานนั้น</button>` +
+      `<button class="restore-no">เริ่มงานใหม่</button>`;
+    document.body.appendChild(bar);
+
+    const close = () => bar.remove();
+    bar.querySelector('.restore-no').onclick = close;
+    bar.querySelector('.restore-yes').onclick = () => {
+      close();
+      if (this.apply(st, { skipVolatile: true })) {
+        setTimeout(() => HISTORY.reset(), 700);
+        // The restore triggers a regenerate, whose own status line lands last.
+        // Say this afterwards or the confirmation is never actually seen.
+        setTimeout(() => status2(`↩ กู้คืนงานล่าสุดแล้ว${when ? ' (' + when + ')' : ''}`), 900);
+      } else {
+        status2('❌ กู้คืนไม่สำเร็จ — ไฟล์ที่บันทึกไว้อาจเสียหาย');
+      }
+    };
+    return true;
   },
 
   saveFile() {
@@ -10642,9 +11098,9 @@ const HISTORY = {
     });
     updateSpacingNote();
 
-    // ── Restore last session, then seed the history baseline ──
-    const restored = PROJECT.restore();
-    setTimeout(() => HISTORY.reset(), restored ? 700 : 0);
+    // ── Open on a clean sheet; offer the last session instead of forcing it ──
+    HISTORY.reset();
+    PROJECT.offerRestore();
     window.addEventListener('beforeunload', () => PROJECT.autosave());
   };
 
