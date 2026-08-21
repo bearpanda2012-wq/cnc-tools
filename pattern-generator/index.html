@@ -1137,16 +1137,16 @@ pre.gcode-content {
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Min Diameter (เส้นผ่าศูนย์กลางต่ำสุด)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nMinR" value="0.0" min="0" step="0.1"><span class="unit-lbl">mm</span></div>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nMinR" value="0.000" min="0" step="0.001"><span class="unit-lbl">mm</span></div>
         </div>
-        <input type="range" id="rMinR" min="0" max="100" value="0.0" step="0.1">
+        <input type="range" id="rMinR" min="0" max="100" value="0.000" step="0.001">
       </div>
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Max Diameter (เส้นผ่าศูนย์กลางสูงสุด)</span>
-          <div class="ctrl-num"><input type="number" class="inline-num" id="nMaxR" value="4.0" min="0.001" step="0.1"><span class="unit-lbl">mm</span></div>
+          <div class="ctrl-num"><input type="number" class="inline-num" id="nMaxR" value="4.000" min="0.001" step="0.001"><span class="unit-lbl">mm</span></div>
         </div>
-        <input type="range" id="rMaxR" min="0.001" max="100" value="4.0" step="0.1">
+        <input type="range" id="rMaxR" min="0.001" max="100" value="4.000" step="0.001">
       </div>
 
       <!-- Quantize sizes -->
@@ -1297,7 +1297,11 @@ pre.gcode-content {
 
         <!-- 8 pattern type buttons -->
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px" id="procTypeGrid">
-          <button class="tool-type-btn active" onclick="setProcType(this,'wave')">
+          <button class="tool-type-btn active" onclick="setProcType(this,'flat')">
+            <svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="8.5" r="2.1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="2.1" fill="currentColor"/><circle cx="8.5" cy="15.5" r="2.1" fill="currentColor"/><circle cx="15.5" cy="15.5" r="2.1" fill="currentColor"/></svg>
+            พื้นเรียบ
+          </button>
+          <button class="tool-type-btn" onclick="setProcType(this,'wave')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M2 12 Q6 4 12 12 Q18 20 22 12"/></svg>
             คลื่น
           </button>
@@ -2917,7 +2921,8 @@ function bindCtrl(rangeId, numId, stateKey, decimals, onChange) {
   // one. Clamp the value to the box's limits and only the thumb to the track.
   // Omitting min/max on the number box means "no limit" — the slider still has
   // its own practical span, it just stops being a ceiling on what you can type.
-  const rMin = parseFloat(rng.min), rMax = parseFloat(rng.max);
+  const rMin = parseFloat(rng.min);
+  let   rMax = parseFloat(rng.max);
   const nMin = num.min !== '' ? parseFloat(num.min) : -Infinity;
   const nMax = num.max !== '' ? parseFloat(num.max) :  Infinity;
   const upd = (v, src) => {
@@ -2926,6 +2931,10 @@ function bindCtrl(rangeId, numId, stateKey, decimals, onChange) {
     v = Math.max(nMin, Math.min(nMax, v));
     v = parseFloat(v.toFixed(decimals));
     S[stateKey] = v;
+    // Typing a value past the slider's span used to leave the thumb stuck at
+    // the end, which reads as "that is the maximum" even though the value was
+    // accepted. Grow the track instead so the control keeps telling the truth.
+    if (v > rMax) { rMax = v; rng.max = String(v); }
     if (src !== 'range') rng.value = Math.max(rMin, Math.min(rMax, v));
     if (src !== 'num')   num.value = v.toFixed(decimals);
     updateRangeTrack(rng);
@@ -2957,8 +2966,8 @@ function bindCtrl_set(rId, nId, key, v, dec) {
   updateRangeTrack($(rId));
 }
 bindCtrl('rSpacing','nSpacing','spacingMm',3,onSpacingChange);
-bindCtrl('rMinR','nMinR','minDmm',1);
-bindCtrl('rMaxR','nMaxR','maxDmm',1);
+bindCtrl('rMinR','nMinR','minDmm',3);
+bindCtrl('rMaxR','nMaxR','maxDmm',3);
 bindCtrl('rAngle','nAngle','angle',0);
 bindCtrl('rPatRot','nPatRot','patRot',0);
 bindCtrl('rContrast','nContrast','contrast',1);
@@ -3816,6 +3825,15 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
 // layer showed up in the preview and in the SVG but was missing from the
 // G-code and the DXF — you could see it on screen and it would never be cut.
 // One list, one answer, used by all of them.
+// The character a given shape stamps. Random mode is resolved once per export
+// so the DXF, the G-code and the preview cannot disagree about what was cut.
+function layerChars(L) {
+  const t = L.mix ? ((S.mixText && S.mixText.length) ? S.mixText : (S.textContent || 'A'))
+                  : (S.textContent || 'ABC');
+  const a = [...t];
+  return a.length ? a : ['A'];
+}
+
 function exportLayers() {
   const out = [{ shapes: S.shapes || [], pat: S.pattern, rot: S.patRot, mix: false }];
   if (S.mixEnabled && S.mixPat && S.mixShapes && S.mixShapes.length)
@@ -4422,6 +4440,36 @@ function buildGcode(offsetX=0, offsetY=0) {
   let _n = 0;
   for (const L of exportLayers()) {
     if (!L.shapes.length) continue;
+    if (L.pat === 'textraster') {
+      // Cut the glyph outline instead of drilling one hole where the letter was.
+      const chars = layerChars(L);
+      const rad = (L.rot || 0) * Math.PI / 180;
+      const cosR = Math.cos(rad), sinR = Math.sin(rad);
+      if (L.mix) g += '\n' + cm(`── Mix layer (text) · ${L.shapes.length} shapes ──`);
+      L.shapes.forEach((s, i) => {
+        const ch = (S.textMode === 'rnd')
+          ? chars[Math.floor(Math.random() * chars.length)]
+          : chars[i % chars.length];
+        const gp = GLYPH.paths(ch, S.textFont || 'Arial');
+        if (!gp.length) return;
+        const cx2 = s.x * sc + offsetX, cy2 = (H - s.y) * sc + offsetY, rr = s.r * sc;
+        g += cm(`#${++_n} "${ch}"`);
+        for (const path of gp) {
+          if (!path || path.length < 2) continue;
+          path.forEach((pt, k) => {
+            const px = cx2 + (pt.x*cosR - pt.y*sinR) * rr;
+            const py = cy2 - (pt.x*sinR + pt.y*cosR) * rr;
+            g += k === 0
+              ? `G0 X${f(px)} Y${f(py)}\nG1 Z${depth} F${plunge}\n`
+              : `G1 X${f(px)} Y${f(py)} F${feed}\n`;
+          });
+          const p0 = path[0];
+          g += `G1 X${f(cx2 + (p0.x*cosR - p0.y*sinR)*rr)} Y${f(cy2 - (p0.x*sinR + p0.y*cosR)*rr)} F${feed}\n`;
+          g += `G0 Z${safeZ}\n`;
+        }
+      });
+      continue;
+    }
     const _ordered = TRAVEL.order(L.shapes);
     if (L.mix) g += '\n' + cm(`── Mix layer (${L.pat}) · ${L.shapes.length} shapes ──`);
     if (_ordered.saved > 0) {
@@ -8781,7 +8829,27 @@ function buildDXF12() {
   for (const L of exportLayers()) {
     const lrot = L.rot || 0;
     const _LS = L.mix ? mixShapeSrc() : IMGSHAPE;
-    if (L.pat === 'imgshape' && _LS.normPaths && _LS.normPaths.length) {
+    if (L.pat === 'textraster') {
+      // Letters used to reach getShapePoints(), whose default returns a single
+      // point — polylines of one point are dropped, so the DXF came out empty.
+      const chars = layerChars(L);
+      const cosR = Math.cos(lrot*Math.PI/180), sinR = Math.sin(lrot*Math.PI/180);
+      L.shapes.forEach((s, i) => {
+        const ch = (S.textMode === 'rnd')
+          ? chars[Math.floor(Math.random() * chars.length)]
+          : chars[i % chars.length];
+        const gp = GLYPH.paths(ch, S.textFont || 'Arial');
+        if (!gp.length) return;
+        const cxm = s.x*sc, cym = (H - s.y)*sc, rr = s.r*sc;
+        for (const path of gp) {
+          if (!path || path.length < 2) continue;
+          ents.push(polyline(path.map(pt => [
+            cxm + (pt.x*cosR - pt.y*sinR)*rr,
+            cym - (pt.x*sinR + pt.y*cosR)*rr      // canvas Y is down, DXF Y is up
+          ])));
+        }
+      });
+    } else if (L.pat === 'imgshape' && _LS.normPaths && _LS.normPaths.length) {
       const cosR = Math.cos(lrot*Math.PI/180), sinR = Math.sin(lrot*Math.PI/180);
       for (const s of L.shapes) {
         const cxm = s.x*sc, cym = (H - s.y)*sc, rr = s.r*sc;
@@ -9441,6 +9509,14 @@ const FILESAVE = {
   _dirHandle: null,
 
   supported() {
+    // A page opened straight off the disk has an opaque origin. Chrome still
+    // EXPOSES showSaveFilePicker there, so this returned true, the save took
+    // the async picker branch, the picker threw SecurityError, and only then
+    // did it fall back to a download — after several `await`s had already
+    // thrown away the click's user activation. Chrome then dropped the
+    // download silently and left a 0-byte file. The synchronous fast path
+    // below was written for exactly this case and never ran.
+    if (location.protocol === 'file:') return false;
     return typeof window.showSaveFilePicker === 'function' && window.isSecureContext;
   },
 
@@ -9480,12 +9556,18 @@ const FILESAVE = {
   // file and reports nothing. A data: URL carries no origin at all, so it is
   // the only thing that works there. Every text export (project, DXF, SVG,
   // G-code, CSV) can take that route; binary canvas exports cannot.
+  // Chrome will not download a data: URL past roughly a couple of megabytes,
+  // and it fails without an error — which is how a 3 MB DXF ended up on disk
+  // as a 0-byte file. Anything above this is refused with instructions instead.
+  DATA_URL_LIMIT: 1.6e6,
+
   _clickDownload(name, blob, text, mime) {
     const fileProto = location.protocol === 'file:';
     let url, isBlobUrl = true;
     if (fileProto && typeof text === 'string') {
       url = 'data:' + (mime || 'application/octet-stream') + ';charset=utf-8,' +
             encodeURIComponent(text);
+      if (url.length > this.DATA_URL_LIMIT) return 'toobig';
       isBlobUrl = false;
     } else {
       url = URL.createObjectURL(blob);
@@ -9512,6 +9594,11 @@ const FILESAVE = {
         if (!blob.size) { status2('❌ ไม่มีข้อมูลให้บันทึก (ไฟล์จะว่าง) — ยกเลิกแล้ว'); return false; }
         const risky = this._clickDownload(name, blob,
                         (typeof source === 'string') ? source : null, mime);
+        if (risky === 'toobig') {
+          status2(`❌ ไฟล์ใหญ่เกินไป (${_fmtBytes(blob.size)}) — เปิดจาก file:// เบราว์เซอร์จะบันทึกได้ 0 ไบต์ ` +
+                  `กรุณาดับเบิลคลิก "เปิดโปรแกรม.bat" แล้วเปิดผ่าน localhost จึงจะบันทึกไฟล์ขนาดนี้ได้`);
+          return false;
+        }
         if (risky) {
           status2(`⚠ ${name} (${_fmtBytes(blob.size)}) — เปิดจาก file:// เบราว์เซอร์อาจได้ไฟล์ 0 ไบต์ ` +
                   `กรุณาเช็คขนาดไฟล์ หรือเปิดผ่าน localhost (ดับเบิลคลิก "เปิดโปรแกรม.bat")`);
@@ -9571,7 +9658,11 @@ const FILESAVE = {
     try {
       const blob = await toBlob();
       if (!blob.size) { status2('❌ ไม่มีข้อมูลให้บันทึก (ไฟล์จะว่าง) — ยกเลิกแล้ว'); return false; }
-      this._clickDownload(name, blob, (typeof source === 'string') ? source : null, mime);
+      if (this._clickDownload(name, blob, (typeof source === 'string') ? source : null, mime) === 'toobig') {
+        status2(`❌ ไฟล์ใหญ่เกินไป (${_fmtBytes(blob.size)}) — เปิดจาก file:// เบราว์เซอร์จะบันทึกได้ 0 ไบต์ ` +
+                `กรุณาดับเบิลคลิก "เปิดโปรแกรม.bat" แล้วเปิดผ่าน localhost`);
+        return false;
+      }
       // No way to read the result back on this path, so never claim more than
       // "handed to the browser" — and on file:// with a big blob, say plainly
       // that the download can come out empty.
@@ -9642,6 +9733,11 @@ function _fn(x, y, oct, rough) {
 
 // ─── Pattern math (nx,ny ∈ 0-1;  cx,cy = centre in 0-1) ────
 const PROC_FN = {
+  // Every other generator returns a varying brightness, which is exactly what
+  // makes a halftone fade. For a plain, evenly-sized pattern there was nothing
+  // to pick — you had to import a solid image. This returns one constant value,
+  // so every dot lands on the same point of the Min..Max ramp.
+  flat: (nx, ny, p) => 1 - ((p.level === undefined ? 100 : p.level) / 100),
   wave: (nx, ny, p) => {
     const r = (p.angle||0)*Math.PI/180;
     const proj = nx*Math.cos(r) + ny*Math.sin(r);
@@ -9750,6 +9846,7 @@ const PROC_FN = {
 
 // ─── Parameter definitions per pattern type ──────────────────
 const PROC_PARAMS = {
+  flat:    [{id:'level', label:'ขนาดจุด (% ของ Max)', min:0, max:100, val:100, step:1}],
   wave:    [{id:'freq',  label:'ความถี่',         min:1,  max:30,  val:8,   step:0.5},
             {id:'angle', label:'มุม (°)',          min:0,  max:360, val:0,   step:1},
             {id:'phase', label:'Phase Shift (°)',  min:0,  max:360, val:0,   step:1}],
@@ -9787,7 +9884,7 @@ const PROC_PARAMS = {
              {id:'angle', label:'มุม (°)',          min:0,  max:180, val:0,   step:1}],
 };
 
-let currentProcType = 'wave';
+let currentProcType = 'flat';
 const procVals = {};
 
 function setProcType(btn, type) {
@@ -10096,6 +10193,173 @@ function stitchPaths(paths, maxGap) {
   }
   return segs.filter(Boolean);
 }
+
+// ════════════════════════════════════════════════════════════════════════
+// Text Raster → real outlines
+// ════════════════════════════════════════════════════════════════════════
+// A canvas can only PAINT a character; it cannot hand back its outline. So the
+// DXF and G-code writers had nothing to emit and fell through to the
+// single-point default — every letter exported as one drill hole, i.e. an
+// empty-looking drawing. Render each glyph once, trace its edges, and cache
+// the result; from then on it behaves exactly like an Image Shape.
+const GLYPH = {
+  _cache: new Map(),
+
+  // Marching-square edge walk. Returns closed loops in cell coordinates,
+  // including the holes inside letters like A, B and O.
+  _trace(bin, w, h) {
+    const val = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? 0 : bin[y*w + x];
+    const seen = new Uint8Array((w+1)*(h+1));
+    const loops = [];
+    const walk = (sx, sy) => {
+      const pts = [];
+      let x = sx, y = sy, dx = 1, dy = 0, guard = w*h*4;
+      do {
+        if (dx === 1 && dy === 0) seen[y*(w+1) + x] = 1;
+        pts.push([x, y]);
+        x += dx; y += dy;
+        let fl, fr;
+        if (dx === 1)       { fl = val(x, y-1);   fr = val(x, y); }
+        else if (dx === -1) { fl = val(x-1, y);   fr = val(x-1, y-1); }
+        else if (dy === 1)  { fl = val(x, y);     fr = val(x-1, y); }
+        else                { fl = val(x-1, y-1); fr = val(x, y-1); }
+        if (fl === 1)      { const t = dx; dx = dy;  dy = -t; }
+        else if (fr === 0) { const t = dx; dx = -dy; dy = t; }
+        if (--guard < 0) return null;
+      } while (!(x === sx && y === sy && dx === 1 && dy === 0));
+      return pts;
+    };
+    for (let y = 0; y <= h; y++)
+      for (let x = 0; x < w; x++)
+        if (val(x, y) === 1 && val(x, y-1) === 0 && !seen[y*(w+1) + x]) {
+          const pts = walk(x, y);
+          if (pts && pts.length >= 4) loops.push(pts);
+        }
+    return loops;
+  },
+
+  // Rounds off the curved runs of a closed outline while leaving genuine
+  // corners sharp. A vertex whose turn angle exceeds `cornerDeg` is treated as
+  // a corner and pinned; the runs between corners are Chaikin-smoothed. Without
+  // the pinning the stems of A and B would get rounded too; without the
+  // smoothing the bowls of B, C and O come out as visible polygons.
+  _smoothClosed(pts, cornerDeg) {
+    const n = pts.length;
+    if (n < 8) return pts;
+    // Perimeter, so the detection window can be a fraction of the outline
+    // rather than a fixed number of points.
+    let per = 0;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      per += Math.hypot(b[0]-a[0], b[1]-a[1]);
+    }
+    const WIN = Math.max(1e-6, per * 0.06);
+
+    // Direction of the chord spanning WIN before / after vertex i. Comparing
+    // immediate neighbours instead treats every single-pixel staircase step as
+    // a 90-degree corner — which pinned the whole of a round letter and left it
+    // exported as a visible polygon.
+    const chord = (i, dir) => {
+      let d = 0, j = i, px = pts[i][0], py = pts[i][1];
+      for (let k = 0; k < n; k++) {
+        const nj = (j + dir + n) % n;
+        const q = pts[nj];
+        d += Math.hypot(q[0]-px, q[1]-py);
+        px = q[0]; py = q[1]; j = nj;
+        if (d >= WIN) break;
+      }
+      return [px - pts[i][0], py - pts[i][1]];
+    };
+    const turnAt = i => {
+      const [bx, by] = chord(i, -1);      // points back along the outline
+      const [fx, fy] = chord(i,  1);
+      const l1 = Math.hypot(bx, by), l2 = Math.hypot(fx, fy);
+      if (l1 < 1e-9 || l2 < 1e-9) return 0;
+      // Angle between "incoming direction" (=-back) and "outgoing direction".
+      const c = Math.max(-1, Math.min(1, ((-bx)*fx + (-by)*fy) / (l1*l2)));
+      return Math.acos(c) * 180 / Math.PI;
+    };
+
+    // Keep only the local maximum of each burst, so one corner stays one point.
+    const t = new Array(n);
+    for (let i = 0; i < n; i++) t[i] = turnAt(i);
+    const corners = [];
+    for (let i = 0; i < n; i++) {
+      if (t[i] < cornerDeg) continue;
+      if (t[i] < t[(i-1+n)%n] || t[i] < t[(i+1)%n]) continue;
+      corners.push(i);
+    }
+
+    if (corners.length < 2) return chaikinSmooth(pts, true, 2);
+
+    const out = [];
+    for (let k = 0; k < corners.length; k++) {
+      const s = corners[k], e = corners[(k + 1) % corners.length];
+      const run = [];
+      for (let i = s; ; i = (i + 1) % n) { run.push(pts[i]); if (i === e) break; }
+      const sm = run.length > 3 ? chaikinSmooth(run, false, 2) : run;
+      for (let i = 0; i < sm.length - 1; i++) out.push(sm[i]);   // drop the shared corner
+    }
+    return out;
+  },
+
+  // Normalised contours for one character, in the same -1..1 space that
+  // IMGSHAPE.normPaths uses, so every downstream consumer already understands
+  // them. Y grows downward, matching the canvas.
+  paths(ch, font) {
+    const key = ch + '|' + (font || 'Arial');
+    if (this._cache.has(key)) return this._cache.get(key);
+    let out = [];
+    try {
+      const SZ = 192, PAD = 16;
+      const oc = document.createElement('canvas');
+      oc.width = oc.height = SZ;
+      const octx = oc.getContext('2d');
+      octx.clearRect(0, 0, SZ, SZ);
+      octx.fillStyle = '#000';
+      octx.textAlign = 'center';
+      octx.textBaseline = 'middle';
+      octx.font = `bold ${SZ - PAD*2}px ${font || 'Arial'}`;
+      octx.fillText(ch, SZ/2, SZ/2);
+      const d = octx.getImageData(0, 0, SZ, SZ).data;
+      const bin = new Uint8Array(SZ*SZ);
+      let minX = SZ, minY = SZ, maxX = -1, maxY = -1, ink = 0;
+      for (let i = 0; i < SZ*SZ; i++) {
+        if (d[i*4 + 3] > 128) {
+          bin[i] = 1; ink++;
+          const x = i % SZ, y = (i / SZ) | 0;
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+      }
+      if (ink > 8 && maxX >= minX && maxY >= minY) {
+        const bw = maxX - minX + 1, bh = maxY - minY + 1;
+        const half = Math.max(bw, bh) / 2;            // keep the glyph's aspect
+        const cx = (minX + maxX + 1) / 2, cy = (minY + maxY + 1) / 2;
+        for (const loop of this._trace(bin, SZ, SZ)) {
+          let pts = loop.map(([x, y]) => [x, y]);
+          // The raw edge walk follows every pixel step (~220 points a letter),
+          // which is far finer than any cutter can follow. Simplifying alone
+          // fixed the size but left the round letters visibly faceted, because
+          // Douglas-Peucker keeps the staircase corners it finds and drops
+          // everything between them. So: thin first, then round off the curved
+          // runs while pinning the real corners, then thin what smoothing added.
+          if (typeof vecSimplify === 'function') pts = vecSimplify(pts, 1.0);
+          pts = GLYPH._smoothClosed(pts, 42);
+          // Thinning AFTER smoothing does double duty: it removes the points
+          // Chaikin added along straight runs, and it drops the sub-pixel
+          // jitter segments that were themselves producing sharp local turns.
+          // A coarser value here measured SMOOTHER than a finer one.
+          if (typeof vecSimplify === 'function') pts = vecSimplify(pts, 0.5);
+          if (pts.length < 3) continue;
+          out.push(pts.map(([x, y]) => ({ x: (x - cx) / half, y: (y - cy) / half })));
+        }
+      }
+    } catch (e) { console.warn('glyph trace failed for', ch, e); }
+    this._cache.set(key, out);
+    return out;
+  }
+};
 
 // Maps a logical control id onto the id that belongs to the given shape slot.
 function _slotEl(slot, id) { return $(slot.ids[id] || id); }
