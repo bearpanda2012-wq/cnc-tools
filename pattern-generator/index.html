@@ -846,6 +846,11 @@ pre.gcode-content {
     <!-- Line Raster settings (shown when lineraster selected) -->
     <div class="panel" id="panLineRaster" data-mode="design" style="display:none">
       <div class="panel-title"><svg class="ic"><use href="#i-route"/></svg> ลายเส้น (Line Raster)</div>
+      <div id="lrMixNote" style="display:none;margin:6px 10px 0;padding:6px 8px;border-radius:6px;
+           background:#2a2312;border:1px solid #4a3c16;font-size:10px;color:#d9a441;line-height:1.5">
+        ค่าคลื่นด้านล่างใช้กับ <b>ลายหลัก</b> เท่านั้น — ลายผสมแบบ "ลายเส้น" วาดเป็นลายเส้นย่อยต่อจุด
+        ปรับขนาดได้ที่ Diameter และมุมที่ "หมุนรูปทรง"
+      </div>
       <div style="padding:8px 10px 10px">
         <div style="margin-bottom:6px">
           <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
@@ -926,6 +931,78 @@ pre.gcode-content {
     </div>
 
     <!-- Mix Layer panel -->
+
+    <!-- The Mix Layer's own Image Shape slot. Same controls as the main one,
+         its own file, so the two layers can stamp different pictures. -->
+    <div class="panel" id="panMixImgShape" data-mode="design" style="display:none">
+      <div class="panel-title"><svg class="ic"><use href="#i-pen"/></svg> รูปลายของลายผสม (Mix Shape Image)</div>
+      <div style="padding:8px 10px 10px">
+        <div id="mxShapeUploadArea" class="upload-area" style="padding:10px;min-height:60px"
+          onclick="$('mxShapeFileInput').click()">
+          <div class="upload-icon"><svg class="ic ic-lg"><use href="#i-pen"/></svg></div>
+          <div class="upload-text" style="font-size:11px">คลิกเลือกรูปลายของลายผสม</div>
+          <div class="upload-hint">PNG (มี alpha ดีที่สุด) · SVG · JPG · DXF</div>
+        </div>
+        <div id="mxShapeThumbWrap" style="display:none;margin-top:6px;cursor:pointer;position:relative;border-radius:6px;overflow:hidden"
+          onclick="$('mxShapeFileInput').click()">
+          <img id="mxShapeThumb" style="width:100%;height:60px;object-fit:contain;background:#111;border-radius:6px;display:block">
+        </div>
+        <input type="file" id="mxShapeFileInput" accept="image/*,.svg,.dxf" style="display:none">
+        <div id="mxShapeInfo" style="font-size:10px;color:#888;margin-top:6px"></div>
+        <div id="mxFallbackNote" style="font-size:9.5px;color:#d9a441;margin-top:4px;line-height:1.45">
+          ยังไม่ได้เลือกรูป — ลายผสมจะใช้รูปเดียวกับลายหลักไปก่อน
+        </div>
+
+        <div style="margin-top:8px">
+          <div style="font-size:10px;color:#aaa;margin-bottom:4px">โหมดตรวจจับเส้น (ความแม่นยำ)</div>
+          <div style="display:flex;gap:4px">
+            <button id="mxTraceAutoBtn" class="tool-type-btn active"
+              onclick="setShapeTraceMode('auto','mix')" style="flex:1;font-size:9px;padding:4px 2px">🤖 อัตโนมัติ</button>
+            <button id="mxTraceOutlineBtn" class="tool-type-btn"
+              onclick="setShapeTraceMode('outline','mix')" style="flex:1;font-size:9px;padding:4px 2px">⬛ เส้นขอบ</button>
+            <button id="mxTraceSkeletonBtn" class="tool-type-btn"
+              onclick="setShapeTraceMode('skeleton','mix')" style="flex:1;font-size:9px;padding:4px 2px">✏️ เส้นกลาง</button>
+          </div>
+        </div>
+
+        <div style="margin-top:8px">
+          <div style="font-size:10px;color:#aaa;margin-bottom:4px">โหมดสี</div>
+          <div style="display:flex;gap:4px">
+            <button id="mxModeAsisBtn" class="tool-type-btn active"
+              onclick="setShapeMode('asis','mix')" style="flex:1;font-size:9px;padding:4px 2px">🎨 ตามรูป</button>
+            <button id="mxModeGrayBtn" class="tool-type-btn"
+              onclick="setShapeMode('gray','mix')" style="flex:1;font-size:9px;padding:4px 2px">⬛ เทา</button>
+            <button id="mxModeSilBtn" class="tool-type-btn"
+              onclick="setShapeMode('sil','mix')" style="flex:1;font-size:9px;padding:4px 2px">◼ ทึบ</button>
+          </div>
+        </div>
+
+        <div id="mxSilRow" style="display:none;margin-top:6px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+            <span>Threshold ทึบ</span>
+            <span id="mxSilThV" style="color:#0a7aff;font-size:10px;font-weight:600">128</span>
+          </div>
+          <input type="range" id="mxSilTh" min="10" max="245" value="128" step="1"
+            oninput="$('mxSilThV').textContent=this.value;MIXSHAPE.dirty=true;scheduleRender()"
+            style="width:100%;accent-color:#0a7aff">
+          <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+            <input type="checkbox" id="mxSilInvert" style="accent-color:#0a7aff"
+              onchange="MIXSHAPE.dirty=true;scheduleRender()">
+            <label for="mxSilInvert" style="font-size:10px;color:#aaa">Invert</label>
+          </div>
+        </div>
+
+        <div style="margin-top:8px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+            <span>หมุนลาย (°)</span>
+            <span id="mxRotV" style="color:#0a7aff;font-size:10px;font-weight:600">0°</span>
+          </div>
+          <input type="range" id="mxRot" min="0" max="359" value="0" step="1"
+            oninput="$('mxRotV').textContent=this.value+'°';scheduleRender()"
+            style="width:100%;accent-color:#0a7aff">
+        </div>
+      </div>
+    </div>
     <div class="panel collap-panel closed" id="panMixLayer" data-mode="design">
       <div class="panel-title" onclick="togglePanel('panMixLayer')"><svg class="ic"><use href="#i-layers"/></svg> ลายผสม (Mix Layer) <span class="collap-arrow">▾</span></div>
       <div class="collap-body" style="padding:0 0 4px">
@@ -970,13 +1047,61 @@ pre.gcode-content {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><line x1="12" y1="3" x2="4" y2="21"/><line x1="12" y1="3" x2="20" y2="21"/><line x1="6.5" y1="14" x2="17.5" y2="14"/></svg>
             </button>
           </div>
-          <div class="ctrl" style="margin-bottom:6px">
-            <div class="ctrl-row">
-              <span class="ctrl-lbl">เส้นผ่าศูนย์กลาง (Diameter)</span>
-              <div class="ctrl-num"><input type="number" class="inline-num" id="nMixDiam" value="2.0" min="0.1" max="20" step="0.1"><span class="unit-lbl">mm</span></div>
-            </div>
-            <input type="range" id="rMixDiam" min="0.1" max="20" value="2.0" step="0.1">
+          <!-- The mix layer used to be a single fixed diameter, which meant it
+               could not follow the image the way the main pattern does. -->
+          <div class="tog-row" style="margin-bottom:8px">
+            <span class="tog-label">ขนาดแปรตามภาพ (เหมือน Pattern หลัก)</span>
+            <div class="toggle" id="togMixVar"></div>
           </div>
+
+          <div id="mixFixedBox">
+            <div class="ctrl" style="margin-bottom:6px">
+              <div class="ctrl-row">
+                <span class="ctrl-lbl">เส้นผ่าศูนย์กลาง (Diameter)</span>
+                <div class="ctrl-num"><input type="number" class="inline-num" id="nMixDiam" value="2.0" min="0.001" step="0.001"><span class="unit-lbl">mm</span></div>
+              </div>
+              <input type="range" id="rMixDiam" min="0.001" max="50" value="2.0" step="0.001">
+            </div>
+          </div>
+
+          <div id="mixVarBox" style="display:none">
+            <div class="ctrl" style="margin-bottom:6px">
+              <div class="ctrl-row">
+                <span class="ctrl-lbl">Min Diameter (ต่ำสุด)</span>
+                <div class="ctrl-num"><input type="number" class="inline-num" id="nMixMinD" value="0.5" min="0" step="0.001"><span class="unit-lbl">mm</span></div>
+              </div>
+              <input type="range" id="rMixMinD" min="0" max="50" value="0.5" step="0.001">
+            </div>
+            <div class="ctrl" style="margin-bottom:6px">
+              <div class="ctrl-row">
+                <span class="ctrl-lbl">Max Diameter (สูงสุด)</span>
+                <div class="ctrl-num"><input type="number" class="inline-num" id="nMixMaxD" value="4.0" min="0.001" step="0.001"><span class="unit-lbl">mm</span></div>
+              </div>
+              <input type="range" id="rMixMaxD" min="0.001" max="50" value="4.0" step="0.001">
+            </div>
+            <div class="ctrl" style="margin-bottom:6px">
+              <label style="font-size:10px;color:#8e8e94;display:block;margin-bottom:3px">
+                เส้นผ่าศูนย์กลาง (mm, คั่นด้วย ,) — ว่าง = ปิด
+              </label>
+              <input type="text" class="num-in" id="mixQuantSizes" placeholder="เช่น 3, 6, 10, 16" style="width:100%">
+              <div class="tog-row" style="margin-top:6px">
+                <span class="tog-label" style="font-size:10px">สุ่มขนาด (Stochastic)</span>
+                <div class="toggle" id="togMixQuantRandom"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Text Raster as a mix layer was forced to reuse the main layer's
+               text, so two text layers could never say different things. -->
+          <div id="mixTextRow" style="display:none;margin-bottom:8px">
+            <label style="font-size:10px;color:#aaa;display:block;margin-bottom:4px">
+              ข้อความของลายผสม (ว่าง = ใช้ข้อความเดียวกับลายหลัก)
+            </label>
+            <input type="text" id="mixText" maxlength="64" placeholder="เช่น CNC"
+              style="width:100%;background:#1a1a1c;border:1px solid #333;border-radius:6px;
+                     color:#e0e0e0;padding:5px 8px;font-size:13px;box-sizing:border-box;letter-spacing:1px"
+              oninput="S.mixText=this.value;scheduleRender()">
+          </div>
+
           <div class="ctrl" style="margin-bottom:6px">
             <div class="ctrl-row">
               <span class="ctrl-lbl">หมุนรูปทรง (°)</span>
@@ -1940,6 +2065,10 @@ const S = {
   textContent: 'ABC', textFont: 'Arial', textMode: 'seq',
   // Mix Layer
   mixEnabled: false, mixPat: 'circle', mixDiamMm: 2.0, mixPatRot: 0, mixAlpha: 0.7,
+  // Mix layer used to be one fixed diameter, preview-only. It can now vary
+  // with tone exactly like the main pattern, and it is exported with it.
+  mixVar: false, mixMinDmm: 0.5, mixMaxDmm: 4.0, mixQuant: [], mixQuantRandom: false,
+  mixText: '',
   // simulation
   simMoves: [], simIdx: 0, simAnimId: null, simRunning: false
 };
@@ -2141,7 +2270,12 @@ $('units').addEventListener('change', () => {
 $('uploadArea').addEventListener('click', () => $('fileInput').click());
 $('imgThumbWrap').addEventListener('click', () => $('fileInput').click());
 $('fileInput').addEventListener('change', e => e.target.files[0] && loadImg(e.target.files[0]));
-$('shapeFileInput').addEventListener('change', e => e.target.files[0] && loadShapeImg(e.target.files[0]));
+$('shapeFileInput').addEventListener('change', e => e.target.files[0] && loadShapeImg(e.target.files[0], 'main'));
+$('mxShapeFileInput').addEventListener('change', e => {
+  if (!e.target.files[0]) return;
+  loadShapeImg(e.target.files[0], 'mix');
+  setTimeout(_syncPatternPanels, 60);      // hide the "using the main picture" note
+});
 
 ['dragover','dragleave','drop'].forEach(ev => {
   $('uploadArea').addEventListener(ev, e => {
@@ -2430,7 +2564,18 @@ function fitCanvases() {
 
   // Size pCanvas (export canvas) to the work area aspect ratio
   const mxW = vp.clientWidth - 32, mxH = vp.clientHeight - 32;
-  const ratio = S.image.width / S.image.height;
+  // Every caller used to be reached only with a photo loaded. Reopening a
+  // project that carries just a shape image — or none at all — calls this with
+  // S.image still null, which threw and aborted the whole restore. Fall back to
+  // the work-area aspect, which is what the canvas actually represents.
+  let ratio;
+  if (S.image && S.image.width > 0 && S.image.height > 0) {
+    ratio = S.image.width / S.image.height;
+  } else {
+    const wMm = workWmm(), hMm = workHmm();
+    ratio = (wMm > 0 && hMm > 0) ? wMm / hMm : 1;
+  }
+  if (!isFinite(ratio) || ratio <= 0) ratio = 1;
   let cw, ch;
   if (mxW / mxH > ratio) { ch = mxH; cw = ch * ratio; }
   else { cw = mxW; ch = cw / ratio; }
@@ -2687,27 +2832,80 @@ function updateViewCanvas() {
   vCtx.restore();
 }
 
-function _applyMixLayer(ctx, fg) {
-  if (!S.mixEnabled || !S.mixPat || !S.mixShapes || !S.mixShapes.length) return;
-  const wW = workWmm();
-  const r2 = Math.max(0.5, (S.mixDiamMm / 2) * (pCanvas.width / wW));
-  ctx.globalAlpha = S.mixAlpha;
-  ctx.fillStyle = fg; ctx.strokeStyle = fg;
-  if (S.mixPat === 'textraster') {
-    // Draw text characters using fillText
-    const chars = [...(S.textContent || 'A')];
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    S.mixShapes.forEach((s, i) => {
-      ctx.font = `bold ${Math.max(1, r2 * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
-      ctx.fillText(chars[i % chars.length], s.x, s.y);
-    });
-  } else {
+// The mix layer's own text. Falls back to the main layer's so an empty box is
+// never a blank stamp.
+function mixChars() {
+  const t = (S.mixText && S.mixText.length) ? S.mixText : (S.textContent || 'A');
+  return [...t];
+}
+
+// Draws the mix pass on any 2D context. Image Shape used to fall through to
+// shapePath(), which only knows how to draw a square placeholder — so an
+// uploaded shape came out as a plain box on every mix dot.
+function _drawMixPass(ctx) {
+  const _MS = mixShapeSrc();
+  if (S.mixPat === 'imgshape' && _MS.normPaths && _MS.normPaths.length) {
+    const stamp = _rebuildMixStamp();
+    if (stamp) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      for (const s of S.mixShapes) {
+        const r = Math.max(s.r, 0.35), d = r * 2;
+        ctx.drawImage(stamp, s.x - r, s.y - r, d, d);
+      }
+      return;
+    }
+    // Fallback: draw the outline directly if the stamp could not be built.
+    const rot = ((parseInt(($(mixShapeRotId())||{}).value) || 0) + (S.mixPatRot || 0)) * Math.PI / 180;
+    const cosR = Math.cos(rot), sinR = Math.sin(rot);
+    const isCont = !!_MS.isContour;
     ctx.beginPath();
     for (const s of S.mixShapes) {
-      shapePath(ctx, s.x, s.y, r2, S.mixPat, S.mixPatRot);
+      const r = Math.max(s.r, 0.35);
+      for (const path of _MS.normPaths) {
+        if (!path || path.length < 2) continue;
+        for (let i = 0; i < path.length; i++) {
+          const px = path[i].x, py = path[i].y;
+          const tx = s.x + (px*cosR - py*sinR) * r;
+          const ty = s.y + (px*sinR + py*cosR) * r;
+          if (i === 0) ctx.moveTo(tx, ty); else ctx.lineTo(tx, ty);
+        }
+        if (isCont) ctx.closePath();
+      }
     }
-    if (S.fill) ctx.fill(); else ctx.stroke();
+    if (S.fill && isCont) ctx.fill(); else ctx.stroke();
+    return;
   }
+  if (S.mixPat === 'textraster') {
+    const chars = mixChars();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    S.mixShapes.forEach((s, i) => {
+      const dr = Math.max(s.r, 0.5);
+      ctx.font = `bold ${Math.max(1, dr * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
+      const ch = S.textMode === 'rnd'
+        ? chars[Math.floor(Math.random() * chars.length)]
+        : chars[i % chars.length];
+      if (S.mixPatRot) {
+        ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(S.mixPatRot * Math.PI / 180);
+        ctx.fillText(ch, 0, 0); ctx.restore();
+      } else {
+        ctx.fillText(ch, s.x, s.y);
+      }
+    });
+    return;
+  }
+  ctx.beginPath();
+  for (const s of S.mixShapes) {
+    shapePath(ctx, s.x, s.y, Math.max(s.r, 0.35), S.mixPat, S.mixPatRot);
+  }
+  if (S.fill) ctx.fill(); else ctx.stroke();
+}
+
+function _applyMixLayer(ctx, fg) {
+  if (!S.mixEnabled || !S.mixPat || !S.mixShapes || !S.mixShapes.length) return;
+  ctx.globalAlpha = S.mixAlpha;
+  ctx.fillStyle = fg; ctx.strokeStyle = fg;
+  _drawMixPass(ctx);
   ctx.globalAlpha = 1;
 }
 
@@ -2765,10 +2963,31 @@ bindCtrl('rAngle','nAngle','angle',0);
 bindCtrl('rPatRot','nPatRot','patRot',0);
 bindCtrl('rContrast','nContrast','contrast',1);
 bindCtrl('rGamma','nGamma','gamma',2);
-bindCtrl('rMixDiam','nMixDiam','mixDiamMm',1);
+bindCtrl('rMixDiam','nMixDiam','mixDiamMm',3);
+bindCtrl('rMixMinD','nMixMinD','mixMinDmm',3);
+bindCtrl('rMixMaxD','nMixMaxD','mixMaxDmm',3);
 bindCtrl('rMixPatRot','nMixPatRot','mixPatRot',0);
 bindCtrl('rBlankLvl','nBlankLvl','blankLevel',0);
-['rSpacing','rMinR','rMaxR','rAngle','rPatRot','rContrast','rGamma','rMixDiam','rMixPatRot'].forEach(id => updateRangeTrack($(id)));
+['rSpacing','rMinR','rMaxR','rAngle','rPatRot','rContrast','rGamma',
+ 'rMixDiam','rMixMinD','rMixMaxD','rMixPatRot'].forEach(id => updateRangeTrack($(id)));
+
+// Mix size list — same parsing rules as the main pattern's size list.
+function _readMixQuant() {
+  const el = $('mixQuantSizes');
+  S.mixQuant = el ? (el.value || '').split(',')
+                      .map(v => parseFloat(v.trim()))
+                      .filter(v => v > 0)
+                  : [];
+}
+$('mixQuantSizes').addEventListener('input', () => {
+  _readMixQuant();
+  const hasVal = S.mixQuant.length > 0;
+  if (hasVal !== S.mixQuantRandom) {
+    S.mixQuantRandom = hasVal;
+    $('togMixQuantRandom').classList.toggle('on', hasVal);
+  }
+  scheduleRender();
+});
 
 function tog(id, key) {
   $(id).addEventListener('click', function() {
@@ -2779,11 +2998,21 @@ function tog(id, key) {
 }
 tog('togInvert','invert'); tog('togFill','fill'); tog('togDarkBg','darkBg');
 tog('togQuantRandom','quantRandom'); tog('togSkipBlank','skipBlank');
+tog('togMixQuantRandom','mixQuantRandom');
+// Swaps the mix layer between one fixed size and a tone-driven range.
+$('togMixVar').addEventListener('click', function() {
+  S.mixVar = !S.mixVar;
+  this.classList.toggle('on', S.mixVar);
+  $('mixVarBox').style.display   = S.mixVar ? '' : 'none';
+  $('mixFixedBox').style.display = S.mixVar ? 'none' : '';
+  scheduleRender();
+});
 // Mix Layer toggle (custom — shows/hides controls)
 $('togMixLayer').addEventListener('click', function() {
   S.mixEnabled = !S.mixEnabled;
   this.classList.toggle('on', S.mixEnabled);
   $('mixLayerControls').style.display = S.mixEnabled ? '' : 'none';
+  _syncPatternPanels();
   scheduleRender();
 });
 // Mix Pattern grid
@@ -2793,6 +3022,7 @@ $('mixPatGrid').addEventListener('click', e => {
   $('mixPatGrid').querySelectorAll('.pat-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   S.mixPat = btn.dataset.mixpat;
+  _syncPatternPanels();
   if (S.mixEnabled) scheduleRender();
 });
 
@@ -2909,6 +3139,35 @@ function updatePatRotState() {
   note.style.color = na ? '#d9a441' : '#8e8e94';
 }
 
+// Image Shape / Line Raster / Text Raster each have their own settings panel.
+// Those panels used to be tied to the MAIN pattern only, so picking one of the
+// three in the Mix Layer gave you the shape with no way to configure it.
+// A panel is now shown when either layer needs it.
+function _syncPatternPanels() {
+  const mixOn = !!S.mixEnabled;
+  const needs = pat => S.pattern === pat || (mixOn && S.mixPat === pat);
+  const map = { panLineRaster: 'lineraster', panTextRaster: 'textraster' };
+  for (const [id, pat] of Object.entries(map)) {
+    const el = $(id);
+    if (el) el.style.display = needs(pat) ? '' : 'none';
+  }
+  // Image Shape has one panel per layer, each with its own picture.
+  const pMain = $('panImgShape');
+  if (pMain) pMain.style.display = (S.pattern === 'imgshape') ? '' : 'none';
+  const pMix = $('panMixImgShape');
+  if (pMix) pMix.style.display = (mixOn && S.mixPat === 'imgshape') ? '' : 'none';
+  const fb = $('mxFallbackNote');
+  if (fb) fb.style.display = (MIXSHAPE.normPaths && MIXSHAPE.normPaths.length) ? 'none' : '';
+  // The mix layer has its own text box; it only makes sense when it draws text.
+  const mt = $('mixTextRow');
+  if (mt) mt.style.display = (mixOn && S.mixPat === 'textraster') ? '' : 'none';
+  // Wave shaping belongs to the whole-image line generator, so say plainly that
+  // it does nothing for a mix layer that only stamps a line motif per dot.
+  const lrn = $('lrMixNote');
+  if (lrn) lrn.style.display =
+    (mixOn && S.mixPat === 'lineraster' && S.pattern !== 'lineraster') ? '' : 'none';
+}
+
 $('patternGrid').addEventListener('click', e => {
   const btn = e.target.closest('[data-pat]');
   if (!btn) return;
@@ -2916,12 +3175,7 @@ $('patternGrid').addEventListener('click', e => {
   btn.classList.add('active');
   S.pattern = btn.dataset.pat;
   updatePatRotState();
-  const psh = $('panImgShape');
-  if(psh) psh.style.display = (S.pattern==='imgshape') ? '' : 'none';
-  const plr = $('panLineRaster');
-  if(plr) plr.style.display = (S.pattern==='lineraster') ? '' : 'none';
-  const ptr = $('panTextRaster');
-  if(ptr) ptr.style.display = (S.pattern==='textraster') ? '' : 'none';
+  _syncPatternPanels();
   scheduleRender();
 });
 
@@ -2958,12 +3212,24 @@ function scheduleRender(ms = 200) {       // 200 ms debounce — prevents rapid-
 // ── Core generation ───────────────────────────────────────
 let _generating = false;                  // mutex — only one render at a time
 function generatePattern() {
-  // imgshape mode can work without a source photo (uniform grid)
-  // lineraster and textraster also work without a source photo (uniform brightness)
-  const _noImgOk = (S.pattern === 'imgshape' && IMGSHAPE.normPaths && IMGSHAPE.normPaths.length)
-                 || S.pattern === 'lineraster' || S.pattern === 'textraster';
+  // Some patterns carry their own geometry and need no source photo: an Image
+  // Shape brings its own traced outline, and Line/Text Raster generate from a
+  // uniform field. This test only ever looked at the MAIN layer, so loading a
+  // picture into the Mix Layer's Image Shape and leaving the main pattern on a
+  // plain circle was refused outright — whichever slot you filled second
+  // appeared to do nothing.
+  const _layerHasOwnGeometry = (pat, store) =>
+       (pat === 'imgshape' && store && store.normPaths && store.normPaths.length > 0)
+    || pat === 'lineraster' || pat === 'textraster';
+  const _noImgOk = _layerHasOwnGeometry(S.pattern, IMGSHAPE)
+                || (S.mixEnabled && S.mixPat && _layerHasOwnGeometry(S.mixPat, mixShapeSrc()));
   if (!S.image && !_noImgOk) {
-    $('statusTxt').textContent = '⚠️ โหลดรูปภาพก่อน หรือกด "ใช้ลายนี้ & Generate" จาก Procedural';
+    // Say which slot is still empty instead of a blanket "load an image".
+    const wantsShape = S.pattern === 'imgshape'
+                    || (S.mixEnabled && S.mixPat === 'imgshape');
+    $('statusTxt').textContent = wantsShape
+      ? '⚠️ ยังไม่มีรูปลาย — เลือกไฟล์ในหัวข้อ "รูปลาย" ก่อน (หรือโหลดรูปภาพต้นฉบับ)'
+      : '⚠️ โหลดรูปภาพก่อน หรือกด "ใช้ลายนี้ & Generate" จาก Procedural';
     return;
   }
   if (_generating) {
@@ -2973,7 +3239,10 @@ function generatePattern() {
   }
   _generating = true;
   $('procOv').classList.add('show');
-  if (IMGSHAPE.dirty) _buildShapeCanvas();
+  if (IMGSHAPE.dirty && IMGSHAPE.img) _buildShapeCanvas(SHAPE_SLOTS.main);
+  // Tracing costs ~400×400 passes; skip it unless the mix layer draws a shape.
+  if (MIXSHAPE.dirty && MIXSHAPE.img && S.mixEnabled && S.mixPat === 'imgshape')
+    _buildShapeCanvas(SHAPE_SLOTS.mix);
   $('statusTxt').textContent = '⏳ กำลังสร้าง...';
   requestAnimationFrame(() => {
     try {
@@ -3004,12 +3273,28 @@ function ensureDesignResolution() {
               .map(v => parseFloat(v.trim())).filter(v => v > 0);
   let featMm = qs.length ? Math.min(...qs)
                          : Math.max(S.minDmm, S.maxDmm);
+  // The mix layer is drawn on the same canvas, so its shapes have to be
+  // resolvable too — but it must be measured the SAME way as the main layer,
+  // i.e. by its largest diameter. Measuring it by its smallest drove the
+  // feature size down to a fraction of a millimetre the moment Mix Layer was
+  // switched on, which multiplied the canvas from 0.4 to 20 megapixels and
+  // made every redraw take seconds. That is what looked like a freeze.
+  if (S.mixEnabled) {
+    const mq = (S.mixQuant && S.mixQuant.length) ? Math.max(...S.mixQuant)
+             : (S.mixVar ? Math.max(S.mixMinDmm, S.mixMaxDmm) : S.mixDiamMm);
+    // Only ever RAISE the requirement toward the main layer's own scale; the
+    // mix layer alone can never demand a finer canvas than the main pattern.
+    if (mq > 0 && !(featMm > 0)) featMm = mq;
+  }
   if (!(featMm > 0)) featMm = S.spacingMm;          // nothing else to go on
   if (!(featMm > 0)) return false;
 
   const TARGET_PX = 4;                               // enough to read a shape
   const MAX_SIDE  = 6000;
-  const MAX_AREA  = 20e6;
+  // Per-pixel JavaScript runs over this canvas on every render. 20 Mpx is a
+  // multi-second redraw, which reads as a hang; 6 Mpx stays interactive and is
+  // still far finer than any preview needs.
+  const MAX_AREA  = 6e6;
 
   const curPxPerMm = pCanvas.width / wWmm;
   const needScale  = TARGET_PX / Math.max(1e-9, featMm * curPxPerMm);
@@ -3326,6 +3611,13 @@ function _generate() {
     const offX = spacingPx * 0.5 * (cosA - sinA);
     const offY = spacingPx * 0.5 * (sinA + cosA);
     const mixShapes = [];
+    // Mix sizing mirrors the main pattern: an explicit size list wins, then a
+    // min..max ramp driven by tone, and finally the legacy single diameter.
+    const mixQ    = (S.mixVar && S.mixQuant && S.mixQuant.length) ? S.mixQuant : null;
+    const mixQPx  = mixQ ? mixQ.map(d => (d / 2) * mmToPx) : null;
+    const mixMinP = Math.max(0, (S.mixMinDmm / 2) * mmToPx);
+    const mixMaxP = Math.max(mixMinP, (S.mixMaxDmm / 2) * mmToPx);
+    const mixFixP = Math.max(0, (S.mixDiamMm / 2) * mmToPx);
     for (const s of shapes) {
       const mx = s.x + offX, my = s.y + offY;
       // Mix-layer dots follow the same rule as the main grid: centre inside
@@ -3335,34 +3627,36 @@ function _generate() {
       let mb = bright(mx, my);
       if (S.invert) mb = 1 - mb;
       const mt = 1 - mb;
-      let mr = minRpx + mt * (maxRpx - minRpx);
+      let mr, mrMm = null;
+      if (mixQPx) {
+        if (S.mixQuantRandom) {
+          if (mt < 0.04) continue;
+          if (Math.random() > mt) continue;
+          const qi = Math.floor(Math.random() * mixQPx.length);
+          mr = mixQPx[qi]; mrMm = mixQ[qi] / 2;
+        } else {
+          const tn = (mt - _tLo) / _tSpan;
+          const qi = Math.max(0, Math.min(mixQPx.length - 1, Math.floor(tn * mixQPx.length)));
+          mr = mixQPx[qi]; mrMm = mixQ[qi] / 2;
+        }
+      } else if (S.mixVar) {
+        mr = mixMinP + mt * (mixMaxP - mixMinP);
+      } else {
+        mr = mixFixP;                       // legacy behaviour: one size for all
+      }
       // Same reasoning as the main grid: no silent 0.40 x pitch clamp, and the
       // "too small" test is scale-relative instead of a fixed 0.25 canvas px.
       if (mr < minRealPx) continue;
-      mixShapes.push({ x: mx, y: my, r: mr });
+      mixShapes.push({ x: mx, y: my, r: mr, rMm: mrMm, frac: mt });
     }
     S.mixShapes = mixShapes;
   }
 
   // ── Mix Layer second pass ──────────────────────────────────
   if (S.mixEnabled && S.mixPat && S.mixShapes.length) {
-    const mixR2 = Math.max(0.5, (S.mixDiamMm / 2) * mmToPx);
     pCtx.globalAlpha = S.mixAlpha;
     pCtx.fillStyle = fg; pCtx.strokeStyle = fg;
-    if (S.mixPat === 'textraster') {
-      const chars = [...(S.textContent || 'A')];
-      pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
-      S.mixShapes.forEach((s, i) => {
-        pCtx.font = `bold ${Math.max(1, mixR2 * 1.9).toFixed(1)}px ${S.textFont || 'Arial'}`;
-        pCtx.fillText(chars[i % chars.length], s.x, s.y);
-      });
-    } else {
-      pCtx.beginPath();
-      for (const s of S.mixShapes) {
-        shapePath(pCtx, s.x, s.y, mixR2, S.mixPat, S.mixPatRot);
-      }
-      if (S.fill) pCtx.fill(); else pCtx.stroke();
-    }
+    _drawMixPass(pCtx);
     pCtx.globalAlpha = 1;
   }
 
@@ -3471,6 +3765,12 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
   // ── Compute mix layer positions between scan lines ──────────
   {
     const mixShapes = [];
+    const _lrMmToPx = W / workWmm();
+    const _lrMixQ   = (S.mixVar && S.mixQuant && S.mixQuant.length) ? S.mixQuant : null;
+    const _lrMixQPx = _lrMixQ ? _lrMixQ.map(d => (d / 2) * _lrMmToPx) : null;
+    const _lrMixMinP = Math.max(0, (S.mixMinDmm / 2) * _lrMmToPx);
+    const _lrMixMaxP = Math.max(_lrMixMinP, (S.mixMaxDmm / 2) * _lrMmToPx);
+    const _lrMixFixP = Math.max(0, (S.mixDiamMm / 2) * _lrMmToPx);
     // Place mix dots at midpoints between adjacent line rows (half spacing perpendicular)
     // and at regular intervals along the lines (full spacing) — dots land between lines
     for (let d = -halfDiag - spacingPx; d <= halfDiag + spacingPx; d += spacingPx) {
@@ -3483,9 +3783,22 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
         let mb = bright(mx, my);
         if (S.invert) mb = 1 - mb;
         const mt = 1 - mb;
-        let mr = minRpx + mt * (maxRpx - minRpx);
+        // Same sizing rules as the main grid's mix pass, so the Line Raster
+        // background does not quietly ignore the mix size settings.
+        let mr, mrMm = null;
+        if (_lrMixQPx) {
+          const qi = S.mixQuantRandom
+            ? Math.floor(Math.random() * _lrMixQPx.length)
+            : Math.max(0, Math.min(_lrMixQPx.length - 1, Math.floor(mt * _lrMixQPx.length)));
+          if (S.mixQuantRandom && (mt < 0.04 || Math.random() > mt)) continue;
+          mr = _lrMixQPx[qi]; mrMm = S.mixQuant[qi] / 2;
+        } else if (S.mixVar) {
+          mr = _lrMixMinP + mt * (_lrMixMaxP - _lrMixMinP);
+        } else {
+          mr = _lrMixFixP;
+        }
         if (mr < _lrMinR) continue;
-        mixShapes.push({ x: mx, y: my, r: mr });
+        mixShapes.push({ x: mx, y: my, r: mr, rMm: mrMm, frac: mt });
       }
     }
     S.mixShapes = mixShapes;
@@ -3497,6 +3810,20 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
   $('procOv').classList.remove('show');
   _generating = false;
   $('statusTxt').textContent = `✅ วาดแล้ว ${lineRows.length.toLocaleString()} เส้น (Line Raster)`;
+}
+
+// Every exporter used to read S.shapes and S.pattern directly, so the mix
+// layer showed up in the preview and in the SVG but was missing from the
+// G-code and the DXF — you could see it on screen and it would never be cut.
+// One list, one answer, used by all of them.
+function exportLayers() {
+  const out = [{ shapes: S.shapes || [], pat: S.pattern, rot: S.patRot, mix: false }];
+  if (S.mixEnabled && S.mixPat && S.mixShapes && S.mixShapes.length)
+    out.push({ shapes: S.mixShapes, pat: S.mixPat, rot: S.mixPatRot, mix: true });
+  return out;
+}
+function exportShapeCount() {
+  return exportLayers().reduce((n, L) => n + L.shapes.length, 0);
 }
 
 // ── Shape path builders ───────────────────────────────────
@@ -3590,10 +3917,17 @@ function updateStats() {
   const feed = parseFloat($('feedRate').value) || 800;
   const units = $('units').value;
   const avgR_mm = (S.minDmm + S.maxDmm) / 4; // diameter → radius: avg(d/2)
-  const cutLen  = S.shapes.length * 2 * Math.PI * avgR_mm;   // cutting length (mm)
+  let   cutLen  = S.shapes.length * 2 * Math.PI * avgR_mm;   // cutting length (mm)
+  // The mix layer is cut too, so it belongs in the time and cost estimate —
+  // otherwise a two-layer job quotes at roughly half of what it really takes.
+  const _mix = (S.mixEnabled && S.mixShapes && S.mixShapes.length) ? S.mixShapes : null;
+  if (_mix) {
+    const mAvgR = S.mixVar ? (S.mixMinDmm + S.mixMaxDmm) / 4 : S.mixDiamMm / 2;
+    cutLen += _mix.length * 2 * Math.PI * mAvgR;
+  }
 
   // Rapid travel between shapes, using the same ordering G-code will use
-  const trav    = TRAVEL.order(S.shapes);
+  const trav    = TRAVEL.order(_mix ? S.shapes.concat(_mix) : S.shapes);
   const sc      = wW / W;
   const travMm  = trav.afterMm * sc;
   const rapid   = 3000;                        // typical G0 rate, mm/min
@@ -3601,8 +3935,10 @@ function updateStats() {
 
   const mmToPx = W / wW;
   const spacePx = S.spacingMm * mmToPx;
-  $('stShapes').textContent = S.shapes.length.toLocaleString();
-  $('stPat').textContent    = patName(S.pattern);
+  $('stShapes').textContent = _mix
+    ? `${(S.shapes.length + _mix.length).toLocaleString()} (${S.shapes.length.toLocaleString()}+${_mix.length.toLocaleString()})`
+    : S.shapes.length.toLocaleString();
+  $('stPat').textContent    = _mix ? `${patName(S.pattern)} + ${patName(S.mixPat)}` : patName(S.pattern);
   $('stGrid').textContent   = `${Math.ceil(W/Math.max(1,spacePx))}×${Math.ceil(H/Math.max(1,spacePx))}`;
   $('stSize').textContent   = `${$('workW').value}×${$('workH').value} ${units}`;
   $('stTime').textContent   = timeSec < 60 ? `~${Math.ceil(timeSec)} วิ` : `~${(timeSec/60).toFixed(1)} นาที`;
@@ -3793,7 +4129,7 @@ function buildSimMoves() {
   return moves;
 }
 
-function getShapePoints(x, y, r, pat, rot) {
+function getShapePoints(x, y, r, pat, rot, src) {
   const a = (rot || 0) * Math.PI / 180;
   const ca = Math.cos(a), sa = Math.sin(a);
   function rp(dx, dy) { return [x + dx*ca - dy*sa, y + dx*sa + dy*ca]; }
@@ -3819,6 +4155,19 @@ function getShapePoints(x, y, r, pat, rot) {
     case 'star': {
       const ir=r*0.4, pts=[];
       for (let i=0;i<=10;i++){const ii=i%10;const ang=(ii*Math.PI)/5-Math.PI/2+a;const rr=ii%2===0?r:ir;pts.push([x+rr*Math.cos(ang),y+rr*Math.sin(ang)]);}
+      return pts;
+    }
+    case 'imgshape': {
+      // Was falling through to the single-point default, so an uploaded shape
+      // exported as one drill hole per dot. Trace the real outline instead.
+      const store = src || ((typeof IMGSHAPE !== 'undefined') ? IMGSHAPE : null);
+      const np = store ? store.normPaths : null;
+      if (!np || !np.length || !np[0] || np[0].length < 2) return [[x,y]];
+      const rotId = (store === (typeof MIXSHAPE !== 'undefined' ? MIXSHAPE : null)) ? 'mxRot' : 'shRot';
+      const extra = (parseInt(($(rotId)||{}).value) || 0) * Math.PI / 180;
+      const c2 = Math.cos(a + extra), s2 = Math.sin(a + extra);
+      const pts = np[0].map(pt => [x + (pt.x*c2 - pt.y*s2)*r, y + (pt.x*s2 + pt.y*c2)*r]);
+      pts.push(pts[0]);                       // close the contour
       return pts;
     }
     default: return [[x,y]];
@@ -3987,7 +4336,9 @@ function buildGcode(offsetX=0, offsetY=0) {
   g += cm('════════════════════════════════════');
   g += cm('CNC Pattern Generator v2');
   g += cm(`Pattern   : ${patName(S.pattern)}`);
-  g += cm(`Shapes    : ${S.shapes.length}`);
+  g += cm(`Shapes    : ${exportShapeCount()}` +
+          (S.mixEnabled && S.mixShapes && S.mixShapes.length
+            ? ` (main ${S.shapes.length} + mix ${S.mixShapes.length})` : ''));
   g += cm(`Work area : ${$('workW').value} × ${$('workH').value} ${units}  (= ${wW.toFixed(2)} × ${workHmm().toFixed(2)} mm)`);
   g += cm(`Tool Ø    : ${$('toolDia').value} mm`);
   g += cm(`Cut depth : ${depth} mm`);
@@ -4038,11 +4389,29 @@ function buildGcode(offsetX=0, offsetY=0) {
       g += `${cm(`Row ${lineNum}`)}`;
       g += `G0 X${f3(startX)} Y${f3(startY)}\nG1 Z${cutD} F${plunge}\nG1 X${f3(endX)} Y${f3(endY)} F${feed}\nG0 Z${safeZ}\n`;
     }
+    // This branch returns early, so the mix layer has to be emitted here —
+    // and before the program footer, or the moves would land after M30 and
+    // never run. A mixed Line Raster job used to export only the lines.
+    let _mixN = 0;
+    for (const L of exportLayers()) {
+      if (!L.mix || !L.shapes.length) continue;
+      g += '\n' + cm(`── Mix layer (${L.pat}) · ${L.shapes.length} shapes ──`);
+      const _o = TRAVEL.order(L.shapes);
+      for (let i = 0; i < _o.shapes.length; i++) {
+        const s = _o.shapes[i];
+        g += gcodeShape(
+          parseFloat((s.x * sc + offsetX).toFixed(3)),
+          parseFloat(((pCanvas.height - s.y) * sc + offsetY).toFixed(3)),
+          parseFloat((s.r * sc).toFixed(3)),
+          L.pat, depth, feed, plunge, safeZ, ++_mixN, fmt, toolDia, L.rot, mixShapeSrc());
+      }
+    }
     g += `\n${cm('── End of job ──')}`;
     if (fmt === 'siemens') { g += `G0 Z${safeZ}\nG0 X0 Y0\nM5\nRET\n`; }
     else { g += `G0 Z${safeZ}\nG0 X0 Y0\nM5\nM30\n`; if (fmt === 'mach2' || fmt === 'mach3' || fmt === 'fanuc') g += '%\n'; }
     S.lastGcode = g;
-    $('statusTxt').textContent = `✅ G-code ready (${S.lineRows.length.toLocaleString()} scan lines)`;
+    $('statusTxt').textContent = `✅ G-code ready (${S.lineRows.length.toLocaleString()} scan lines` +
+      (_mixN ? ` + ${_mixN.toLocaleString()} mix shapes` : '') + ')';
     return g;
   }
 
@@ -4050,18 +4419,23 @@ function buildGcode(offsetX=0, offsetY=0) {
   // Shapes are generated in raster order (row by row), which makes the tool
   // fly back across the whole workpiece at the end of every row. Re-ordering
   // them nearest-neighbour first cuts a large slice off the rapid travel.
-  const _ordered = TRAVEL.order(S.shapes);
-  if (_ordered.saved > 0) {
-    g += cm(`Travel optimised: ${_ordered.beforeMm.toFixed(0)}mm → ${_ordered.afterMm.toFixed(0)}mm (-${_ordered.saved.toFixed(0)}%)`);
-    g += '\n';
-  }
-
-  for (let i = 0; i < _ordered.shapes.length; i++) {
-    const s  = _ordered.shapes[i];
-    const sx = parseFloat((s.x * sc + offsetX).toFixed(3));
-    const sy = parseFloat(((H - s.y) * sc + offsetY).toFixed(3));
-    const sr = parseFloat((s.r * sc).toFixed(3));
-    g += gcodeShape(sx, sy, sr, S.pattern, depth, feed, plunge, safeZ, i+1, fmt, toolDia, S.patRot);
+  let _n = 0;
+  for (const L of exportLayers()) {
+    if (!L.shapes.length) continue;
+    const _ordered = TRAVEL.order(L.shapes);
+    if (L.mix) g += '\n' + cm(`── Mix layer (${L.pat}) · ${L.shapes.length} shapes ──`);
+    if (_ordered.saved > 0) {
+      g += cm(`Travel optimised: ${_ordered.beforeMm.toFixed(0)}mm → ${_ordered.afterMm.toFixed(0)}mm (-${_ordered.saved.toFixed(0)}%)`);
+      g += '\n';
+    }
+    for (let i = 0; i < _ordered.shapes.length; i++) {
+      const s  = _ordered.shapes[i];
+      const sx = parseFloat((s.x * sc + offsetX).toFixed(3));
+      const sy = parseFloat(((H - s.y) * sc + offsetY).toFixed(3));
+      const sr = parseFloat((s.r * sc).toFixed(3));
+      g += gcodeShape(sx, sy, sr, L.pat, depth, feed, plunge, safeZ, ++_n, fmt, toolDia, L.rot,
+                      L.mix ? mixShapeSrc() : IMGSHAPE);
+    }
   }
 
   g += `\n${cm('── End of job ──')}`;
@@ -4073,11 +4447,11 @@ function buildGcode(offsetX=0, offsetY=0) {
   }
 
   S.lastGcode = g;
-  $('statusTxt').textContent = `✅ G-code ready (${S.shapes.length.toLocaleString()} shapes)`;
+  $('statusTxt').textContent = `✅ G-code ready (${exportShapeCount().toLocaleString()} shapes)`;
   return g;
 }
 
-function gcodeShape(x, y, r, pat, depth, feed, plunge, safeZ, n, fmt, toolDia = 0, rot = 0) {
+function gcodeShape(x, y, r, pat, depth, feed, plunge, safeZ, n, fmt, toolDia = 0, rot = 0, src = null) {
   const cmChar = (fmt==='fanuc'||fmt==='siemens') ? '(' : ';';
   const cmEnd  = (fmt==='fanuc'||fmt==='siemens') ? ')' : '';
   let g = `${cmChar} #${n}${cmEnd}\n`;
@@ -4096,7 +4470,7 @@ function gcodeShape(x, y, r, pat, depth, feed, plunge, safeZ, n, fmt, toolDia = 
       break;
     }
     default: {
-      const pts = getShapePoints(x, y, r, pat, rot);
+      const pts = getShapePoints(x, y, r, pat, rot, src);
       let first = true;
       for (const [px, py] of pts) {
         if (first) { g += `G0 X${f(px)} Y${f(py)}\nG1 Z${depth} F${plunge}\n`; first = false; }
@@ -4142,7 +4516,56 @@ function buildSVGString(units) {
         `${((p.cx - p.hw*lnx)*sc).toFixed(3)},${((H - p.cy + p.hw*lny)*sc).toFixed(3)}`).join(' ');
       strips += `  <polygon points="${edgeA} ${edgeB}" fill="${fg}"/>\n`;
     }
-    return `${hdr}\n${strips}</svg>`;
+    return `${hdr}\n${strips}${_mixSvg()}</svg>`;
+  }
+
+  // The Line Raster and Text Raster branches below return early, so the mix
+  // layer used to vanish from the SVG whenever the MAIN pattern was one of
+  // them. Build it once here and splice it into every exit.
+  function _mixSvg() {
+    if (!(S.mixEnabled && S.mixPat && S.mixShapes && S.mixShapes.length)) return '';
+    const op = S.mixAlpha.toFixed(2), sw = (0.15*sc).toFixed(3);
+    if (S.mixPat === 'textraster') {
+      const chars = mixChars();
+      if (!chars.length) chars.push('A');
+      let t = '';
+      S.mixShapes.forEach((s, i) => {
+        if (s.r < 0.5) return;
+        const ch = S.textMode === 'rnd'
+          ? chars[Math.floor(Math.random() * chars.length)]
+          : chars[i % chars.length];
+        t += `  <text x="${(s.x*sc).toFixed(3)}" y="${((H-s.y)*sc).toFixed(3)}" ` +
+             `font-size="${(s.r*1.9*sc).toFixed(3)}" font-family="${S.textFont||'Arial'}" ` +
+             `font-weight="bold" text-anchor="middle" dominant-baseline="middle" ` +
+             `fill="${fg}" opacity="${op}">${ch}</text>\n`;
+      });
+      return t;
+    }
+    let d2 = '';
+    const _MS = mixShapeSrc();
+    if (S.mixPat === 'imgshape' && _MS.normPaths && _MS.normPaths.length) {
+      const rot = ((parseInt(($(mixShapeRotId())||{}).value) || 0) + (S.mixPatRot || 0)) * Math.PI / 180;
+      const cosR = Math.cos(rot), sinR = Math.sin(rot);
+      for (const s of S.mixShapes) {
+        const r = s.r * sc, cx2 = s.x * sc, cy2 = (H - s.y) * sc;
+        for (const path of _MS.normPaths) {
+          if (!path || path.length < 2) continue;
+          path.forEach((pt, i) => {
+            const x2 = cx2 + (pt.x*cosR - pt.y*sinR) * r;
+            const y2 = cy2 - (pt.x*sinR + pt.y*cosR) * r;   // SVG Y is up here
+            d2 += `${i ? 'L' : 'M'}${x2.toFixed(3)},${y2.toFixed(3)} `;
+          });
+          if (_MS.isContour) d2 += 'Z ';
+        }
+      }
+    } else {
+      for (const s of S.mixShapes) {
+        d2 += svgShapePath(s.x*sc, (H - s.y)*sc, Math.max(0.001, s.r*sc), S.mixPat, S.mixPatRot);
+      }
+    }
+    if (!d2) return '';
+    return `  <path d="${d2.trim()}" fill="${S.fill?fg:'none'}" ` +
+           `stroke="${S.fill?'none':fg}" stroke-width="${sw}" opacity="${op}"/>\n`;
   }
 
   // ── Text Raster SVG: <text> elements ─────────────────────
@@ -4160,7 +4583,7 @@ function buildSVGString(units) {
       const tx = (s.x * sc).toFixed(3), ty = ((H - s.y) * sc).toFixed(3);
       texts += `  <text x="${tx}" y="${ty}" font-size="${fs}" font-family="${S.textFont||'Arial'}" font-weight="bold" text-anchor="middle" dominant-baseline="middle" fill="${fg}">${ch}</text>\n`;
     }
-    return `${hdr}\n${texts}</svg>`;
+    return `${hdr}\n${texts}${_mixSvg()}</svg>`;
   }
 
   // ── Standard shapes SVG ───────────────────────────────────
@@ -4169,17 +4592,9 @@ function buildSVGString(units) {
     const sx = s.x * sc, sy = (H - s.y) * sc, sr = s.r * sc;
     d += svgShapePath(sx, sy, sr, S.pattern, S.patRot);
   }
-  // Mix Layer overlay path
-  let d2 = '';
-  if (S.mixEnabled && S.mixPat && S.mixShapes && S.mixShapes.length) {
-    const mixR = Math.max(0.001, S.mixDiamMm / 2); // radius in mm (sc already mm scale)
-    for (const s of S.mixShapes) {
-      const sx = s.x * sc, sy = (H - s.y) * sc;
-      d2 += svgShapePath(sx, sy, mixR, S.mixPat, S.patRot);
-    }
-  }
   let svg = `${hdr}\n  <path d="${d.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${(0.15*sc).toFixed(3)}"/>`;
-  if (d2) svg += `\n  <path d="${d2.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${(0.15*sc).toFixed(3)}" opacity="${S.mixAlpha.toFixed(2)}"/>`;
+  const _mx = _mixSvg();
+  if (_mx) svg += `\n${_mx.replace(/\n$/, '')}`;
   svg += '\n</svg>';
   return svg;
 }
@@ -8363,30 +8778,34 @@ function buildDXF12() {
     return s + g(0,'SEQEND') + g(5,nh()) + g(8,'0');
   };
 
-  if (S.pattern === 'imgshape' && IMGSHAPE.normPaths && IMGSHAPE.normPaths.length) {
-    const cosR = Math.cos(rot*Math.PI/180), sinR = Math.sin(rot*Math.PI/180);
-    for (const s of S.shapes) {
-      const cxm = s.x*sc, cym = (H - s.y)*sc, rr = s.r*sc;
-      for (const path of IMGSHAPE.normPaths) {
-        if (!path || path.length < 2) continue;
-        ents.push(polyline(path.map(p => [
-          cxm + (p.x*cosR - p.y*sinR)*rr,
-          cym - (p.x*sinR + p.y*cosR)*rr     // canvas Y is down, DXF Y is up
-        ])));
+  for (const L of exportLayers()) {
+    const lrot = L.rot || 0;
+    const _LS = L.mix ? mixShapeSrc() : IMGSHAPE;
+    if (L.pat === 'imgshape' && _LS.normPaths && _LS.normPaths.length) {
+      const cosR = Math.cos(lrot*Math.PI/180), sinR = Math.sin(lrot*Math.PI/180);
+      for (const s of L.shapes) {
+        const cxm = s.x*sc, cym = (H - s.y)*sc, rr = s.r*sc;
+        for (const path of _LS.normPaths) {
+          if (!path || path.length < 2) continue;
+          ents.push(polyline(path.map(p => [
+            cxm + (p.x*cosR - p.y*sinR)*rr,
+            cym - (p.x*sinR + p.y*cosR)*rr     // canvas Y is down, DXF Y is up
+          ])));
+        }
       }
-    }
-  } else if (S.pattern === 'circle' || S.pattern === 'dot') {
-    for (const s of S.shapes) {
-      const x = s.x*sc, y = (H - s.y)*sc, r = s.r*sc;
-      if (!(r > 0)) continue;                       // AutoCAD rejects a zero-radius circle
-      track(x, y, r);
-      ents.push(g(0,'CIRCLE') + g(5,nh()) + g(8,'0') + g(10,f(x)) + g(20,f(y)) + g(30,'0.0') + g(40,f(r)));
-    }
-  } else {
-    for (const s of S.shapes) {
-      const pts = getShapePoints(s.x, s.y, s.r, S.pattern, rot);
-      if (!pts || pts.length < 2) continue;
-      ents.push(polyline(pts.map(p => [p[0]*sc, (H - p[1])*sc])));
+    } else if (L.pat === 'circle' || L.pat === 'dot') {
+      for (const s of L.shapes) {
+        const x = s.x*sc, y = (H - s.y)*sc, r = s.r*sc;
+        if (!(r > 0)) continue;                     // AutoCAD rejects a zero-radius circle
+        track(x, y, r);
+        ents.push(g(0,'CIRCLE') + g(5,nh()) + g(8,'0') + g(10,f(x)) + g(20,f(y)) + g(30,'0.0') + g(40,f(r)));
+      }
+    } else {
+      for (const s of L.shapes) {
+        const pts = getShapePoints(s.x, s.y, s.r, L.pat, lrot, _LS);
+        if (!pts || pts.length < 2) continue;
+        ents.push(polyline(pts.map(p => [p[0]*sc, (H - p[1])*sc])));
+      }
     }
   }
 
@@ -8833,7 +9252,7 @@ $('expAI').addEventListener('click', () => {
      x="0px" y="0px" width="${wW}mm" height="${wH}mm" viewBox="0 0 ${wW} ${wH}"
      xml:space="preserve">
 <!-- Adobe Illustrator compatible SVG -->
-<!-- CNC Pattern Generator | ${patName(S.pattern)} | ${S.shapes.length} shapes -->
+<!-- CNC Pattern Generator | ${patName(S.pattern)} | ${exportShapeCount()} shapes -->
 <rect width="${wW}" height="${wH}" fill="${bg}"/>
 <path d="${d.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${f(0.15*sc)}"/>
 </svg>`;
@@ -8846,7 +9265,7 @@ $('expAI').addEventListener('click', () => {
 // before 100k; 200k circles is a ~16 MB file that will hang it. Say so before
 // spending a minute writing a file that cannot be used.
 function _confirmHugeExport(kind) {
-  const n = S.shapes.length;
+  const n = exportShapeCount();
   const est = n * 82;
   // Opened straight off the disk, Chrome turns off the File System Access API,
   // so saving falls back to a blob download — and a large blob download from a
@@ -9509,11 +9928,75 @@ procPreview();
 // IMGSHAPE MODULE  — custom image as pattern element
 // ============================================================
 const IMGSHAPE = { img: null, canvas: null, normPaths: [], rawPaths: [], mode: 'asis', dirty: false, version: 0, traceMode: 'auto' };
+// The Mix Layer's Image Shape used to borrow the main layer's picture, so the
+// two layers could never use different shapes and the mix side had no upload
+// of its own. It now owns a full slot with the same tracing pipeline.
+const MIXSHAPE = { img: null, canvas: null, normPaths: [], rawPaths: [], mode: 'asis', dirty: false, version: 0, traceMode: 'auto' };
+
+// A "slot" is the store plus the ids of the controls that drive it. Passing one
+// into the tracer is what lets the same ~200 lines serve both layers.
+const SHAPE_SLOTS = {
+  main: { store: IMGSHAPE, ids: {} },
+  mix:  { store: MIXSHAPE, ids: {
+    shapeInfo: 'mxShapeInfo', shSilInvert: 'mxSilInvert', shSilTh: 'mxSilTh',
+    shSilThV: 'mxSilThV', shSilRow: 'mxSilRow', shRot: 'mxRot', shRotV: 'mxRotV',
+    shapeThumb: 'mxShapeThumb', shapeThumbWrap: 'mxShapeThumbWrap',
+    shapeUploadArea: 'mxShapeUploadArea'
+  } }
+};
+// The mix layer draws its own shape when it has one, and falls back to the main
+// picture otherwise — so projects saved before this existed keep working.
+function mixShapeSrc() {
+  return (MIXSHAPE.normPaths && MIXSHAPE.normPaths.length) ? MIXSHAPE : IMGSHAPE;
+}
+function mixShapeRotId() {
+  return (MIXSHAPE.normPaths && MIXSHAPE.normPaths.length) ? 'mxRot' : 'shRot';
+}
 
 // ── Offscreen stamp cache for imgshape fast rendering ────────────────────────
 // Pre-bakes the shape into a 512×512 canvas once; updateViewCanvas() stamps it
 // with drawImage() instead of re-tracing every path point for every shape instance.
 let _ishStamp = null, _ishStampKey = '';
+let _mixStamp = null, _mixStampKey = '';
+
+// The mix layer used to be drawn by walking every traced point for every dot.
+// A real traced picture is ~1000 points, so a few thousand dots meant millions
+// of lineTo calls per frame — 20-30x slower than the main layer, which bakes
+// the shape into a small canvas once and blits it. Same treatment here.
+function _rebuildMixStamp() {
+  const store = mixShapeSrc();
+  const np = store.normPaths;
+  if (!np || !np.length) { _mixStamp = null; return null; }
+  const rot = ((parseInt(($(mixShapeRotId()) || {}).value) || 0) + (S.mixPatRot || 0)) * Math.PI / 180;
+  const fg  = S.darkBg ? '#ffffff' : '#000000';
+  const key = `${store === MIXSHAPE ? 'm' : 'i'}|${store.version}|${rot.toFixed(4)}|${S.fill ? 1 : 0}|${fg}`;
+  if (_mixStamp && _mixStampKey === key) return _mixStamp;
+  const SZ = 512, half = SZ / 2;
+  const oc = document.createElement('canvas'); oc.width = oc.height = SZ;
+  const octx = oc.getContext('2d');
+  octx.clearRect(0, 0, SZ, SZ);
+  octx.strokeStyle = fg; octx.fillStyle = fg;
+  octx.lineWidth = 2; octx.lineCap = 'round'; octx.lineJoin = 'round';
+  const cosR = Math.cos(rot), sinR = Math.sin(rot);
+  const useRot = Math.abs(rot) > 0.01;
+  const isContour = !!store.isContour;
+  octx.beginPath();
+  for (const path of np) {
+    if (!path || path.length < 2) continue;
+    for (let i = 0; i < path.length; i++) {
+      const px = path[i].x, py = path[i].y;
+      const rx = useRot ? px*cosR - py*sinR : px;
+      const ry = useRot ? px*sinR + py*cosR : py;
+      const tx = half + rx * half, ty = half + ry * half;
+      if (i === 0) octx.moveTo(tx, ty); else octx.lineTo(tx, ty);
+    }
+    if (isContour) octx.closePath();
+  }
+  if (isContour && S.fill) octx.fill('evenodd'); else octx.stroke();
+  _mixStamp = oc; _mixStampKey = key;
+  return _mixStamp;
+}
+
 function _rebuildImgshapeStamp() {
   const np = IMGSHAPE.normPaths;
   if (!np || !np.length) { _ishStamp = null; return; }
@@ -9549,24 +10032,29 @@ function _rebuildImgshapeStamp() {
   _ishStamp = oc; _ishStampKey = key;
 }
 
-function setShapeMode(m) {
-  IMGSHAPE.mode = m;
+function setShapeMode(m, which) {
+  const slot = (which === 'mix') ? SHAPE_SLOTS.mix : SHAPE_SLOTS.main;
+  const pre  = (which === 'mix') ? 'mxMode' : 'shMode';
+  slot.store.mode = m;
   ['asis','gray','sil'].forEach(k=>{
-    const b=$('shMode'+k.charAt(0).toUpperCase()+k.slice(1)+'Btn');
+    const b=$(pre+k.charAt(0).toUpperCase()+k.slice(1)+'Btn');
     if(b) b.classList.toggle('active', k===m);
   });
-  const sr=$('shSilRow'); if(sr) sr.style.display = m==='sil'?'':'none';
-  if (IMGSHAPE.img) { _buildShapeCanvas(); scheduleRender(); }
+  const sr=$((which === 'mix') ? 'mxSilRow' : 'shSilRow');
+  if(sr) sr.style.display = m==='sil'?'':'none';
+  if (slot.store.img) { slot.store.dirty = true; _buildShapeCanvas(slot); scheduleRender(); }
 }
 
 // ── โหมดตรวจจับเส้น: อัตโนมัติ / บังคับเส้นขอบ (รูปทึบ) / บังคับเส้นกลาง (ลายเส้นบาง) ──
-function setShapeTraceMode(m) {
-  IMGSHAPE.traceMode = m;
+function setShapeTraceMode(m, which) {
+  const slot = (which === 'mix') ? SHAPE_SLOTS.mix : SHAPE_SLOTS.main;
+  const pre  = (which === 'mix') ? 'mxTrace' : 'shTrace';
+  slot.store.traceMode = m;
   ['auto','outline','skeleton'].forEach(k=>{
-    const b=$('shTrace'+k.charAt(0).toUpperCase()+k.slice(1)+'Btn');
+    const b=$(pre+k.charAt(0).toUpperCase()+k.slice(1)+'Btn');
     if(b) b.classList.toggle('active', k===m);
   });
-  if (IMGSHAPE.img) { IMGSHAPE.dirty = true; _buildShapeCanvas(); scheduleRender(); }
+  if (slot.store.img) { slot.store.dirty = true; _buildShapeCanvas(slot); scheduleRender(); }
 }
 
 function onImgShapeSelect() {
@@ -9609,8 +10097,24 @@ function stitchPaths(paths, maxGap) {
   return segs.filter(Boolean);
 }
 
-function _buildShapeCanvas() {
+// Maps a logical control id onto the id that belongs to the given shape slot.
+function _slotEl(slot, id) { return $(slot.ids[id] || id); }
+
+function _buildShapeCanvas(slot) {
+  // Shadow the two things the body reaches for. Everything below then operates
+  // on whichever slot was asked for, with no other edits to the algorithm.
+  const _slot = slot || SHAPE_SLOTS.main;
+  const IMGSHAPE = _slot.store;
+  // Resolved through a helper defined outside this function — declaring a local
+  // `$` here shadows the real one for the whole body, so it cannot call itself.
+  const $ = id => _slotEl(_slot, id);
   if (!IMGSHAPE.img) return;
+  // Cleared here, not on the success path. Three of the exits below return
+  // early ("no shape found", "trace failed"), and every one of them used to
+  // leave `dirty` set — so the caller re-ran this whole trace on every single
+  // frame. With a picture that never traces cleanly that is an endless loop,
+  // which is exactly what "the app freezes on import" looks like.
+  IMGSHAPE.dirty = false;
   const SZ = 400, N = SZ*SZ;
 
   // ── 1. Display canvas (white bg) ─────────────────────────────────
@@ -9749,6 +10253,7 @@ function _buildShapeCanvas() {
 
   let fgArea = 0; for (let i=0;i<N;i++) fgArea += fg[i];
   if (fgArea < 40) {
+    IMGSHAPE.normPaths = []; IMGSHAPE.rawPaths = []; IMGSHAPE.version++;
     $('shapeInfo').textContent = '⚠️ ไม่พบลายในภาพ — ลองติ๊ก Invert หรือใช้ภาพที่คอนทราสต์สูงกว่า';
     return;
   }
@@ -9837,13 +10342,14 @@ function _buildShapeCanvas() {
   const simp2   = allPaths.slice(0, 120).map(p => vecSimplify(p, 1.0));  // eps 1.5→1.0
   const smooth2 = simp2.filter(p => p.length >= 2).map(p => chaikinSmooth(p, false, 1));
   if (!smooth2.length) {
+    IMGSHAPE.normPaths = []; IMGSHAPE.rawPaths = []; IMGSHAPE.version++;
     $('shapeInfo').textContent = '⚠️ ลอกลายไม่สำเร็จ — ลองสลับโหมดตรวจจับเส้น หรือใช้ภาพลายเส้นที่ชัดกว่า';
     return;
   }
   IMGSHAPE.normPaths = smooth2.map(norm);
   IMGSHAPE.rawPaths  = simp2.filter(p => p.length >= 2).map(norm);
   IMGSHAPE.isContour = false; IMGSHAPE.dirty = false; IMGSHAPE.version++;
-  _ishStamp = null; // invalidate stamp cache
+  _ishStamp = null; _mixStamp = null; // invalidate stamp caches
   const pts2 = smooth2.reduce((a,p)=>a+p.length, 0);
   $('shapeInfo').textContent =
     `✅ ${smooth2.length} เส้น / ${pts2} จุด (skeleton · ${fgLabel} · เส้นหนา ${strokeW.toFixed(1)}px)`;
@@ -9914,26 +10420,29 @@ function _outerBoundary(bin, w, h) {
   return contour;
 }
 
-function loadShapeImg(file) {
+function loadShapeImg(file, which) {
+  const slot = (which === 'mix') ? SHAPE_SLOTS.mix : SHAPE_SLOTS.main;
+  const id   = k => slot.ids[k] || k;
   const ext = (file.name||'').split('.').pop().toLowerCase();
-  const read = (txt) => {
-    const img = new Image();
-    img.onload = () => {
-      IMGSHAPE.img = img;
-      IMGSHAPE.dirty = true;
-      $('shapeThumb').src = img.src;
-      $('shapeThumbWrap').style.display = 'block';
-      $('shapeUploadArea').style.display = 'none';
-      $('shapeInfo').textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
-      _buildShapeCanvas();
-      scheduleRender();
-    };
-    img.src = txt;
+  const place = (img) => {
+    slot.store.img = img;
+    slot.store.dirty = true;
+    const th = $(id('shapeThumb')); if (th) th.src = img.src;
+    const tw = $(id('shapeThumbWrap')); if (tw) tw.style.display = 'block';
+    const ua = $(id('shapeUploadArea')); if (ua) ua.style.display = 'none';
+    const inf = $(id('shapeInfo'));
+    if (inf) inf.textContent = `${img.naturalWidth||img.width}×${img.naturalHeight||img.height}px`;
+    _buildShapeCanvas(slot);
+    scheduleRender();
   };
   if (ext==='dxf') {
-    const r=new FileReader(); r.onload=e=>{ const img=dxfToImage(e.target.result,512,512); img.onload=()=>{ IMGSHAPE.img=img;IMGSHAPE.dirty=true;$('shapeThumb').src=img.src;$('shapeThumbWrap').style.display='block';$('shapeUploadArea').style.display='none';_buildShapeCanvas();scheduleRender();}; }; r.readAsText(file);
+    const r=new FileReader();
+    r.onload=e=>{ const img=dxfToImage(e.target.result,512,512); img.onload=()=>place(img); };
+    r.readAsText(file);
   } else {
-    const r=new FileReader(); r.onload=e=>read(e.target.result); r.readAsDataURL(file);
+    const r=new FileReader();
+    r.onload=e=>{ const img=new Image(); img.onload=()=>place(img); img.src=e.target.result; };
+    r.readAsDataURL(file);
   }
 }
 
@@ -10474,8 +10983,8 @@ const GCHECK = {
     } else if (depth > 0) add('ok', `ความลึกตัด ${depth} mm`);
 
     // ── 7. Program size ──
-    if (S.shapes.length > 20000) {
-      add('warn', `จำนวนรูปสูงมาก (${S.shapes.length.toLocaleString()})`,
+    if (exportShapeCount() > 20000) {
+      add('warn', `จำนวนรูปสูงมาก (${exportShapeCount().toLocaleString()})`,
           'คอนโทรลเลอร์บางรุ่นบัฟเฟอร์ไม่พอ ควรลองแบ่งงานหรือเพิ่มระยะห่าง');
     }
 
@@ -10630,7 +11139,8 @@ const PROJECT = {
   TOGGLES: {
     togInvert: 'invert', togFill: 'fill', togDarkBg: 'darkBg',
     togQuantRandom: 'quantRandom', togMixLayer: 'mixEnabled',
-    togSkipBlank: 'skipBlank'
+    togSkipBlank: 'skipBlank', togMixVar: 'mixVar',
+    togMixQuantRandom: 'mixQuantRandom'
   },
 
   collect(withImages = true) {
@@ -10654,11 +11164,13 @@ const PROJECT = {
       // aspect lock falls back to 1:1 on reload and squares the work area.
       aspectLocked: S.aspectLocked, imgAspect: S.imgAspect,
       shapeMode: IMGSHAPE.mode, traceMode: IMGSHAPE.traceMode,
+      mixShapeMode: MIXSHAPE.mode, mixTraceMode: MIXSHAPE.traceMode,
       profToolType, acToolTypeVal
     };
     if (withImages) {
       st.image      = (S.image && S.image.src)      ? S.image.src      : null;
-      st.shapeImage = (IMGSHAPE.img && IMGSHAPE.img.src) ? IMGSHAPE.img.src : null;
+      st.shapeImage    = (IMGSHAPE.img && IMGSHAPE.img.src) ? IMGSHAPE.img.src : null;
+      st.mixShapeImage = (MIXSHAPE.img && MIXSHAPE.img.src) ? MIXSHAPE.img.src : null;
     }
     return st;
   },
@@ -10712,15 +11224,18 @@ const PROJECT = {
       if (st.mode) setMode(st.mode);
       if (st.shapeMode) setShapeMode(st.shapeMode);
       if (st.traceMode) setShapeTraceMode(st.traceMode);
+      if (st.mixShapeMode) setShapeMode(st.mixShapeMode, 'mix');
+      if (st.mixTraceMode) setShapeTraceMode(st.mixTraceMode, 'mix');
       // Images load asynchronously, so the restore is NOT over when this
       // function returns. Hold the guard until every image has landed.
       this._sizeSnap = {
         workW: st.ctrls.workW, workH: st.ctrls.workH, units: st.ctrls.units,
         dpiPreset: st.ctrls.dpiPreset, dpiCustom: st.ctrls.dpiCustom
       };
-      this._pendingImgs = (st.image ? 1 : 0) + (st.shapeImage ? 1 : 0);
+      this._pendingImgs = (st.image ? 1 : 0) + (st.shapeImage ? 1 : 0) + (st.mixShapeImage ? 1 : 0);
       if (st.image)      this._restoreImage(st.image, false);
-      if (st.shapeImage) this._restoreImage(st.shapeImage, true);
+      if (st.shapeImage)    this._restoreImage(st.shapeImage, 'shape');
+      if (st.mixShapeImage) this._restoreImage(st.mixShapeImage, 'mixshape');
     } catch (e) {
       console.error('Project restore failed:', e);
       this._pendingImgs = 0;
@@ -10728,6 +11243,7 @@ const PROJECT = {
       return false;
     }
     if (!this._pendingImgs) this.restoring = false;
+    if (typeof _syncPatternPanels === 'function') _syncPatternPanels();
     scheduleRender(50);
     return true;
   },
@@ -10749,6 +11265,7 @@ const PROJECT = {
       }
     } catch (e) { console.warn('size restore:', e); }
     this.restoring = false;
+    if (typeof _syncPatternPanels === 'function') _syncPatternPanels();
     if (typeof updateSourceInfo === 'function') updateSourceInfo();
     if (typeof updateSpacingNote === 'function') updateSpacingNote();
     fitCanvases();
@@ -10767,12 +11284,18 @@ const PROJECT = {
     img.onerror = () => { console.warn('restored image failed to decode'); done(); };
     setTimeout(done, 15000);
     img.onload = () => {
-      if (isShape) {
+      if (isShape === 'mixshape') {
+        MIXSHAPE.img = img; MIXSHAPE.dirty = true;
+        $('mxShapeThumb').src = img.src;
+        $('mxShapeThumbWrap').style.display = 'block';
+        $('mxShapeUploadArea').style.display = 'none';
+        _buildShapeCanvas(SHAPE_SLOTS.mix);
+      } else if (isShape) {
         IMGSHAPE.img = img; IMGSHAPE.dirty = true;
         $('shapeThumb').src = img.src;
         $('shapeThumbWrap').style.display = 'block';
         $('shapeUploadArea').style.display = 'none';
-        _buildShapeCanvas();
+        _buildShapeCanvas(SHAPE_SLOTS.main);
       } else {
         _applyLoadedImage(img);
       }
@@ -10833,7 +11356,7 @@ const PROJECT = {
   // clean and offer the recovery instead of forcing it.
   _worthRestoring(st) {
     if (!st || !st.ctrls) return false;
-    if (st.image || st.shapeImage) return true;
+    if (st.image || st.shapeImage || st.mixShapeImage) return true;
     const c = st.ctrls;
     if (c.textRaster && String(c.textRaster).trim()) return true;
     // Any work size the user actually typed counts as work in progress.
@@ -11097,6 +11620,8 @@ const HISTORY = {
       if (el) el.addEventListener('input', () => updateSpacingNote());
     });
     updateSpacingNote();
+
+    if (typeof _syncPatternPanels === 'function') _syncPatternPanels();
 
     // ── Open on a clean sheet; offer the last session instead of forcing it ──
     HISTORY.reset();
