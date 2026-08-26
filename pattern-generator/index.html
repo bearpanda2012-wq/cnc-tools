@@ -1513,6 +1513,35 @@ pre.gcode-content {
         <button class="btn btn-blue" style="width:100%;font-size:12px;padding:9px;border-radius:8px"
           onclick="applyProcPattern()">▶ ใช้ลายนี้ &amp; Generate</button>
 
+        <!-- Blending the generated field with a loaded photo, instead of
+             throwing the photo away. -->
+        <div id="procMixBox" style="margin-top:10px;border-top:1px solid #2a2c34;padding-top:9px">
+          <div class="tog-row" style="margin-bottom:6px">
+            <span class="tog-label">ผสมกับรูปที่โหลดไว้</span>
+            <div class="toggle" id="togProcMix"></div>
+          </div>
+          <div id="procMixOpts" style="display:none">
+            <div style="font-size:10px;color:#aaa;margin-bottom:4px">วิธีผสม</div>
+            <select id="procMixMode" class="num-in" style="width:100%;margin-bottom:8px"
+              onchange="updateProcMixNote()">
+              <option value="multiply">คูณ (Multiply) — ลายกดให้เข้มขึ้น</option>
+              <option value="screen">สกรีน (Screen) — ลายทำให้สว่างขึ้น</option>
+              <option value="average">เฉลี่ย (Average) — ผสมเท่า ๆ กัน</option>
+              <option value="darken">เลือกเข้ม (Darken)</option>
+              <option value="lighten">เลือกสว่าง (Lighten)</option>
+              <option value="overlay">ทับซ้อน (Overlay) — คงคอนทราสต์รูป</option>
+              <option value="mask">ขอบเขต (Mask) — สร้างลายเฉพาะในพื้นที่ของลาย</option>
+            </select>
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+              <span>น้ำหนักลาย</span>
+              <span id="procMixAmtV" style="color:#0a7aff;font-size:10px;font-weight:600">50%</span>
+            </div>
+            <input type="range" id="procMixAmt" min="0" max="100" value="50" step="1"
+              oninput="$('procMixAmtV').textContent=this.value+'%'" style="width:100%;accent-color:#0a7aff">
+            <div id="procMixNote" style="font-size:9px;color:#8e8e94;margin-top:5px;line-height:1.5"></div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -2127,7 +2156,7 @@ const S = {
   // Mix Layer
   // Which pattern engine builds the cell positions. 'std45' is the original
   // behaviour and the default, so existing projects are untouched.
-  patternEngine: 'std45', xSpacingMm: 100, ySpacingMm: 100,
+  patternEngine: 'std45', xSpacingMm: 100, ySpacingMm: 100, sourcePhoto: null,
   mixEnabled: false, mixPat: 'circle', mixDiamMm: 2.0, mixPatRot: 0, mixAlpha: 0.7,
   // Mix layer used to be one fixed diameter, preview-only. It can now vary
   // with tone exactly like the main pattern, and it is exported with it.
@@ -2364,6 +2393,11 @@ $('mxShapeFileInput').addEventListener('change', e => {
 function _applyLoadedImage(img) {
   S.image = img;
   S.imageFromProc = false;
+  // The imported picture, kept aside untouched. Blending writes its RESULT
+  // back into S.image, so without this the next blend would use the already
+  // blended copy as its base and the photo washed out a little more with every
+  // press of Generate until only the pattern was left.
+  S.sourcePhoto = img;
   $('imgThumb').src = img.src || img.currentSrc || '';
   $('imgThumbWrap').style.display = 'block';
   $('uploadArea').style.display = 'none';
@@ -2384,6 +2418,7 @@ function _applyLoadedImage(img) {
   }
   fitCanvases();
   zoom.show();
+  if (typeof updateProcMixNote === 'function') updateProcMixNote();
   scheduleRender();
 }
 
@@ -3206,6 +3241,32 @@ function tog(id, key) {
 tog('togInvert','invert'); tog('togFill','fill'); tog('togDarkBg','darkBg');
 tog('togQuantRandom','quantRandom'); tog('togSkipBlank','skipBlank');
 tog('togMixQuantRandom','mixQuantRandom');
+
+// Blend-with-photo switch. Shows its options and says whether there is a photo
+// to blend with, because the control does nothing without one.
+$('togProcMix').addEventListener('click', function() {
+  this.classList.toggle('on');
+  $('procMixOpts').style.display = this.classList.contains('on') ? '' : 'none';
+  updateProcMixNote();
+  if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+});
+function updateProcMixNote() {
+  const n = $('procMixNote');
+  if (!n) return;
+  const on = $('togProcMix').classList.contains('on');
+  if (!on) { n.textContent = ''; return; }
+  const isMask = ($('procMixMode') || {}).value === 'mask';
+  const hasPhoto = !!(S.sourcePhoto || (S.image && !S.imageFromProc));
+  if (isMask) {
+    n.textContent = 'โหมดขอบเขต: สร้างลายเฉพาะในพื้นที่ของลายเท่านั้น · ' +
+      'นอกพื้นที่จะเว้นว่างไม่มีรู · เลื่อน "น้ำหนักลาย" เพื่อขยาย/ลดพื้นที่' +
+      (hasPhoto ? ' · ขนาดรูในพื้นที่ยังไล่ตามรูป' : '');
+  } else {
+    n.textContent = hasPhoto
+      ? 'ลายจะถูกผสมกับรูปที่โหลดไว้ · รูปจะไม่ถูกแทนที่ และคงสัดส่วนเดิม'
+      : '⚠ ยังไม่มีรูปที่โหลดไว้ — จะได้ลายล้วน กรุณานำรูปเข้าก่อนแล้วกดสร้างลายอีกครั้ง';
+  }
+}
 // Swaps the mix layer between one fixed size and a tone-driven range.
 $('togMixVar').addEventListener('click', function() {
   S.mixVar = !S.mixVar;
@@ -3357,7 +3418,7 @@ function generateSpecialXYPattern(o, emit) {
 // first line, and in every export filename — so a file and a screenshot
 // always say which build produced them. Several rounds have been lost
 // analysing output from a stale copy of this page.
-const BUILD_TAG = '26Aug-b21';
+const BUILD_TAG = '26Aug-b27';
 
 const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
 function updateSpacingNote() {
@@ -3977,9 +4038,18 @@ function _generate() {
     // the tile centres that engine already places.
     let offX, offY;
     if (S.patternEngine === 'specialxy') {
-      const hx = (S.xSpacingMm * mmToPx) * 0.5, hy = (S.ySpacingMm * mmToPx) * 0.5;
-      offX = hx * cosA - hy * sinA;
-      offY = hx * sinA + hy * cosA;
+      // The Special engine does NOT rotate its lattice — the Grid Angle only
+      // staggers rows. Rotating the half-cell offset by that angle threw the
+      // mix dots right off the lattice; a plain half cell was no better,
+      // because the next row is ALREADY shifted, so the offset landed back on
+      // the neighbouring column. The interstitial point of a lattice built
+      // from (X, 0) and (shift, Y) is half of each basis vector added
+      // together — that is the centre of the four dots around it.
+      const xPx = S.xSpacingMm * mmToPx, yPx = S.ySpacingMm * mmToPx;
+      const degS = ((S.angle % 180) + 180) % 180;
+      const shiftPx = xPx * ((degS / 90) % 1);
+      offX = (xPx + shiftPx) / 2;
+      offY = yPx / 2;
     } else {
       offX = spacingPx * 0.5 * (cosA - sinA);
       offY = spacingPx * 0.5 * (sinA + cosA);
@@ -10388,10 +10458,62 @@ function applyProcPattern(keepSize = false) {
   const inv = $('togProcInv').classList.contains('on');
   if (!fn) return;
 
-  const W = 1024, H = 1024;
+  // Mixing with the picture that is already loaded, rather than replacing it.
+  // The photo supplies the tone, the generated field modulates it.
+  const mixOn  = $('togProcMix') && $('togProcMix').classList.contains('on');
+  // Always blend from the ORIGINAL photo, never from the previous result.
+  const basePhoto = mixOn
+    ? (S.sourcePhoto || ((S.image && !S.imageFromProc) ? S.image : null))
+    : null;
+  const mixMode = ($('procMixMode') || {}).value || 'multiply';
+  // `|| 50` would be wrong here: 0 is a legitimate setting and is falsy, so
+  // asking for 0% strength silently became 50%.
+  const _amtRaw = parseFloat(($('procMixAmt') || {}).value);
+  const mixAmt  = Math.max(0, Math.min(1, (isFinite(_amtRaw) ? _amtRaw : 50) / 100));
+
+  // Keep the photo's own proportions when mixing — squashing it into a 1024
+  // square would distort the artwork the pattern is supposed to follow.
+  let W = 1024, H = 1024;
+  if (basePhoto) {
+    const pw = basePhoto.naturalWidth || basePhoto.width || 1024;
+    const ph = basePhoto.naturalHeight || basePhoto.height || 1024;
+    const k  = Math.min(1, 2048 / Math.max(pw, ph));      // cap the working size
+    W = Math.max(1, Math.round(pw * k));
+    H = Math.max(1, Math.round(ph * k));
+  }
   const offscreen = document.createElement('canvas');
   offscreen.width = W; offscreen.height = H;
   const ctx = offscreen.getContext('2d');
+
+  // Read the photo's brightness once, if we are mixing with it.
+  let photoLum = null;
+  if (basePhoto) {
+    try {
+      ctx.drawImage(basePhoto, 0, 0, W, H);
+      const pd = ctx.getImageData(0, 0, W, H).data;
+      photoLum = new Float32Array(W * H);
+      for (let i = 0, n = W * H; i < n; i++) {
+        const o = i * 4;
+        // Rec. 601 luma, and transparent pixels read as white so an alpha
+        // cut-out does not turn into a black blob.
+        photoLum[i] = (pd[o + 3] < 8)
+          ? 1
+          : (0.299 * pd[o] + 0.587 * pd[o + 1] + 0.114 * pd[o + 2]) / 255;
+      }
+    } catch (e) { photoLum = null; }
+  }
+
+  const blend = (a, b) => {          // a = photo, b = pattern, both 0..1
+    switch (mixMode) {
+      case 'screen':  return 1 - (1 - a) * (1 - b);
+      case 'average': return (a + b) / 2;
+      case 'darken':  return Math.min(a, b);
+      case 'lighten': return Math.max(a, b);
+      case 'overlay': return a < 0.5 ? 2 * a * b : 1 - 2 * (1 - a) * (1 - b);
+      default:        return a * b;                       // multiply
+    }
+  };
+
   const id  = ctx.createImageData(W, H);
   const buf = id.data;
   for (let y = 0; y < H; y++) {
@@ -10399,7 +10521,22 @@ function applyProcPattern(keepSize = false) {
       const nx = x/W, ny = y/H;
       let b = fn(nx, ny, p, cx, cy);
       if (inv) b = 1-b;
-      const v = (b*255)|0, i = (y*W+x)*4;
+      const i = (y*W+x)*4;
+      let out = b;
+      if (mixMode === 'mask') {
+        // The pattern is a stencil, not a tone: inside it the photo shows
+        // through, outside it the field is pure white so no dot is placed at
+        // all. "น้ำหนักลาย" becomes how much of the pattern counts as inside —
+        // 0% keeps the whole sheet, 100% keeps only its darkest core.
+        const a = photoLum ? photoLum[y*W + x] : b;
+        out = (b <= mixAmt) ? a : 1;
+      } else if (photoLum) {
+        const a = photoLum[y*W + x];
+        // mixAmt slides between the untouched photo and the full blend, so 0%
+        // is "photo as it was" and 100% is "pattern at full strength".
+        out = a + (blend(a, b) - a) * mixAmt;
+      }
+      const v = Math.max(0, Math.min(255, (out*255)|0));
       buf[i] = buf[i+1] = buf[i+2] = v; buf[i+3] = 255;
     }
   }
@@ -10413,17 +10550,27 @@ function applyProcPattern(keepSize = false) {
   const userW = parseFloat($('workW').value), userH = parseFloat($('workH').value);
   const hasUserSize = (userW > 0) || (userH > 0);
 
+  // A stencil only shows if the white areas are left bare. Without this the
+  // mask changes the tone but still fills the whole sheet with dots, which
+  // looks like it did nothing.
+  if (mixMode === 'mask' && !S.skipBlank) {
+    const sb = $('togSkipBlank');
+    if (sb) sb.click();
+  }
+
   const img = new Image();
   img.onload = () => {
     S.image         = img;
-    S.imageFromProc = true;
+    // A mixed result inherits the photo's real proportions, so it must not be
+    // treated as the aspect-less generated field.
+    S.imageFromProc = !photoLum;
     // A generated field is a 1024 px SQUARE with no real proportion of its own.
     // With the aspect lock on, that 1:1 ratio was pushed onto the work area:
     // typing 800 wide set 800 tall, then typing 400 tall set 400 wide, so the
     // sheet could never be anything but square. Release the lock — there is no
     // aspect here worth preserving. It can be switched back on to hold
     // whatever ratio is on screen.
-    if (S.aspectLocked) {
+    if (S.aspectLocked && !photoLum) {
       S.aspectLocked = false;
       const lk = $('aspectLock');
       if (lk) { lk.classList.remove('locked'); lk.textContent = '🔓'; }
@@ -11876,6 +12023,11 @@ const PROJECT = {
     };
     if (withImages) {
       st.image      = (S.image && S.image.src)      ? S.image.src      : null;
+      // Only when it differs from the visible image — otherwise the project
+      // file would carry the same picture twice.
+      st.sourcePhoto = (S.sourcePhoto && S.sourcePhoto.src &&
+                        (!S.image || S.sourcePhoto.src !== S.image.src))
+                       ? S.sourcePhoto.src : null;
       st.shapeImage    = (IMGSHAPE.img && IMGSHAPE.img.src) ? IMGSHAPE.img.src : null;
       st.mixShapeImage = (MIXSHAPE.img && MIXSHAPE.img.src) ? MIXSHAPE.img.src : null;
     }
@@ -11941,10 +12093,12 @@ const PROJECT = {
         dpiPreset: st.ctrls.dpiPreset, dpiCustom: st.ctrls.dpiCustom
       };
       this._procFlag = !!st.imageFromProc;
-      this._pendingImgs = (st.image ? 1 : 0) + (st.shapeImage ? 1 : 0) + (st.mixShapeImage ? 1 : 0);
+      this._pendingImgs = (st.image ? 1 : 0) + (st.shapeImage ? 1 : 0) +
+                          (st.mixShapeImage ? 1 : 0) + (st.sourcePhoto ? 1 : 0);
       if (st.image)      this._restoreImage(st.image, false);
       if (st.shapeImage)    this._restoreImage(st.shapeImage, 'shape');
       if (st.mixShapeImage) this._restoreImage(st.mixShapeImage, 'mixshape');
+      if (st.sourcePhoto)   this._restoreImage(st.sourcePhoto, 'sourcephoto');
     } catch (e) {
       console.error('Project restore failed:', e);
       this._pendingImgs = 0;
@@ -11981,6 +12135,7 @@ const PROJECT = {
     // here — and before fitCanvases(), which reads it to decide whether the
     // canvas follows the picture or the work area.
     if (this._procFlag !== undefined) { S.imageFromProc = this._procFlag; this._procFlag = undefined; }
+    if (!S.sourcePhoto && S.image && !S.imageFromProc) S.sourcePhoto = S.image;
     this.restoring = false;
     if (typeof _syncPatternPanels === 'function') _syncPatternPanels();
     if (typeof updateSourceInfo === 'function') updateSourceInfo();
@@ -12001,7 +12156,9 @@ const PROJECT = {
     img.onerror = () => { console.warn('restored image failed to decode'); done(); };
     setTimeout(done, 15000);
     img.onload = () => {
-      if (isShape === 'mixshape') {
+      if (isShape === 'sourcephoto') {
+        S.sourcePhoto = img;
+      } else if (isShape === 'mixshape') {
         MIXSHAPE.img = img; MIXSHAPE.dirty = true;
         $('mxShapeThumb').src = img.src;
         $('mxShapeThumbWrap').style.display = 'block';
