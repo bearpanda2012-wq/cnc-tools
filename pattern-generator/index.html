@@ -37,6 +37,27 @@ header {
 .ic-lg { width: 26px; height: 26px; stroke-width: 1.6; }
 
 /* ── Header action buttons ── */
+.hist-panel {
+  position: fixed; top: 52px; right: 14px; z-index: 9500; display: none;
+  width: 290px; max-height: 60vh; background: #17181d; border: 1px solid #33353e;
+  border-radius: 10px; box-shadow: 0 14px 38px rgba(0,0,0,.6); overflow: hidden;
+  flex-direction: column;
+}
+.hist-panel.open { display: flex; }
+.hist-hd { padding: 9px 11px; font-size: 12px; font-weight: 600; color: #e8e9ee;
+           border-bottom: 1px solid #2a2c34; display:flex; justify-content:space-between; align-items:center; }
+.hist-count { font-size: 10px; color: #8e8e94; font-weight: 500; }
+.hist-list { overflow-y: auto; padding: 4px; }
+.hist-item {
+  display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left;
+  padding: 6px 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent;
+  background: transparent; color: #c9cad1; font-size: 11.5px; line-height: 1.4;
+}
+.hist-item:hover { background: #22242b; }
+.hist-item.current { background: #1d2633; border-color: #2c4160; color: #fff; }
+.hist-item .hist-n { color: #6a6a70; font-size: 10px; min-width: 20px; }
+.hist-item .hist-t { margin-left: auto; color: #6a6a70; font-size: 10px; white-space: nowrap; }
+.hist-ft { padding: 7px 11px; font-size: 9.5px; color: #6a6a70; border-top: 1px solid #2a2c34; line-height:1.5; }
 .hdr-actions { display: flex; align-items: center; gap: 3px; margin-left: 14px; }
 .hdr-btn {
   background: transparent; border: 1px solid transparent; color: #8a8a8e;
@@ -566,7 +587,14 @@ pre.gcode-content {
 </head>
 <body>
 
-<!-- ══ LineTracer Pro modal (opened from AI Vectorizer Engines panel) ══ -->
+<!-- ══ History picker ══ -->
+<div id="histPanel" class="hist-panel">
+  <div class="hist-hd">ประวัติการแก้ไข <span id="histCount" class="hist-count"></span></div>
+  <div id="histList" class="hist-list"></div>
+  <div class="hist-ft">คลิกรายการเพื่อย้อนกลับไปจุดนั้น · เก็บสูงสุด 60 ขั้น</div>
+</div>
+
+<!-- ══ LineTracer Pro modal ══ -->
 <div id="ltModal">
   <div class="lt-box">
     <div class="lt-bar">
@@ -632,12 +660,22 @@ pre.gcode-content {
 <header>
   <div class="logo"><svg class="ic" style="width:19px;height:19px"><use href="#i-cpu"/></svg></div>
   <div>
-    <div class="header-title">CNC Pattern Generator</div>
+    <div class="header-title">CNC Pattern Generator
+      <span id="buildTag" style="font-size:10px;font-weight:600;color:#8fc2ff;background:#1d2633;
+        border:1px solid #2c4160;border-radius:5px;padding:1px 6px;margin-left:7px;vertical-align:middle"></span>
+    </div>
   </div>
   <button class="hdr-btn" id="btnSidebarToggle" title="ซ่อน/แสดงแผงควบคุม" aria-label="Toggle sidebar"><svg class="ic"><use href="#i-menu"/></svg></button>
   <div class="hdr-actions">
     <button class="hdr-btn" id="btnUndo" title="ย้อนกลับ (Ctrl+Z)" aria-label="Undo" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
     <button class="hdr-btn" id="btnRedo" title="ทำซ้ำ (Ctrl+Shift+Z)" aria-label="Redo" disabled><svg class="ic"><use href="#i-redo"/></svg></button>
+    <button class="hdr-btn" id="btnHistory" title="ประวัติการแก้ไข" aria-label="History"
+      onclick="toggleHistoryPanel(event)">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/>
+      </svg>
+    </button>
     <span class="hdr-div"></span>
     <button class="hdr-btn" id="btnSaveProj" title="บันทึกโปรเจกต์เป็นไฟล์ .cncproj" aria-label="Save project"><svg class="ic"><use href="#i-save"/></svg></button>
     <button class="hdr-btn" id="btnLoadProj" title="เปิดโปรเจกต์จากไฟล์" aria-label="Open project"><svg class="ic"><use href="#i-folder"/></svg></button>
@@ -1126,6 +1164,39 @@ pre.gcode-content {
     <div class="panel" data-mode="design">
       <div class="panel-title"><svg class="ic"><use href="#i-sliders"/></svg> ตั้งค่า Pattern</div>
 
+      <!-- Two independent layout engines. Switching only chooses which one
+           builds the cell positions; everything downstream is shared. -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;color:#aaa;margin-bottom:4px">รูปแบบการวาง (Pattern Type)</div>
+        <div style="display:flex;gap:4px">
+          <button id="engStdBtn" class="tool-type-btn active" style="flex:1;font-size:10px;padding:5px 4px"
+            onclick="setPatternEngine('std45')">Standard Grid</button>
+          <button id="engSpecialBtn" class="tool-type-btn" style="flex:1;font-size:10px;padding:5px 4px"
+            onclick="setPatternEngine('specialxy')">Special XY Pattern</button>
+        </div>
+        <div id="engNote" style="font-size:9px;color:#8e8e94;margin-top:4px;line-height:1.45"></div>
+      </div>
+
+      <div id="engSpecialBox" style="display:none">
+        <div class="ctrl">
+          <div class="ctrl-row">
+            <span class="ctrl-lbl">X Spacing (แนวนอน)</span>
+            <div class="ctrl-num"><input type="number" class="inline-num" id="nXSpacing" value="100.000" min="0.001" step="0.001"><span class="unit-lbl">mm</span></div>
+          </div>
+          <input type="range" id="rXSpacing" min="0.001" max="500" value="100.000" step="0.001">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-row">
+            <span class="ctrl-lbl">Y Spacing (แนวตั้ง)</span>
+            <div class="ctrl-num"><input type="number" class="inline-num" id="nYSpacing" value="100.000" min="0.001" step="0.001"><span class="unit-lbl">mm</span></div>
+          </div>
+          <input type="range" id="rYSpacing" min="0.001" max="500" value="100.000" step="0.001">
+        </div>
+        <div id="xySpacingNote" style="font-size:9px;color:#8e8e94;margin:-2px 0 8px;line-height:1.45"></div>
+      </div>
+
+      <div id="engStdBox">
+
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Spacing (ระยะห่าง)</span>
@@ -1134,6 +1205,7 @@ pre.gcode-content {
         <input type="range" id="rSpacing" min="0.001" max="50" value="5.000" step="0.001">
         <div id="spacingNote" style="font-size:9px;color:#8e8e94;margin-top:3px;line-height:1.45"></div>
       </div>
+      </div><!-- /engStdBox -->
       <div class="ctrl">
         <div class="ctrl-row">
           <span class="ctrl-lbl">Min Diameter (เส้นผ่าศูนย์กลางต่ำสุด)</span>
@@ -1441,23 +1513,6 @@ pre.gcode-content {
         <button class="btn btn-blue" style="width:100%;font-size:12px;padding:9px;border-radius:8px"
           onclick="applyProcPattern()">▶ ใช้ลายนี้ &amp; Generate</button>
 
-      </div>
-    </div>
-
-    <!-- ══ AI Vectorizer (LineTracer Pro, embedded) ══ -->
-    <div class="panel collap-panel closed" id="panVec" data-mode="design">
-      <div class="panel-title" onclick="togglePanel('panVec')">
-        <svg class="ic"><use href="#i-wand"/></svg> AI Vectorizer Engines <span class="collap-arrow">▾</span>
-      </div>
-      <div class="collap-body">
-        <p style="font-size:11px;color:#999;line-height:1.6;margin-bottom:10px">
-          เครื่องมือแปลงรูปเป็นเวกเตอร์แบบเต็มรูปแบบ (LineTracer Pro) —
-          ลบพื้นหลังอัตโนมัติ/AI, พรีเซ็ตงาน (ลายฉลุ/ตราปั๊ม/แกะเลเซอร์/สติกเกอร์),
-          5 โหมดตรวจจับเส้น (สเก็ตช์/ขอบภาพ/ขาว-ดำ/สีเต็ม/รูปถ่าย),
-          เครื่องมือปากกา/ยางลบ/ครอบตัด, ซูม+มินิแมพ และ export PNG/SVG/DXF ในตัว
-        </p>
-        <button style="width:100%;background:#0d2a0d;color:#5dff5d;border:1px solid #1a5a1a;border-radius:5px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:0.3px"
-          onclick="openLineTracer()"><svg class="ic"><use href="#i-wand"/></svg> เปิด LineTracer Pro</button>
       </div>
     </div>
 
@@ -1874,7 +1929,9 @@ pre.gcode-content {
           <div class="st-row"><span>Travel saved</span><span class="st-val" id="stTravel">—</span></div>
           <div class="st-row"><span>Est. cost</span><span class="st-val" id="stCost">—</span></div>
         </div>
-        <div class="processing-ov" id="procOv"><div class="spinner"></div></div>
+        <div class="processing-ov" id="procOv"><div class="spinner"></div>
+          <div id="procMsg" style="margin-top:10px;font-size:11.5px;color:#c9cad1;text-align:center;line-height:1.6"></div>
+        </div>
         <!-- zoom toolbar -->
         <div class="zoom-toolbar" id="zoomToolbar">
           <button class="zt-btn" id="ztOut" title="Zoom Out">−</button>
@@ -2068,6 +2125,9 @@ const S = {
   // Text Raster
   textContent: 'ABC', textFont: 'Arial', textMode: 'seq',
   // Mix Layer
+  // Which pattern engine builds the cell positions. 'std45' is the original
+  // behaviour and the default, so existing projects are untouched.
+  patternEngine: 'std45', xSpacingMm: 100, ySpacingMm: 100,
   mixEnabled: false, mixPat: 'circle', mixDiamMm: 2.0, mixPatRot: 0, mixAlpha: 0.7,
   // Mix layer used to be one fixed diameter, preview-only. It can now vary
   // with tone exactly like the main pattern, and it is exported with it.
@@ -2130,6 +2190,10 @@ function _unitDecimals(f) {
 
 function autoSetWorkSize() {
   if (!S.image) return;
+  // While a project is being restored the SAVED size is the right answer.
+  // Replaying the control events fires the DPI handler, which called this and
+  // overwrote 1600 x 2400 with the image's own 86.7 x 130 mm.
+  if (typeof PROJECT !== 'undefined' && PROJECT.restoring) return;
   const dpi = getDpi();
   // Prefer the size the file states about itself. Only fall back to the DPI
   // dropdown when the file carries no physical size at all.
@@ -2186,6 +2250,7 @@ function updateSourceInfo() {
 // Mirrors the work size onto the CNC tab. Read-only: the inputs stay on the
 // design tab so there is only ever one source of truth.
 function updateCncSizeInfo() {
+  if (typeof updateXYNote === 'function') updateXYNote();
   const v = $('cncSizeVal'); if (!v) return;
   const sub = $('cncSizeSub');
   const f = unitFactor(), dec = _unitDecimals(f);
@@ -2233,6 +2298,7 @@ $('workW').addEventListener('input', () => {
     else $('workH').value = '';
   }
   updateSourceInfo();
+  if (!S.image || S.imageFromProc) fitCanvases();   // canvas follows the work area
   scheduleRender();
 });
 $('workH').addEventListener('input', () => {
@@ -2243,6 +2309,7 @@ $('workH').addEventListener('input', () => {
     else $('workW').value = '';
   }
   updateSourceInfo();
+  if (!S.image || S.imageFromProc) fitCanvases();   // canvas follows the work area
   scheduleRender();
 });
 
@@ -2376,7 +2443,7 @@ const FILESIZE = {
 
   // ── SVG: width/height carrying a real unit ──
   svg(text) {
-    const head = text.slice(0, 4000);
+    const head = text.slice(0, true);
     const grab = a => {
       const m = head.match(new RegExp(a + '\\s*=\\s*["\']\\s*([\\d.]+)\\s*(mm|cm|in|pt|pc|px)?\\s*["\']', 'i'));
       return m ? { v: parseFloat(m[1]), u: (m[2] || 'px').toLowerCase() } : null;
@@ -2572,8 +2639,17 @@ function fitCanvases() {
   // project that carries just a shape image — or none at all — calls this with
   // S.image still null, which threw and aborted the whole restore. Fall back to
   // the work-area aspect, which is what the canvas actually represents.
+  // The canvas IS the work area, so its proportions have to be the work area's.
+  // An imported photo is the one exception: it maps onto the sheet one-to-one,
+  // and the aspect lock keeps the two in step.
+  //
+  // A generated pattern has no proportion of its own — it is just a 1024 px
+  // square field. Using that square here meant a 500 x 2000 mm job was drawn on
+  // a square canvas covering only 500 x 500 mm, and everything past that was
+  // simply cut off: the exported DXF came out 500 x 250 instead of 500 x 2000.
   let ratio;
-  if (S.image && S.image.width > 0 && S.image.height > 0) {
+  const _photo = S.image && !S.imageFromProc && S.image.width > 0 && S.image.height > 0;
+  if (_photo) {
     ratio = S.image.width / S.image.height;
   } else {
     const wMm = workWmm(), hMm = workHmm();
@@ -2583,8 +2659,19 @@ function fitCanvases() {
   let cw, ch;
   if (mxW / mxH > ratio) { ch = mxH; cw = ch * ratio; }
   else { cw = mxW; ch = cw / ratio; }
-  pCanvas.width  = Math.round(cw);
-  pCanvas.height = Math.round(ch);
+  pCanvas.width  = Math.max(1, Math.round(cw));
+  // Round the height UP, not to nearest. The scale is fixed by the width, so a
+  // height rounded down leaves the canvas SHORTER than the sheet — on a 1400 mm
+  // job it covered 1397.5 mm, and the bottom row of holes fell outside it and
+  // was dropped. Heights whose scaled pixel count happened to round down were
+  // exactly the ones losing their last row. Covering a hair too much is
+  // harmless: the millimetre bounds check trims anything past the edge.
+  {
+    const wMm = workWmm(), hMm = workHmm();
+    pCanvas.height = (!_photo && wMm > 0 && hMm > 0)
+      ? Math.max(1, Math.ceil(hMm * (pCanvas.width / wMm)))
+      : Math.max(1, Math.round(ch));
+  }
   iCanvas.width  = pCanvas.width;
   iCanvas.height = pCanvas.height;
   iCtx.drawImage(S.image, 0, 0, iCanvas.width, iCanvas.height);
@@ -2827,9 +2914,7 @@ function updateViewCanvas() {
   // Floor the drawn radius at ~0.35 device pixels (the context is scaled by
   // `sc`, so divide) — keeps very small shapes visible without touching s.r.
   const _minDrawR = 0.35 / Math.max(0.0001, sc);
-  vCtx.beginPath();
-  for (const s of S.shapes) shapePath(vCtx, s.x, s.y, Math.max(s.r, _minDrawR), S.pattern, S.patRot);
-  if (S.fill) vCtx.fill(); else vCtx.stroke();
+  _batchDrawShapes(vCtx, S.shapes, S.pattern, S.patRot, _minDrawR, S.fill);
 
   _applyMixLayer(vCtx, fg);
 
@@ -2898,11 +2983,7 @@ function _drawMixPass(ctx) {
     });
     return;
   }
-  ctx.beginPath();
-  for (const s of S.mixShapes) {
-    shapePath(ctx, s.x, s.y, Math.max(s.r, 0.35), S.mixPat, S.mixPatRot);
-  }
-  if (S.fill) ctx.fill(); else ctx.stroke();
+  _batchDrawShapes(ctx, S.mixShapes, S.mixPat, S.mixPatRot, 0.35, S.fill);
 }
 
 function _applyMixLayer(ctx, fg) {
@@ -2980,6 +3061,123 @@ bindCtrl('rBlankLvl','nBlankLvl','blankLevel',0);
 ['rSpacing','rMinR','rMaxR','rAngle','rPatRot','rContrast','rGamma',
  'rMixDiam','rMixMinD','rMixMaxD','rMixPatRot'].forEach(id => updateRangeTrack($(id)));
 
+// Opened straight off the disk, this page cannot write files of any real size:
+// the browser refuses and leaves a 0-byte file behind. That has cost several
+// rounds of "the DXF will not open", so say it once, up front, with the fix.
+let _fileNoticeDismissed = false;
+function showFileProtocolNotice() {
+  if (location.protocol !== 'file:') return;
+  // Storage can be unavailable (private mode, restricted profiles). Fall back
+  // to a session flag so the bar cannot reappear over and over in that case.
+  if (_fileNoticeDismissed) return;
+  try { if (localStorage.getItem('cncpat.fileNoticeSeen') === '1') return; } catch (e) {}
+  const bar = document.createElement('div');
+  bar.className = 'restore-bar';
+  bar.style.bottom = '78px';
+  bar.innerHTML =
+    `<div class="restore-txt"><b>เปิดจากไฟล์โดยตรง — บันทึกไฟล์ใหญ่ไม่ได้</b>` +
+    `<span>DXF/G-code ที่ใหญ่กว่า ~600 KB จะได้ไฟล์ 0 ไบต์ · แก้โดยเปิดผ่าน localhost</span></div>` +
+    `<button class="restore-yes">วิธีเปิดผ่าน localhost</button>` +
+    `<button class="restore-no">ไม่ต้องเตือนอีก</button>`;
+  document.body.appendChild(bar);
+  bar.querySelector('.restore-no').onclick = () => {
+    _fileNoticeDismissed = true;
+    try { localStorage.setItem('cncpat.fileNoticeSeen', '1'); } catch (e) {}
+    bar.remove();
+  };
+  bar.querySelector('.restore-yes').onclick = () => {
+    alert('เปิดโปรแกรมผ่าน localhost:\n\n' +
+          '1. เปิดโฟลเดอร์ที่เก็บไฟล์นี้\n' +
+          '2. ดับเบิลคลิก "เปิดโปรแกรม.bat"\n' +
+          '3. หน้าต่างสีดำจะเปิดขึ้น — เปิดค้างไว้ระหว่างใช้งาน\n' +
+          '4. เบราว์เซอร์จะเปิดโปรแกรมให้เองที่ http://localhost:8765\n\n' +
+          'เมื่อเปิดแบบนี้ จะมีหน้าต่างเลือกโฟลเดอร์ตอนบันทึก\n' +
+          'บันทึกไฟล์ใหญ่ได้ไม่จำกัด และโปรแกรมตรวจขนาดไฟล์ให้หลังเขียนเสร็จ');
+    _fileNoticeDismissed = true;
+    bar.remove();
+  };
+}
+
+// ── History picker ───────────────────────────────────────────────────────
+function toggleHistoryPanel(e) {
+  if (e) e.stopPropagation();
+  const p = $('histPanel');
+  if (!p) return;
+  const open = !p.classList.contains('open');
+  p.classList.toggle('open', open);
+  if (open) renderHistoryList();
+}
+
+function renderHistoryList() {
+  const list = $('histList');
+  if (!list) return;
+  const n = HISTORY.stack.length;
+  const cnt = $('histCount');
+  if (cnt) cnt.textContent = n ? `${HISTORY.idx + 1} / ${n}` : '';
+  if (!$('histPanel').classList.contains('open')) return;
+  list.innerHTML = '';
+  // Newest first: that is where you look when you want to step back.
+  for (let i = n - 1; i >= 0; i--) {
+    const l = (HISTORY.labels || [])[i] || {};
+    const b = document.createElement('button');
+    b.className = 'hist-item' + (i === HISTORY.idx ? ' current' : '');
+    const t = l.t ? new Date(l.t).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+    b.innerHTML = `<span class="hist-n">${i + 1}</span>` +
+                  `<span>${(l.what || 'แก้ไข').replace(/[<>&]/g, '')}</span>` +
+                  `<span class="hist-t">${t}</span>`;
+    b.onclick = () => { HISTORY.goTo(i); };
+    list.appendChild(b);
+  }
+}
+
+// Clicking anywhere else closes it — a floating panel that will not go away is
+// worse than no panel.
+document.addEventListener('click', e => {
+  const p = $('histPanel');
+  if (!p || !p.classList.contains('open')) return;
+  if (p.contains(e.target) || (e.target.closest && e.target.closest('#btnHistory'))) return;
+  p.classList.remove('open');
+});
+
+// ── Pattern engine switch ────────────────────────────────────────────────
+// Purely a selector: it changes which generator runs and which fields are on
+// screen. It never rewrites the other engine's parameters.
+function setPatternEngine(which) {
+  S.patternEngine = (which === 'specialxy') ? 'specialxy' : 'std45';
+  const sp = S.patternEngine === 'specialxy';
+  const sb = $('engStdBox'), xb = $('engSpecialBox');
+  if (sb) sb.style.display = sp ? 'none' : '';
+  if (xb) xb.style.display = sp ? '' : 'none';
+  const a = $('engStdBtn'), b = $('engSpecialBtn');
+  if (a) a.classList.toggle('active', !sp);
+  if (b) b.classList.toggle('active',  sp);
+  updateXYNote();
+  if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+  scheduleRender();
+}
+
+function updateXYNote() {
+  const eng = $('engNote');
+  if (eng) eng.textContent = (S.patternEngine === 'specialxy')
+    ? 'X/Y คือระยะที่วัดได้จริงแนวนอน/แนวตั้ง · Grid Angle เยื้องแถว (45° = เยื้างครึ่งช่อง) โดยไม่เปลี่ยน X/Y'
+    : 'กริดสี่เหลี่ยมระยะเท่ากันทุกด้าน หมุนทั้งกริดตาม Grid Angle (ระบบเดิม)';
+  const n = $('xySpacingNote');
+  if (!n) return;
+  const wW = workWmm(), wH = workHmm();
+  const x = S.xSpacingMm, y = S.ySpacingMm;
+  if (!(x > 0 && y > 0 && wW > 0 && wH > 0)) { n.textContent = ''; return; }
+  const fmt = v => (+v.toFixed(3)).toString();
+  const c2 = Math.floor(wW / x) + 1, r2 = Math.floor(wH / y) + 1;
+  const deg = ((S.angle % 180) + 180) % 180;
+  const step = ((deg / 90) % 1);
+  const how = step < 0.001 ? 'แถวตรง' : `เยื้องแถวละ ${fmt(x*step)} mm`;
+  n.textContent = `วัดได้จริง ${fmt(x)} mm แนวนอน · ${fmt(y)} mm แนวตั้ง (ทุกมุม) · ` +
+                  `Angle ${fmt(S.angle)}° = ${how} · ` +
+                  `เต็มพื้นที่อัตโนมัติ ≈ ${(c2*r2).toLocaleString()} จุด บน ${fmt(wW)}×${fmt(wH)} mm`;
+}
+
+bindCtrl('rXSpacing','nXSpacing','xSpacingMm',3, updateXYNote);
+bindCtrl('rYSpacing','nYSpacing','ySpacingMm',3, updateXYNote);
 // Mix size list — same parsing rules as the main pattern's size list.
 function _readMixQuant() {
   const el = $('mixQuantSizes');
@@ -3056,6 +3254,111 @@ const PATROT_NA = {
 };
 // Live preview of how many shapes the current spacing × work-area implies, so
 // the cap is visible BEFORE hitting Regenerate rather than as a surprise after.
+// ════════════════════════════════════════════════════════════════════════
+// PATTERN ENGINES — two independent generators
+// ════════════════════════════════════════════════════════════════════════
+// Both emit candidate cell centres in canvas pixels through a callback, so
+// nothing large is ever materialised and the caller keeps full control of the
+// shape budget. They share only the small transform helpers below; the core
+// geometry of each is separate on purpose and must stay that way.
+
+function rotatePoint(x, y, cosA, sinA) {
+  return [x * cosA - y * sinA, x * sinA + y * cosA];
+}
+function applyOffset(pt, ox, oy) { return [pt[0] + ox, pt[1] + oy]; }
+
+// ── ENGINE 1: Standard 45° Grid ─────────────────────────────────────────
+// The original algorithm, unchanged: a square lattice of `spacingPx`, rotated
+// about the canvas centre by the Grid Angle, swept over the exact row/column
+// span that covers the canvas. Nothing from the Special engine belongs here.
+function generateStandard45Grid(o, emit) {
+  const { W, H, cx, cy, spacingPx, angleRad, jitter,
+          colFrom, colTo, rowFrom, rowTo } = o;
+  const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
+  for (let row = rowFrom; row <= rowTo; row++) {
+    for (let col = colFrom; col <= colTo; col++) {
+      const gx = col * spacingPx, gy = row * spacingPx;
+      // Position jitter for random mode — randomises spacing
+      const jx = jitter ? (Math.random() - 0.5) * 2 * jitter : 0;
+      const jy = jitter ? (Math.random() - 0.5) * 2 * jitter : 0;
+      const rx = gx * cosA - gy * sinA + cx + jx;
+      const ry = gx * sinA + gy * cosA + cy + jy;
+      if (emit(rx, ry) === false) return;
+    }
+  }
+}
+
+// ── ENGINE 2: Special XY Pattern ────────────────────────────────────────
+// X Spacing and Y Spacing are the distances you would MEASURE on the drawing:
+// X straight across, Y straight up. That is the whole point of this engine and
+// it is why it cannot simply rotate a square grid — rotating one puts the
+// spacing you typed on the diagonal instead, so 100 mm at 45 degrees measures
+// 141.42 across and 70.71 up. Here the raster is fixed and the Grid Angle
+// shifts each row along it instead:
+//
+//   Angle 0    ● ● ● ●      rows line up
+//              ● ● ● ●
+//
+//   Angle 45   ● ● ● ●      every row steps half of X sideways — the diamond
+//               ● ● ● ●     look — while X across and Y up are still exactly
+//              ● ● ● ●      the numbers you typed.
+//
+// The row step is angle/90 of X, so 0 and 90 both give aligned rows and 45
+// gives the half step. Standard 45 Grid is untouched and still rotates.
+function generateSpecialXYPattern(o, emit) {
+  const { wMm, hMm, mmToPx, xMm, yMm, angleRad, jitter } = o;
+  if (!(xMm > 0) || !(yMm > 0) || !(wMm > 0) || !(hMm > 0) || !(mmToPx > 0)) return;
+
+  // Row-to-row sideways step, as a fraction of X. A whole X is the same as no
+  // shift at all, so this wraps and 90 degrees lands back on aligned rows.
+  const deg   = ((angleRad * 180 / Math.PI) % 180 + 180) % 180;
+  const shift = xMm * ((deg / 90) % 1);
+
+  // ── Centre the pattern on the sheet, in real millimetres ─────────────
+  // Laying rows out from a fixed origin leaves whatever does not divide evenly
+  // as one lop-sided margin: on a 500 x 2400 sheet the dots sat against the
+  // left edge with a wide empty strip down the right, and the top row fell off
+  // entirely. Work out the extent the pattern will occupy, then split the
+  // leftover evenly. Only rows are scanned, so this stays cheap.
+  const EPS = 1e-6;
+  const rows = Math.max(1, Math.floor(hMm / yMm + EPS) + 1);
+  const y0   = (hMm - (rows - 1) * yMm) / 2;        // top of the centred block
+
+  let xMin = Infinity, xMax = -Infinity;
+  const cols = [];
+  for (let r = 0; r < rows; r++) {
+    const rs = ((r * shift) % xMm + xMm) % xMm;
+    const kMin = Math.ceil((0 - rs) / xMm - EPS);
+    const kMax = Math.floor((wMm - rs) / xMm + EPS);
+    cols.push([rs, kMin, kMax]);
+    if (kMax < kMin) continue;
+    const a = rs + kMin * xMm, b = rs + kMax * xMm;
+    if (a < xMin) xMin = a;
+    if (b > xMax) xMax = b;
+  }
+  if (!isFinite(xMin)) return;
+  const dx = (wMm - (xMax - xMin)) / 2 - xMin;      // centres the block horizontally
+
+  // mm -> canvas pixels. Y is flipped because the canvas grows downwards while
+  // the sheet is measured upwards, which is also how the exporters read it.
+  for (let r = 0; r < rows; r++) {
+    const [rs, kMin, kMax] = cols[r];
+    const yMmPos = y0 + r * yMm;
+    const py = (hMm - yMmPos) * mmToPx;
+    for (let k = kMin; k <= kMax; k++) {
+      const jx = jitter ? (Math.random() - 0.5) * 2 * jitter : 0;
+      const jy = jitter ? (Math.random() - 0.5) * 2 * jitter : 0;
+      if (emit((rs + k * xMm + dx) * mmToPx + jx, py + jy) === false) return;
+    }
+  }
+}
+
+// Bump on every change. It shows in the header, in every exported DXF's
+// first line, and in every export filename — so a file and a screenshot
+// always say which build produced them. Several rounds have been lost
+// analysing output from a stale copy of this page.
+const BUILD_TAG = '26Aug-b21';
+
 const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
 function updateSpacingNote() {
   const note = $('spacingNote');
@@ -3218,6 +3521,19 @@ function scheduleRender(ms = 200) {       // 200 ms debounce — prevents rapid-
   renderTimer = setTimeout(generatePattern, ms);
 }
 
+// Roughly how many shapes the current settings will produce. Cheap enough to
+// call before generating, which is the only time the answer is useful.
+function estimateShapeCount() {
+  const wW = workWmm(), wH = workHmm();
+  if (S.patternEngine === 'specialxy') {
+    if (!(S.xSpacingMm > 0) || !(S.ySpacingMm > 0)) return 0;
+    return (Math.floor(wW / S.xSpacingMm) + 1) * (Math.floor(wH / S.ySpacingMm) + 1);
+  }
+  if (!(S.spacingMm > 0)) return 0;
+  return Math.min(MAX_SHAPES_UI,
+    Math.round((wW / S.spacingMm + 1) * (wH / S.spacingMm + 1)));
+}
+
 // ── Core generation ───────────────────────────────────────
 let _generating = false;                  // mutex — only one render at a time
 function generatePattern() {
@@ -3236,9 +3552,9 @@ function generatePattern() {
     // Say which slot is still empty instead of a blanket "load an image".
     const wantsShape = S.pattern === 'imgshape'
                     || (S.mixEnabled && S.mixPat === 'imgshape');
-    $('statusTxt').textContent = wantsShape
+    status2(wantsShape
       ? '⚠️ ยังไม่มีรูปลาย — เลือกไฟล์ในหัวข้อ "รูปลาย" ก่อน (หรือโหลดรูปภาพต้นฉบับ)'
-      : '⚠️ โหลดรูปภาพก่อน หรือกด "ใช้ลายนี้ & Generate" จาก Procedural';
+      : '⚠️ โหลดรูปภาพก่อน หรือกด "ใช้ลายนี้ & Generate" จาก Procedural');
     return;
   }
   if (_generating) {
@@ -3247,19 +3563,33 @@ function generatePattern() {
     return;
   }
   _generating = true;
+  // A dense pattern of polygons takes seconds to rasterise, and a spinner with
+  // no numbers is indistinguishable from a crash. Say how much work it is, and
+  // say it before the work starts.
+  {
+    const est = estimateShapeCount();
+    const msg = $('procMsg');
+    if (msg) {
+      const heavy = est > 20000 && S.pattern !== 'circle' && S.pattern !== 'dot';
+      msg.textContent = est > 20000
+        ? `กำลังวาด ~${est.toLocaleString()} รูป` +
+          (heavy ? ` (${patName(S.pattern)} ใช้เวลานานกว่าวงกลมมาก — เพิ่มระยะห่างจะเร็วขึ้น)` : '')
+        : '';
+    }
+  }
   $('procOv').classList.add('show');
   if (IMGSHAPE.dirty && IMGSHAPE.img) _buildShapeCanvas(SHAPE_SLOTS.main);
   // Tracing costs ~400×400 passes; skip it unless the mix layer draws a shape.
   if (MIXSHAPE.dirty && MIXSHAPE.img && S.mixEnabled && S.mixPat === 'imgshape')
     _buildShapeCanvas(SHAPE_SLOTS.mix);
-  $('statusTxt').textContent = '⏳ กำลังสร้าง...';
+  status2('⏳ กำลังสร้าง...');
   requestAnimationFrame(() => {
     try {
       _generate();
     } catch (e) {
       console.error('Pattern generation error:', e);
       $('procOv').classList.remove('show');
-      $('statusTxt').textContent = '❌ เกิดข้อผิดพลาด: ' + e.message;
+      status2('❌ เกิดข้อผิดพลาด: ' + e.message, true);
       _generating = false;
     }
   });
@@ -3524,30 +3854,57 @@ function _generate() {
   const _tSpan = Math.max(1e-6, _tHi - _tLo);
 
   let limitHit = false;
-  outer: for (let row = rowFrom; row <= rowTo; row++) {
-    for (let col = colFrom; col <= colTo; col++) {
-      const gx = col * spacingPx, gy = row * spacingPx;
-      // Add position jitter when random mode is on — randomises spacing
-      const jx = jitter ? (Math.random() - 0.5) * 2 * jitter : 0;
-      const jy = jitter ? (Math.random() - 0.5) * 2 * jitter : 0;
-      const rx = gx * _cosA - gy * _sinA + cx + jx;
-      const ry = gx * _sinA + gy * _cosA + cy + jy;
+  // Which engine lays out the cells. Everything after this point — blank
+  // skipping, tone sampling, sizing, the shape budget — is shared and behaves
+  // identically whichever engine produced the position.
+  const _engineOpts = {
+    W, H, cx, cy, spacingPx, angleRad, jitter, colFrom, colTo, rowFrom, rowTo,
+    xSpacingPx: S.xSpacingMm * mmToPx,
+    ySpacingPx: S.ySpacingMm * mmToPx,
+    // Real millimetres as well as pixels. The canvas is a whole number of
+    // pixels so it covers a fraction more than the sheet; laying the pattern
+    // out in pixels inherited that error and pushed the block off centre by a
+    // whole row. The Special engine does its arithmetic in mm instead.
+    wMm: workW_mm, hMm: workH_mm, mmToPx,
+    xMm: S.xSpacingMm, yMm: S.ySpacingMm,
+  };
+  const _engine = (S.patternEngine === 'specialxy')
+    ? generateSpecialXYPattern
+    : generateStandard45Grid;
+
+  _engine(_engineOpts, (rx, ry) => {
+    {
       // Keep a shape only when its CENTRE lies inside the work area. The old
       // test allowed centres up to one shape-radius outside so the halftone
       // would bleed to the border, but on a real machine that means plunging
       // into the table beside the stock — with large shapes it put centres
       // tens of millimetres past the edge. Edges may still overhang by the
       // radius; the pre-export check reports that as a margin to allow for.
-      if (rx < 0 || rx > W || ry < 0 || ry > H) continue;
-      if (isBlank(rx, ry)) continue;          // leave empty areas of the image bare
+      // One pixel of slack. The canvas is a rounded whole number of pixels, so
+      // a point that sits exactly on the sheet edge can land a hair outside it
+      // in pixel terms — that is what removed the bottom row of holes. The
+      // millimetre test below is the one that decides; this only rejects
+      // points that are clearly off the canvas.
+      if (rx < -1 || rx > W + 1 || ry < -1 || ry > H + 1) return;
+      // The canvas is a whole number of pixels, so it covers a fraction of a
+      // millimetre more than the sheet does. Checked in pixels alone a centre
+      // could sit just outside the stock — 400.41 mm measured on a 400 mm
+      // sheet. Re-check in the SAME coordinates the exporters write, which is
+      // what the user measures in CAD: X from the left, Y up from the bottom.
+      {
+        const _xMm = rx / mmToPx, _yMm = workH_mm - ry / mmToPx;
+        if (_xMm < -1e-6 || _xMm > workW_mm + 1e-6) return;
+        if (_yMm < -1e-6 || _yMm > workH_mm + 1e-6) return;
+      }
+      if (isBlank(rx, ry)) return;             // leave empty areas of the image bare
       let b = bright(rx, ry);
       if (S.invert) b = 1 - b;
       const t = 1 - b;
       let r, rMm = null;
       if (useQuant && S.quantRandom) {
         // Stochastic halftone: brightness controls DENSITY (dark=dense, bright=sparse)
-        if (t < 0.04) continue;                          // very bright → no dot at all
-        if (Math.random() > t) continue;                 // probabilistic placement
+        if (t < 0.04) return;                            // very bright → no dot at all
+        if (Math.random() > t) return;                   // probabilistic placement
         const qi = Math.floor(Math.random() * _qPx.length);
         r = _qPx[qi]; rMm = _qMm[qi] / 2;           // store radius = diameter/2
       } else {
@@ -3563,7 +3920,7 @@ function _generate() {
           r = _qPx[qi]; rMm = _qMm[qi] / 2;             // store radius = diameter/2
         } else {
           r = minRpx + t * (maxRpx - minRpx);
-          if (r < minRealPx) continue;                   // skip features below MIN_R_MM
+          if (r < minRealPx) return;                     // skip features below MIN_R_MM
         }
       }
       // No size cap. This used to clamp r to 0.40 × spacing, which quietly
@@ -3574,11 +3931,11 @@ function _generate() {
       // says so rather than the generator overriding the user.
       // Threshold in real millimetres, not canvas pixels: on a large work area
       // every dot is sub-pixel on screen yet still perfectly valid G-code.
-      if (r < minRealPx) continue;
+      if (r < minRealPx) return;
       shapes.push({ x: rx, y: ry, r, rMm, frac: t });
-      if (shapes.length >= MAX_SHAPES) { limitHit = true; break outer; }
+      if (shapes.length >= MAX_SHAPES) { limitHit = true; return false; }
     }
-  }
+  });
 
   const fg = S.darkBg ? '#ffffff' : '#000000';
   pCtx.fillStyle = fg; pCtx.strokeStyle = fg; pCtx.lineWidth = 0.7;
@@ -3608,17 +3965,25 @@ function _generate() {
   } else {
     // Draw radius is floored so sub-pixel geometry still shows in the preview;
     // s.r itself stays exact because that is what the exporters read.
-    pCtx.beginPath();
-    for (const s of shapes) shapePath(pCtx, s.x, s.y, Math.max(s.r, 0.35), S.pattern, S.patRot);
-    if (S.fill) pCtx.fill(); else pCtx.stroke();
+    _batchDrawShapes(pCtx, shapes, S.pattern, S.patRot, 0.35, S.fill);
   }
 
   // ── Compute mix layer offset positions (half grid unit between main dots) ──
   {
     const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
-    // Offset = 0.5 step in both grid axes → lands exactly between 4 nearest neighbors
-    const offX = spacingPx * 0.5 * (cosA - sinA);
-    const offY = spacingPx * 0.5 * (sinA + cosA);
+    // Offset = 0.5 step in both grid axes → lands exactly between 4 nearest
+    // neighbors. The Special engine has its own cell, so it gets its own half
+    // step — using the Standard pitch there would drop the mix dots on top of
+    // the tile centres that engine already places.
+    let offX, offY;
+    if (S.patternEngine === 'specialxy') {
+      const hx = (S.xSpacingMm * mmToPx) * 0.5, hy = (S.ySpacingMm * mmToPx) * 0.5;
+      offX = hx * cosA - hy * sinA;
+      offY = hx * sinA + hy * cosA;
+    } else {
+      offX = spacingPx * 0.5 * (cosA - sinA);
+      offY = spacingPx * 0.5 * (sinA + cosA);
+    }
     const mixShapes = [];
     // Mix sizing mirrors the main pattern: an explicit size list wins, then a
     // min..max ramp driven by tone, and finally the legacy single diameter.
@@ -3676,9 +4041,9 @@ function _generate() {
   $('procOv').classList.remove('show');
   _generating = false;  // release mutex
   if (limitHit) {
-    $('statusTxt').textContent = `⚠️ ${shapes.length.toLocaleString()} shapes (ถึงขีดจำกัด — เพิ่มระยะห่างเพื่อลดจำนวน)`;
+    status2(`⚠️ ${shapes.length.toLocaleString()} shapes (ถึงขีดจำกัด — เพิ่มระยะห่างเพื่อลดจำนวน)`);
   } else {
-    $('statusTxt').textContent = `✅ สร้างแล้ว ${shapes.length.toLocaleString()} shapes`;
+    status2(`✅ สร้างแล้ว ${shapes.length.toLocaleString()} shapes`);
   }
 }
 
@@ -3818,7 +4183,7 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
   updateNestInfo();
   $('procOv').classList.remove('show');
   _generating = false;
-  $('statusTxt').textContent = `✅ วาดแล้ว ${lineRows.length.toLocaleString()} เส้น (Line Raster)`;
+  status2(`✅ วาดแล้ว ${lineRows.length.toLocaleString()} เส้น (Line Raster)`);
 }
 
 // Every exporter used to read S.shapes and S.pattern directly, so the mix
@@ -3843,6 +4208,35 @@ function exportLayers() {
 function exportShapeCount() {
   return exportLayers().reduce((n, L) => n + L.shapes.length, 0);
 }
+
+// Filling one path that holds every shape is what makes a dense pattern feel
+// like a freeze: a circle is a single arc primitive, but a diamond, star or
+// cross is 4-12 line segments each, so 58,000 of them is up to 700,000 edges in
+// ONE path. Rasterising that in a single call takes many seconds. Flushing in
+// batches gives the renderer paths it can actually chew, with identical
+// geometry — the exporters are untouched.
+function _batchDrawShapes(ctx, list, pat, rot, minR, fill, batch) {
+  const B = batch || 4000;
+  let n = 0;
+  ctx.beginPath();
+  for (const s of list) {
+    shapePath(ctx, s.x, s.y, Math.max(s.r, minR), pat, rot);
+    if (++n % B === 0) {
+      if (fill) ctx.fill(); else ctx.stroke();
+      ctx.beginPath();
+    }
+  }
+  if (n % B !== 0) { if (fill) ctx.fill(); else ctx.stroke(); }
+}
+
+// Canvas Y (down from the top) -> sheet Y (up from the bottom), in mm.
+//
+// Every exporter used to do `(H - s.y) * sc`, treating the CANVAS height as the
+// sheet height. The canvas is a whole number of pixels, so it is up to one
+// pixel taller than the sheet — on a tall job that pixel was 2.9 mm, which put
+// the whole drawing off centre and pushed the top row outside the stock. The
+// sheet is the reference, not the canvas.
+function _sheetY(canvasY, sc) { return workHmm() - canvasY * sc; }
 
 // ── Shape path builders ───────────────────────────────────
 function shapePath(ctx, x, y, r, pat, rot) {
@@ -4428,8 +4822,8 @@ function buildGcode(offsetX=0, offsetY=0) {
     if (fmt === 'siemens') { g += `G0 Z${safeZ}\nG0 X0 Y0\nM5\nRET\n`; }
     else { g += `G0 Z${safeZ}\nG0 X0 Y0\nM5\nM30\n`; if (fmt === 'mach2' || fmt === 'mach3' || fmt === 'fanuc') g += '%\n'; }
     S.lastGcode = g;
-    $('statusTxt').textContent = `✅ G-code ready (${S.lineRows.length.toLocaleString()} scan lines` +
-      (_mixN ? ` + ${_mixN.toLocaleString()} mix shapes` : '') + ')';
+    status2(`✅ G-code ready (${S.lineRows.length.toLocaleString()} scan lines` +
+            (_mixN ? ` + ${_mixN.toLocaleString()} mix shapes` : '') + ')');
     return g;
   }
 
@@ -4452,7 +4846,7 @@ function buildGcode(offsetX=0, offsetY=0) {
           : chars[i % chars.length];
         const gp = GLYPH.paths(ch, S.textFont || 'Arial');
         if (!gp.length) return;
-        const cx2 = s.x * sc + offsetX, cy2 = (H - s.y) * sc + offsetY, rr = s.r * sc;
+        const cx2 = s.x * sc + offsetX, cy2 = _sheetY(s.y, sc) + offsetY, rr = s.r * sc;
         g += cm(`#${++_n} "${ch}"`);
         for (const path of gp) {
           if (!path || path.length < 2) continue;
@@ -4479,7 +4873,7 @@ function buildGcode(offsetX=0, offsetY=0) {
     for (let i = 0; i < _ordered.shapes.length; i++) {
       const s  = _ordered.shapes[i];
       const sx = parseFloat((s.x * sc + offsetX).toFixed(3));
-      const sy = parseFloat(((H - s.y) * sc + offsetY).toFixed(3));
+      const sy = parseFloat((_sheetY(s.y, sc) + offsetY).toFixed(3));
       const sr = parseFloat((s.r * sc).toFixed(3));
       g += gcodeShape(sx, sy, sr, L.pat, depth, feed, plunge, safeZ, ++_n, fmt, toolDia, L.rot,
                       L.mix ? mixShapeSrc() : IMGSHAPE);
@@ -4495,7 +4889,7 @@ function buildGcode(offsetX=0, offsetY=0) {
   }
 
   S.lastGcode = g;
-  $('statusTxt').textContent = `✅ G-code ready (${exportShapeCount().toLocaleString()} shapes)`;
+  status2(`✅ G-code ready (${exportShapeCount().toLocaleString()} shapes)`);
   return g;
 }
 
@@ -4595,7 +4989,7 @@ function buildSVGString(units) {
       const rot = ((parseInt(($(mixShapeRotId())||{}).value) || 0) + (S.mixPatRot || 0)) * Math.PI / 180;
       const cosR = Math.cos(rot), sinR = Math.sin(rot);
       for (const s of S.mixShapes) {
-        const r = s.r * sc, cx2 = s.x * sc, cy2 = (H - s.y) * sc;
+        const r = s.r * sc, cx2 = s.x * sc, cy2 = _sheetY(s.y, sc);
         for (const path of _MS.normPaths) {
           if (!path || path.length < 2) continue;
           path.forEach((pt, i) => {
@@ -4608,7 +5002,7 @@ function buildSVGString(units) {
       }
     } else {
       for (const s of S.mixShapes) {
-        d2 += svgShapePath(s.x*sc, (H - s.y)*sc, Math.max(0.001, s.r*sc), S.mixPat, S.mixPatRot);
+        d2 += svgShapePath(s.x*sc, _sheetY(s.y, sc), Math.max(0.001, s.r*sc), S.mixPat, S.mixPatRot);
       }
     }
     if (!d2) return '';
@@ -4628,7 +5022,7 @@ function buildSVGString(units) {
         ? chars[Math.floor(Math.random() * chars.length)]
         : chars[i % chars.length];
       const fs = (s.r * 1.9 * sc).toFixed(3);
-      const tx = (s.x * sc).toFixed(3), ty = ((H - s.y) * sc).toFixed(3);
+      const tx = (s.x * sc).toFixed(3), ty = _sheetY(s.y, sc).toFixed(3);
       texts += `  <text x="${tx}" y="${ty}" font-size="${fs}" font-family="${S.textFont||'Arial'}" font-weight="bold" text-anchor="middle" dominant-baseline="middle" fill="${fg}">${ch}</text>\n`;
     }
     return `${hdr}\n${texts}${_mixSvg()}</svg>`;
@@ -4637,7 +5031,7 @@ function buildSVGString(units) {
   // ── Standard shapes SVG ───────────────────────────────────
   let d = '';
   for (const s of S.shapes) {
-    const sx = s.x * sc, sy = (H - s.y) * sc, sr = s.r * sc;
+    const sx = s.x * sc, sy = _sheetY(s.y, sc), sr = s.r * sc;
     d += svgShapePath(sx, sy, sr, S.pattern, S.patRot);
   }
   let svg = `${hdr}\n  <path d="${d.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${(0.15*sc).toFixed(3)}"/>`;
@@ -8840,7 +9234,7 @@ function buildDXF12() {
           : chars[i % chars.length];
         const gp = GLYPH.paths(ch, S.textFont || 'Arial');
         if (!gp.length) return;
-        const cxm = s.x*sc, cym = (H - s.y)*sc, rr = s.r*sc;
+        const cxm = s.x*sc, cym = _sheetY(s.y, sc), rr = s.r*sc;
         for (const path of gp) {
           if (!path || path.length < 2) continue;
           ents.push(polyline(path.map(pt => [
@@ -8852,7 +9246,7 @@ function buildDXF12() {
     } else if (L.pat === 'imgshape' && _LS.normPaths && _LS.normPaths.length) {
       const cosR = Math.cos(lrot*Math.PI/180), sinR = Math.sin(lrot*Math.PI/180);
       for (const s of L.shapes) {
-        const cxm = s.x*sc, cym = (H - s.y)*sc, rr = s.r*sc;
+        const cxm = s.x*sc, cym = _sheetY(s.y, sc), rr = s.r*sc;
         for (const path of _LS.normPaths) {
           if (!path || path.length < 2) continue;
           ents.push(polyline(path.map(p => [
@@ -8863,7 +9257,7 @@ function buildDXF12() {
       }
     } else if (L.pat === 'circle' || L.pat === 'dot') {
       for (const s of L.shapes) {
-        const x = s.x*sc, y = (H - s.y)*sc, r = s.r*sc;
+        const x = s.x*sc, y = _sheetY(s.y, sc), r = s.r*sc;
         if (!(r > 0)) continue;                     // AutoCAD rejects a zero-radius circle
         track(x, y, r);
         ents.push(g(0,'CIRCLE') + g(5,nh()) + g(8,'0') + g(10,f(x)) + g(20,f(y)) + g(30,'0.0') + g(40,f(r)));
@@ -8872,7 +9266,7 @@ function buildDXF12() {
       for (const s of L.shapes) {
         const pts = getShapePoints(s.x, s.y, s.r, L.pat, lrot, _LS);
         if (!pts || pts.length < 2) continue;
-        ents.push(polyline(pts.map(p => [p[0]*sc, (H - p[1])*sc])));
+        ents.push(polyline(pts.map(p => [p[0]*sc, _sheetY(p[1], sc)])));
       }
     }
   }
@@ -8887,7 +9281,10 @@ function buildDXF12() {
     // $HANDSEED must sit ABOVE every handle used, it is the next free one
     .replace('@@HANDSEED@@', _hnd.toString(16).toUpperCase());
 
-  return head +
+  // A 999 comment is the DXF way of tagging a file. AutoCAD ignores it; we can
+  // read it with `head -2` and know exactly which build wrote the file.
+  return g(999, `CNC Pattern Generator ${BUILD_TAG} · ${exportShapeCount()} shapes`) +
+         head +
          g(0,'SECTION') + g(2,'ENTITIES') + ents.join('') + g(0,'ENDSEC') +
          g(0,'EOF');
 }
@@ -8959,7 +9356,7 @@ function buildDXF() {
   }
 
   for (const s of S.shapes) {
-    const sx = s.x * sc, sy = (H - s.y) * sc, sr = s.r * sc;
+    const sx = s.x * sc, sy = _sheetY(s.y, sc), sr = s.r * sc;
 
     if (S.pattern === 'circle' || S.pattern === 'dot') {
       const ch = nh();
@@ -9143,7 +9540,7 @@ function calcProfileGcode(downloadNow) {
   if (downloadNow) {
     const ext = {grbl:'.nc',mach2:'.tap',mach3:'.tap',fanuc:'.nc',linuxcnc:'.ngc',smoothie:'.nc',siemens:'.mpf'}[fmt]||'.nc';
     download(`${name}${ext}`, g, 'text/plain');
-    $('statusTxt').textContent = `✅ Profile G-code: ${passes} pass${passes>1?'es':''}`;
+    status2(`✅ Profile G-code: ${passes} pass${passes>1?'es':''}`);
   }
   return g;
 }
@@ -9282,7 +9679,7 @@ function calcAreaGcode(downloadNow) {
   if (downloadNow) {
     const ext = {grbl:'.nc',mach2:'.tap',mach3:'.tap',fanuc:'.nc',linuxcnc:'.ngc',smoothie:'.nc',siemens:'.mpf'}[fmt]||'.nc';
     download(`${name}${ext}`, g, 'text/plain');
-    $('statusTxt').textContent = `✅ Area Clearance G-code: ${passes} Z-pass${passes>1?'es':''}`;
+    status2(`✅ Area Clearance G-code: ${passes} Z-pass${passes>1?'es':''}`);
   }
   return g;
 }
@@ -9299,7 +9696,7 @@ function requireShapes() {
 
 $('expSVG').addEventListener('click', () => {
   if (!requireShapes()) return;
-  download('cnc-pattern.svg', buildSVGString('mm'), 'image/svg+xml');
+  download(`cnc-pattern_${BUILD_TAG}.svg`, buildSVGString('mm'), 'image/svg+xml');
   status2('✅ SVG exported');
 });
 
@@ -9340,16 +9737,23 @@ function _confirmHugeExport(kind) {
   // file:// page is exactly the case Chrome drops on the floor, leaving a
   // 0-byte file behind with no error anywhere. Say so up front.
   const viaFile = location.protocol === 'file:' && !FILESAVE.supported();
-  if (n <= 50000 && !(viaFile && est > 4e6)) return true;
+  // Estimated bytes vs what this page can actually write. Checking here means
+  // the warning arrives before a long export, not after it silently fails.
+  const overFileLimit = viaFile && est > FILESAVE.DATA_URL_LIMIT * 0.55;
+  if (n <= 50000 && !overFileLimit) return true;
   return confirm(
     `ลายนี้มี ${n.toLocaleString()} รูป → ไฟล์ ${kind} ประมาณ ${_fmtBytes(est)}\n\n` +
-    (viaFile
-      ? `⚠ หน้านี้เปิดจากไฟล์ในเครื่องโดยตรง (file://) เบราว์เซอร์จึงบันทึกไฟล์ใหญ่ไม่ได้\n` +
-        `   มักได้ไฟล์ขนาด 0 ไบต์โดยไม่แจ้งเตือน — นี่คือสาเหตุที่ AutoCAD เปิดไม่ได้\n\n`
+    (overFileLimit
+      ? `⚠ หน้านี้เปิดจากไฟล์ในเครื่องโดยตรง (file://) เบราว์เซอร์บันทึกไฟล์ขนาดนี้ไม่ได้\n` +
+        `   จะได้ไฟล์ 0 ไบต์โดยไม่แจ้งเตือน — นี่คือสาเหตุที่ AutoCAD บอกว่าไฟล์ใช้ไม่ได้\n\n` +
+        `   วิธีแก้: ปิดหน้านี้ แล้วดับเบิลคลิก "เปิดโปรแกรม.bat" ในโฟลเดอร์เดียวกัน\n` +
+        `   โปรแกรมจะเปิดผ่าน localhost ซึ่งบันทึกไฟล์ใหญ่ได้ไม่จำกัด\n\n`
       : '') +
-    `AutoCAD และ CAM ส่วนใหญ่เปิดไฟล์ขนาดนี้ไม่ไหวอยู่แล้ว\n` +
-    `แนะนำ: เพิ่มค่า Spacing ให้เหลือไม่เกิน ~20,000 รูป แล้วส่งออกใหม่\n\n` +
-    `ต้องการส่งออกต่อไปหรือไม่?`);
+    (n > 50000
+      ? `AutoCAD และ CAM ส่วนใหญ่เปิดไฟล์ขนาดนี้ไม่ไหวอยู่แล้ว\n` +
+        `แนะนำ: เพิ่มค่า Spacing ให้เหลือไม่เกิน ~20,000 รูป แล้วส่งออกใหม่\n\n`
+      : '') +
+    `ต้องการลองส่งออกต่อไปหรือไม่?`);
 }
 
 $('expDXF').addEventListener('click', () => {
@@ -9357,7 +9761,7 @@ $('expDXF').addEventListener('click', () => {
   if (!_confirmHugeExport('DXF')) { status2('ยกเลิกการส่งออก'); return; }
   // R12 by default — the widest-compatibility flavour, and the one AutoCAD
   // actually accepts. The AC1015 writer stays available on the button below.
-  download('cnc-pattern.dxf', buildDXF12(), 'application/dxf');
+  download(`cnc-pattern_${BUILD_TAG}.dxf`, buildDXF12(), 'application/dxf');
 });
 const _expDxf2000 = $('expDXF2000');
 if (_expDxf2000) _expDxf2000.addEventListener('click', () => {
@@ -9369,13 +9773,13 @@ $('expPNG').addEventListener('click', () => {
   if (!requireShapes()) return;
   // Blob is produced lazily so the save dialog opens while the click's
   // user-activation is still valid (canvas encoding is slow enough to lose it)
-  FILESAVE.save('cnc-pattern.png',
+  FILESAVE.save(`cnc-pattern_${BUILD_TAG}.png`,
     () => new Promise(res => pCanvas.toBlob(res, 'image/png')), 'image/png');
 });
 
 $('expJPG').addEventListener('click', () => {
   if (!requireShapes()) return;
-  FILESAVE.save('cnc-pattern.jpg', () => new Promise(res => {
+  FILESAVE.save(`cnc-pattern_${BUILD_TAG}.jpg`, () => new Promise(res => {
     // Draw on white bg first — JPEG has no alpha
     const tmp = document.createElement('canvas');
     tmp.width = pCanvas.width; tmp.height = pCanvas.height;
@@ -9396,7 +9800,7 @@ $('expPDF').addEventListener('click', () => {
   const imgData = pCanvas.toDataURL('image/png');
   doc.addImage(imgData, 'PNG', 0, 0, wW, wH);
   // doc.save() writes straight to Downloads — route through the picker instead
-  FILESAVE.save('cnc-pattern.pdf', () => doc.output('blob'), 'application/pdf');
+  FILESAVE.save(`cnc-pattern_${BUILD_TAG}.pdf`, () => doc.output('blob'), 'application/pdf');
 });
 
 $('expGCODE').addEventListener('click', () => {
@@ -9488,7 +9892,23 @@ $('expSheetGcode').addEventListener('click', () => {
 
 // ── Helpers ───────────────────────────────────────────────
 function f(n) { return parseFloat(n.toFixed(3)); }
-function status2(msg) {
+// The status line is shared, and almost every action ends by kicking off a
+// render that writes its own "generated N shapes" over whatever was there.
+// Four separate messages have been lost that way and each was patched with its
+// own setTimeout. `hold` fixes the class instead: a message asks to stay for a
+// while, and routine updates during that window are dropped.
+let _statusHoldUntil = 0;
+// The window only has to outlive the render that the same action kicks off —
+// roughly one animation frame plus the draw. Holding for seconds instead
+// swallowed the NEXT action's message, which is just as confusing.
+const STATUS_HOLD_MS = 1200;
+// A new user action starts with a clean slate: whatever was held belonged to
+// the previous action.
+function statusClearHold() { _statusHoldUntil = 0; }
+function status2(msg, hold) {
+  const now = Date.now();
+  if (!hold && now < _statusHoldUntil) return;   // a deliberate message is showing
+  _statusHoldUntil = hold ? now + STATUS_HOLD_MS : 0;
   $('statusTxt').textContent = msg;
   $('exportModal').classList.remove('show');
 }
@@ -9556,10 +9976,13 @@ const FILESAVE = {
   // file and reports nothing. A data: URL carries no origin at all, so it is
   // the only thing that works there. Every text export (project, DXF, SVG,
   // G-code, CSV) can take that route; binary canvas exports cannot.
-  // Chrome will not download a data: URL past roughly a couple of megabytes,
-  // and it fails without an error — which is how a 3 MB DXF ended up on disk
-  // as a 0-byte file. Anything above this is refused with instructions instead.
-  DATA_URL_LIMIT: 1.6e6,
+  // Chrome will not download a data: URL past a certain size from a file://
+  // page, and it fails without an error — which is how a multi-megabyte DXF
+  // ends up on disk as a 0-byte file. The exact ceiling is not documented and
+  // has now bitten this project three times, so the limit here is deliberately
+  // conservative: below it downloads are reliable, above it the save is
+  // refused with instructions rather than gambling on another empty file.
+  DATA_URL_LIMIT: 6e5,
 
   _clickDownload(name, blob, text, mime) {
     const fileProto = location.protocol === 'file:';
@@ -9580,6 +10003,7 @@ const FILESAVE = {
   },
 
   async save(name, source, mime) {
+    statusClearHold();
     const toBlob = async () => {
       const v = (typeof source === 'function') ? await source() : source;
       return (v instanceof Blob) ? v : new Blob([v], { type: mime || 'application/octet-stream' });
@@ -9596,7 +10020,7 @@ const FILESAVE = {
                         (typeof source === 'string') ? source : null, mime);
         if (risky === 'toobig') {
           status2(`❌ ไฟล์ใหญ่เกินไป (${_fmtBytes(blob.size)}) — เปิดจาก file:// เบราว์เซอร์จะบันทึกได้ 0 ไบต์ ` +
-                  `กรุณาดับเบิลคลิก "เปิดโปรแกรม.bat" แล้วเปิดผ่าน localhost จึงจะบันทึกไฟล์ขนาดนี้ได้`);
+                  `กรุณาดับเบิลคลิก "เปิดโปรแกรม.bat" แล้วเปิดผ่าน localhost จึงจะบันทึกไฟล์ขนาดนี้ได้`, true);
           return false;
         }
         if (risky) {
@@ -9993,6 +10417,17 @@ function applyProcPattern(keepSize = false) {
   img.onload = () => {
     S.image         = img;
     S.imageFromProc = true;
+    // A generated field is a 1024 px SQUARE with no real proportion of its own.
+    // With the aspect lock on, that 1:1 ratio was pushed onto the work area:
+    // typing 800 wide set 800 tall, then typing 400 tall set 400 wide, so the
+    // sheet could never be anything but square. Release the lock — there is no
+    // aspect here worth preserving. It can be switched back on to hold
+    // whatever ratio is on screen.
+    if (S.aspectLocked) {
+      S.aspectLocked = false;
+      const lk = $('aspectLock');
+      if (lk) { lk.classList.remove('locked'); lk.textContent = '🔓'; }
+    }
     if (hasUserSize) {
       // Keep the sheet the user asked for, and take the aspect from it so the
       // lock does not square the work area on the next edit.
@@ -10005,7 +10440,10 @@ function applyProcPattern(keepSize = false) {
     fitCanvases();
     zoom.show();
     scheduleRender();
-    $('statusTxt').textContent = '\u2705 Procedural "' + currentProcType + '" pattern applied';
+    // Applying the pattern kicks off a render whose own status line lands
+    // last, so say this afterwards or the notice is never actually seen.
+    status2('\u2705 สร้างลาย "' + currentProcType + '" แล้ว — ' +
+            'ปลดล็อกสัดส่วนให้ ตั้งขนาดงาน W และ H ได้อิสระ', true);
   };
   img.src = offscreen.toDataURL();
 }
@@ -11424,6 +11862,11 @@ const PROJECT = {
       v: 2, savedAt: new Date().toISOString(),
       ctrls, toggles, panels,
       pattern: S.pattern, mixPat: S.mixPat, mode: S.mode,
+      patternEngine: S.patternEngine,
+      // Without this a restored pattern was treated as an imported photo, so
+      // the canvas took the generated image's square shape instead of the work
+      // area's — a 500 x 2000 job came back drawn square after an undo.
+      imageFromProc: !!S.imageFromProc,
       // imgAspect is derived from the loaded image, so without saving it the
       // aspect lock falls back to 1:1 on reload and squares the work area.
       aspectLocked: S.aspectLocked, imgAspect: S.imgAspect,
@@ -11485,6 +11928,7 @@ const PROJECT = {
         const b = document.querySelector(`#mixPatGrid [data-mixpat="${st.mixPat}"]`);
         if (b) b.click();
       }
+      if (st.patternEngine) setPatternEngine(st.patternEngine);
       if (st.mode) setMode(st.mode);
       if (st.shapeMode) setShapeMode(st.shapeMode);
       if (st.traceMode) setShapeTraceMode(st.traceMode);
@@ -11496,6 +11940,7 @@ const PROJECT = {
         workW: st.ctrls.workW, workH: st.ctrls.workH, units: st.ctrls.units,
         dpiPreset: st.ctrls.dpiPreset, dpiCustom: st.ctrls.dpiCustom
       };
+      this._procFlag = !!st.imageFromProc;
       this._pendingImgs = (st.image ? 1 : 0) + (st.shapeImage ? 1 : 0) + (st.mixShapeImage ? 1 : 0);
       if (st.image)      this._restoreImage(st.image, false);
       if (st.shapeImage)    this._restoreImage(st.shapeImage, 'shape');
@@ -11506,7 +11951,11 @@ const PROJECT = {
       this.restoring = false;
       return false;
     }
-    if (!this._pendingImgs) this.restoring = false;
+    if (!this._pendingImgs) {
+      if (this._procFlag !== undefined) { S.imageFromProc = this._procFlag; this._procFlag = undefined; }
+      this.restoring = false;
+      fitCanvases();
+    }
     if (typeof _syncPatternPanels === 'function') _syncPatternPanels();
     scheduleRender(50);
     return true;
@@ -11528,6 +11977,10 @@ const PROJECT = {
         if (w > 0 && hh > 0) S.imgAspect = w / hh;
       }
     } catch (e) { console.warn('size restore:', e); }
+    // _applyLoadedImage() always clears this flag, so it has to be put back
+    // here — and before fitCanvases(), which reads it to decide whether the
+    // canvas follows the picture or the work area.
+    if (this._procFlag !== undefined) { S.imageFromProc = this._procFlag; this._procFlag = undefined; }
     this.restoring = false;
     if (typeof _syncPatternPanels === 'function') _syncPatternPanels();
     if (typeof updateSourceInfo === 'function') updateSourceInfo();
@@ -11652,9 +12105,7 @@ const PROJECT = {
       close();
       if (this.apply(st, { skipVolatile: true })) {
         setTimeout(() => HISTORY.reset(), 700);
-        // The restore triggers a regenerate, whose own status line lands last.
-        // Say this afterwards or the confirmation is never actually seen.
-        setTimeout(() => status2(`↩ กู้คืนงานล่าสุดแล้ว${when ? ' (' + when + ')' : ''}`), 900);
+        status2(`↩ กู้คืนงานล่าสุดแล้ว${when ? ' (' + when + ')' : ''}`, true);
       } else {
         status2('❌ กู้คืนไม่สำเร็จ — ไฟล์ที่บันทึกไว้อาจเสียหาย');
       }
@@ -11662,11 +12113,48 @@ const PROJECT = {
     return true;
   },
 
-  saveFile() {
-    const st = this.collect(true);
+  async saveFile() {
     const name = 'cnc-project-' + new Date().toISOString().slice(0, 10) + '.cncproj';
-    // download() reports the final result itself (saved / cancelled / failed)
-    return download(name, JSON.stringify(st, null, 1), 'application/json');
+    const full = JSON.stringify(this.collect(true), null, 1);
+
+    // Refusing to save the user's own work is never the right answer. A project
+    // is mostly the embedded source image, so when it will not fit through a
+    // file:// download, save the settings on their own rather than nothing —
+    // and say plainly that the pictures are not in it.
+    const tooBigForFile = location.protocol === 'file:' &&
+      encodeURIComponent(full).length > FILESAVE.DATA_URL_LIMIT;
+
+    if (!tooBigForFile) {
+      // download() reports the final result itself (saved / cancelled / failed)
+      return download(name, full, 'application/json');
+    }
+
+    // Dropping the picture without asking is not "saving your work". Explain
+    // the situation and let the user decide; the full file is one launcher
+    // away, so cancelling is a real option rather than a dead end.
+    const keepGoing = confirm(
+      `ไฟล์งานเต็ม (มีรูปฝังอยู่) มีขนาด ${_fmtBytes(full.length)}\n\n` +
+      `หน้านี้เปิดจากไฟล์ในเครื่องโดยตรง (file://) เบราว์เซอร์บันทึกไฟล์ขนาดนี้ไม่ได้\n\n` +
+      `▸ กด "ยกเลิก" (แนะนำ) แล้วดับเบิลคลิก "เปิดโปรแกรม.bat"\n` +
+      `   เปิดผ่าน localhost จะบันทึกได้ครบทั้งรูปและค่าทุกอย่าง\n\n` +
+      `▸ กด "ตกลง" เพื่อบันทึกเฉพาะค่าตั้งค่าตอนนี้ (ไม่มีรูป ต้องนำรูปเข้าใหม่ตอนเปิด)\n\n` +
+      `บันทึกเฉพาะค่าตั้งค่าต่อไปหรือไม่?`);
+    if (!keepGoing) {
+      status2('ยังไม่ได้บันทึก — ใช้ "เปิดโปรแกรม.bat" เพื่อบันทึกไฟล์เต็มพร้อมรูป', true);
+      return false;
+    }
+
+    const lean = this.collect(false);
+    lean.imagesSkipped = true;
+    const leanJson = JSON.stringify(lean, null, 1);
+    const okLean = await download(name.replace('.cncproj', '-settings.cncproj'),
+                                  leanJson, 'application/json');
+    if (okLean) {
+      status2(`💾 บันทึกเฉพาะค่าตั้งค่าแล้ว (${_fmtBytes(leanJson.length)}) — ` +
+              `รูปไม่ได้อยู่ในไฟล์ ต้องนำเข้าใหม่ตอนเปิด · ` +
+              `ถ้าต้องการไฟล์เต็ม ใช้ "เปิดโปรแกรม.bat"`, true);
+    }
+    return okLean;
   },
 
   loadFile(file) {
@@ -11674,11 +12162,37 @@ const PROJECT = {
     r.onload = e => {
       try {
         const st = JSON.parse(e.target.result);
-        if (this.apply(st)) { HISTORY.reset(); this.autosave(); status2('✅ เปิดโปรเจกต์แล้ว'); }
-        else status2('❌ ไฟล์โปรเจกต์ไม่ถูกต้อง');
-      } catch (err) { status2('❌ อ่านไฟล์ไม่ได้: ' + err.message); }
+        if (!this.apply(st)) { status2('❌ ไฟล์โปรเจกต์ไม่ถูกต้อง', true); return; }
+        HISTORY.reset();
+        this.autosave();
+        // A settings-only file has no picture in it. Saying "load an image
+        // first" — which is what the generator says next — reads like the file
+        // failed to open. Say what actually happened, and keep it on screen.
+        if (st.imagesSkipped && !st.image) {
+          this._noImageNotice(file && file.name);
+          status2('📂 เปิดไฟล์แล้ว — ไฟล์นี้ไม่มีรูปฝังอยู่ กรุณานำรูปเข้าใหม่', true);
+        } else {
+          status2('✅ เปิดโปรเจกต์แล้ว', true);
+        }
+      } catch (err) { status2('❌ อ่านไฟล์ไม่ได้: ' + err.message, true); }
     };
     r.readAsText(file);
+  },
+
+  _noImageNotice(fname) {
+    document.querySelectorAll('.noimg-bar').forEach(b => b.remove());
+    const bar = document.createElement('div');
+    bar.className = 'restore-bar noimg-bar';
+    bar.style.bottom = '78px';
+    bar.innerHTML =
+      `<div class="restore-txt"><b>เปิดไฟล์แล้ว — แต่ไฟล์นี้ไม่มีรูป</b>` +
+      `<span>${(fname || 'ไฟล์นี้').replace(/[<>&]/g, '')} เก็บเฉพาะค่าตั้งค่า · ` +
+      `ค่าทุกอย่างกลับมาแล้ว เหลือแค่นำรูปเข้า</span></div>` +
+      `<button class="restore-yes">เลือกรูปเลย</button>` +
+      `<button class="restore-no">ปิด</button>`;
+    document.body.appendChild(bar);
+    bar.querySelector('.restore-no').onclick = () => bar.remove();
+    bar.querySelector('.restore-yes').onclick = () => { bar.remove(); $('fileInput').click(); };
   },
 
   clear() {
@@ -11694,9 +12208,51 @@ const PROJECT = {
 const HISTORY = {
   stack: [], idx: -1, MAX: 60, _timer: null,
 
+  // Snapshots used to be taken WITHOUT images, so undo restored every slider
+  // but left whatever picture was on screen — "ย้อนกลับ" did not actually go
+  // back. Images are far too big to copy into 60 snapshots, so they are kept
+  // once in a pool and referenced by id.
+  _pool: new Map(),        // id  -> data URL
+  _ids:  new Map(),        // data URL -> id
+  _seq: 0,
+  IMG_KEYS: ['image', 'shapeImage', 'mixShapeImage'],
+
+  _pack(st) {
+    for (const k of this.IMG_KEYS) {
+      const v = st[k];
+      if (typeof v !== 'string' || !v) continue;
+      let id = this._ids.get(v);
+      if (!id) { id = 'i' + (++this._seq); this._ids.set(v, id); this._pool.set(id, v); }
+      st[k] = '@' + id;
+    }
+    return st;
+  },
+  _unpack(st) {
+    for (const k of this.IMG_KEYS) {
+      const v = st[k];
+      if (typeof v === 'string' && v.charAt(0) === '@') st[k] = this._pool.get(v.slice(1)) || null;
+    }
+    return st;
+  },
+  // Drop pooled images no snapshot still points at, so a long session editing
+  // several pictures does not hold all of them forever.
+  _prune() {
+    const live = new Set();
+    for (const s of this.stack)
+      for (const m of s.matchAll(/"@(i\d+)"/g)) live.add(m[1]);
+    for (const [id, url] of [...this._pool]) {
+      if (live.has(id)) continue;
+      this._pool.delete(id); this._ids.delete(url);
+    }
+  },
+
+  _snap() { return JSON.stringify(this._pack(PROJECT.collect(true))); },
+
   reset() {
-    this.stack = [JSON.stringify(PROJECT.collect(false))];
+    this.stack = [this._snap()];
+    this.labels = [{ t: Date.now(), what: 'เริ่มต้น' }];
     this.idx = 0;
+    this._prune();
     this._sync();
   },
 
@@ -11706,28 +12262,70 @@ const HISTORY = {
     this._timer = setTimeout(() => this.push(), 450);
   },
 
-  push() {
+  // `what` is a short human label for the History list.
+  push(what) {
     if (PROJECT.restoring) return;
-    const snap = JSON.stringify(PROJECT.collect(false));
+    const snap = this._snap();
     if (this.stack[this.idx] === snap) return;      // nothing actually changed
-    this.stack = this.stack.slice(0, this.idx + 1);
+    const label = { t: Date.now(), what: what || this._describe(this.stack[this.idx], snap) };
+    this.stack  = this.stack.slice(0, this.idx + 1);
+    this.labels = (this.labels || []).slice(0, this.idx + 1);
     this.stack.push(snap);
-    if (this.stack.length > this.MAX) this.stack.shift();
+    this.labels.push(label);
+    if (this.stack.length > this.MAX) { this.stack.shift(); this.labels.shift(); }
     this.idx = this.stack.length - 1;
+    this._prune();
     this._sync();
+  },
+
+  // What changed between two snapshots, in words, so the History list is
+  // navigable instead of being 60 identical rows.
+  _describe(prevJson, nextJson) {
+    try {
+      const a = JSON.parse(prevJson || '{}'), b = JSON.parse(nextJson);
+      const ca = a.ctrls || {}, cb = b.ctrls || {};
+      for (const k of this.IMG_KEYS)
+        if (a[k] !== b[k]) return b[k] ? 'เปลี่ยนรูป' : 'เอารูปออก';
+      if (a.pattern !== b.pattern) return 'ลาย: ' + patName(b.pattern);
+      if (a.patternEngine !== b.patternEngine)
+        return 'รูปแบบการวาง: ' + (b.patternEngine === 'specialxy' ? 'Special XY' : 'Standard');
+      const nice = {
+        workW: 'ขนาดงาน W', workH: 'ขนาดงาน H', nSpacing: 'ระยะห่าง',
+        nMinR: 'Min Ø', nMaxR: 'Max Ø', nAngle: 'มุมกริด', nPatRot: 'หมุนรูปทรง',
+        nXSpacing: 'X Spacing', nYSpacing: 'Y Spacing', units: 'หน่วย',
+        quantSizes: 'ลิสต์ขนาด', toolDia: 'ดอกกัด Ø', nContrast: 'Contrast', nGamma: 'Gamma'
+      };
+      for (const k of Object.keys(cb))
+        if (ca[k] !== cb[k]) return (nice[k] || k) + ' = ' + cb[k];
+      for (const k of Object.keys(b.toggles || {}))
+        if ((a.toggles || {})[k] !== b.toggles[k]) return 'สลับ ' + k.replace(/^tog/, '');
+      return 'แก้ไข';
+    } catch (e) { return 'แก้ไข'; }
   },
 
   undo() { this._go(-1); },
   redo() { this._go(1); },
+
+  // Jump straight to a point in the list.
+  goTo(i) {
+    if (i < 0 || i >= this.stack.length || i === this.idx) return;
+    this.idx = i;
+    clearTimeout(this._timer);
+    PROJECT.apply(this._unpack(JSON.parse(this.stack[i])));
+    this._sync();
+    const l = (this.labels || [])[i];
+    status2('⟲ ย้อนไปที่: ' + (l ? l.what : '#' + (i + 1)), true);
+    PROJECT.markDirty();
+  },
 
   _go(dir) {
     const next = this.idx + dir;
     if (next < 0 || next >= this.stack.length) return;
     this.idx = next;
     clearTimeout(this._timer);
-    PROJECT.apply(JSON.parse(this.stack[this.idx]));
+    PROJECT.apply(this._unpack(JSON.parse(this.stack[this.idx])));
     this._sync();
-    status2(dir < 0 ? '↩ ย้อนกลับ' : '↪ ทำซ้ำ');
+    status2(dir < 0 ? '↩ ย้อนกลับ' : '↪ ทำซ้ำ', true);
     PROJECT.markDirty();
   },
 
@@ -11735,6 +12333,7 @@ const HISTORY = {
     const u = $('btnUndo'), r = $('btnRedo');
     if (u) u.disabled = this.idx <= 0;
     if (r) r.disabled = this.idx >= this.stack.length - 1;
+    if (typeof renderHistoryList === 'function') renderHistoryList();
   }
 };
 
@@ -11886,6 +12485,9 @@ const HISTORY = {
     updateSpacingNote();
 
     if (typeof _syncPatternPanels === 'function') _syncPatternPanels();
+    if (typeof setPatternEngine === 'function') setPatternEngine(S.patternEngine);
+    const _bt = $('buildTag'); if (_bt) _bt.textContent = BUILD_TAG;
+    if (typeof showFileProtocolNotice === 'function') showFileProtocolNotice();
 
     // ── Open on a clean sheet; offer the last session instead of forcing it ──
     HISTORY.reset();
