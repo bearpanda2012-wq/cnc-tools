@@ -755,6 +755,15 @@ pre.gcode-content {
         </div>
       </div>
 
+      <div class="tog-row" style="margin-top:8px">
+        <span class="tog-label">ใส่เส้นกรอบขนาดงานตอน Export</span>
+        <div class="toggle on" id="togExportFrame"></div>
+      </div>
+      <div style="font-size:9px;color:#8e8e94;margin:-2px 0 8px;line-height:1.5">
+        เพิ่มสี่เหลี่ยมขอบเขตงานลงใน DXF และ SVG เพื่อใช้อ้างอิงตำแหน่ง ·
+        ไม่ถูกเพิ่มลง G-code จึงไม่ถูกกัด
+      </div>
+
       <!-- Work size with aspect lock -->
       <div class="worksize-row">
         <div class="in-grp"><label>ขนาดงาน W</label>
@@ -2157,6 +2166,7 @@ const S = {
   // Which pattern engine builds the cell positions. 'std45' is the original
   // behaviour and the default, so existing projects are untouched.
   patternEngine: 'std45', xSpacingMm: 100, ySpacingMm: 100, sourcePhoto: null,
+  exportFrame: true,
   mixEnabled: false, mixPat: 'circle', mixDiamMm: 2.0, mixPatRot: 0, mixAlpha: 0.7,
   // Mix layer used to be one fixed diameter, preview-only. It can now vary
   // with tone exactly like the main pattern, and it is exported with it.
@@ -3241,6 +3251,13 @@ function tog(id, key) {
 tog('togInvert','invert'); tog('togFill','fill'); tog('togDarkBg','darkBg');
 tog('togQuantRandom','quantRandom'); tog('togSkipBlank','skipBlank');
 tog('togMixQuantRandom','mixQuantRandom');
+// Default is on, so the switch has to start in that position.
+$('togExportFrame').classList.toggle('on', !!S.exportFrame);
+$('togExportFrame').addEventListener('click', function() {
+  S.exportFrame = !S.exportFrame;
+  this.classList.toggle('on', S.exportFrame);
+  if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+});
 
 // Blend-with-photo switch. Shows its options and says whether there is a photo
 // to blend with, because the control does nothing without one.
@@ -3418,7 +3435,7 @@ function generateSpecialXYPattern(o, emit) {
 // first line, and in every export filename — so a file and a screenshot
 // always say which build produced them. Several rounds have been lost
 // analysing output from a stale copy of this page.
-const BUILD_TAG = '26Aug-b27';
+const BUILD_TAG = '26Aug-b28';
 
 const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
 function updateSpacingNote() {
@@ -5013,7 +5030,12 @@ function buildSVGString(units) {
   const sc = wW / W;
   const bg = S.darkBg ? '#111111' : '#ffffff';
   const fg = S.darkBg ? '#ffffff' : '#000000';
-  const hdr = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${wW}${un}" height="${wH}${un}" viewBox="0 0 ${wW} ${wH}">\n  <!-- CNC Pattern Generator | Pattern: ${patName(S.pattern)} -->\n  <rect width="${wW}" height="${wH}" fill="${bg}"/>`;
+  // The work-area outline. Stroked, never filled, so it reads as a boundary.
+  const frame = S.exportFrame
+    ? `\n  <rect x="0" y="0" width="${wW}" height="${wH}" fill="none" stroke="${fg}" ` +
+      `stroke-width="${(0.2*sc).toFixed(3)}" vector-effect="non-scaling-stroke"/>`
+    : '';
+  const hdr = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${wW}${un}" height="${wH}${un}" viewBox="0 0 ${wW} ${wH}">\n  <!-- CNC Pattern Generator ${BUILD_TAG} | Pattern: ${patName(S.pattern)} -->\n  <rect width="${wW}" height="${wH}" fill="${bg}"/>${frame}`;
 
   // ── Line Raster SVG: filled polyline strips ───────────────
   if (S.pattern === 'lineraster' && S.lineRows && S.lineRows.length) {
@@ -9341,6 +9363,15 @@ function buildDXF12() {
     }
   }
 
+  // The work-area outline, so the drawing carries its own reference frame.
+  // Deliberately not written into the G-code — it is a boundary to line the
+  // sheet up with, not a cut.
+  if (S.exportFrame) {
+    const fw = wW, fh = workHmm();
+    ents.push(polyline([[0,0],[fw,0],[fw,fh],[0,fh]]));
+    track(0, 0); track(fw, fh);
+  }
+
   if (!isFinite(minX)) { minX = minY = 0; maxX = wW; maxY = workHmm(); }
 
   const head = DXF12_SKELETON
@@ -12009,7 +12040,7 @@ const PROJECT = {
       v: 2, savedAt: new Date().toISOString(),
       ctrls, toggles, panels,
       pattern: S.pattern, mixPat: S.mixPat, mode: S.mode,
-      patternEngine: S.patternEngine,
+      patternEngine: S.patternEngine, exportFrame: !!S.exportFrame,
       // Without this a restored pattern was treated as an imported photo, so
       // the canvas took the generated image's square shape instead of the work
       // area's — a 500 x 2000 job came back drawn square after an undo.
@@ -12081,6 +12112,11 @@ const PROJECT = {
         if (b) b.click();
       }
       if (st.patternEngine) setPatternEngine(st.patternEngine);
+      if (typeof st.exportFrame === 'boolean') {
+        S.exportFrame = st.exportFrame;
+        const ef = $('togExportFrame');
+        if (ef) ef.classList.toggle('on', S.exportFrame);
+      }
       if (st.mode) setMode(st.mode);
       if (st.shapeMode) setShapeMode(st.shapeMode);
       if (st.traceMode) setShapeTraceMode(st.traceMode);
