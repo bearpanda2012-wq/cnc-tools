@@ -508,6 +508,13 @@ pre.gcode-content {
 
 /* !important so it wins over the inline display the pattern picker sets on
    the shape/line/text panels — a panel hidden by mode must stay hidden. */
+.anchor-grid { display:grid; grid-template-columns:repeat(3,18px); gap:4px; }
+.anchor-grid button {
+  width:18px; height:18px; border-radius:50%; cursor:pointer; padding:0;
+  background:#1a1b20; border:1px solid #3a3c45; transition:background .12s, border-color .12s;
+}
+.anchor-grid button:hover { border-color:#4da3ff; }
+.anchor-grid button.on { background:#0a7aff; border-color:#0a7aff; box-shadow:0 0 0 2px rgba(10,122,255,.25); }
 .restore-bar  { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:9000;
                 display:flex; align-items:center; gap:10px; padding:10px 12px;
                 background:#1b1d23; border:1px solid #34363f; border-radius:10px;
@@ -762,6 +769,37 @@ pre.gcode-content {
       <div style="font-size:9px;color:#8e8e94;margin:-2px 0 8px;line-height:1.5">
         เพิ่มสี่เหลี่ยมขอบเขตงานลงใน DXF และ SVG เพื่อใช้อ้างอิงตำแหน่ง ·
         ไม่ถูกเพิ่มลง G-code จึงไม่ถูกกัด
+      </div>
+
+      <div class="tog-row">
+        <span class="tog-label">แบ่งแผ่น (Split panels)</span>
+        <div class="toggle" id="togSplitPanels"></div>
+      </div>
+      <div id="splitPanelBox" style="display:none">
+        <div class="in-row" style="margin:6px 0">
+          <div class="in-grp"><label>กว้างต่อแผ่น</label>
+            <input type="number" class="num-in" id="nPanelW" value="1200" min="1" step="1"></div>
+          <div class="in-grp"><label>ยาวต่อแผ่น</label>
+            <input type="number" class="num-in" id="nPanelH" value="2400" min="1" step="1"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin:2px 0 6px">
+          <div>
+            <div style="font-size:10px;color:#aaa;margin-bottom:4px">ตำแหน่งเริ่มวางแผ่น</div>
+            <div id="panelAnchorGrid" class="anchor-grid">
+              <button data-anchor="tl" title="ชิดบน-ซ้าย"></button>
+              <button data-anchor="tc" title="ชิดบน-กลาง"></button>
+              <button data-anchor="tr" title="ชิดบน-ขวา"></button>
+              <button data-anchor="ml" title="กลาง-ซ้าย"></button>
+              <button data-anchor="mc" title="กึ่งกลาง"></button>
+              <button data-anchor="mr" title="กลาง-ขวา"></button>
+              <button data-anchor="bl" class="on" title="ชิดล่าง-ซ้าย"></button>
+              <button data-anchor="bc" title="ชิดล่าง-กลาง"></button>
+              <button data-anchor="br" title="ชิดล่าง-ขวา"></button>
+            </div>
+          </div>
+          <div id="anchorNote" style="font-size:9px;color:#8e8e94;line-height:1.5;flex:1"></div>
+        </div>
+        <div id="splitNote" style="font-size:9px;color:#8e8e94;margin:-2px 0 8px;line-height:1.5"></div>
       </div>
 
       <!-- Work size with aspect lock -->
@@ -2166,7 +2204,8 @@ const S = {
   // Which pattern engine builds the cell positions. 'std45' is the original
   // behaviour and the default, so existing projects are untouched.
   patternEngine: 'std45', xSpacingMm: 100, ySpacingMm: 100, sourcePhoto: null,
-  exportFrame: true,
+  exportFrame: true, splitPanels: false, panelWmm: 1200, panelHmm: 2400,
+  panelAnchor: 'bl',
   mixEnabled: false, mixPat: 'circle', mixDiamMm: 2.0, mixPatRot: 0, mixAlpha: 0.7,
   // Mix layer used to be one fixed diameter, preview-only. It can now vary
   // with tone exactly like the main pattern, and it is exported with it.
@@ -2290,6 +2329,7 @@ function updateSourceInfo() {
 // design tab so there is only ever one source of truth.
 function updateCncSizeInfo() {
   if (typeof updateXYNote === 'function') updateXYNote();
+  if (typeof updateSplitNote === 'function') updateSplitNote();
   const v = $('cncSizeVal'); if (!v) return;
   const sub = $('cncSizeSub');
   const f = unitFactor(), dec = _unitDecimals(f);
@@ -2853,6 +2893,47 @@ const zoom = (() => {
 })();
 
 // ── View canvas renderer (vector-crisp at any zoom) ───────
+// The export frame and the panel divisions, drawn on screen in the same place
+// they will appear in the file. Deciding a panel size without seeing where the
+// cuts land is guesswork.
+function _drawSheetGuides(ctx, scale) {
+  if (!S.exportFrame && !S.splitPanels) return;
+  const W = pCanvas.width, H = pCanvas.height;
+  const wMm = workWmm(), hMm = workHmm();
+  if (!(wMm > 0 && hMm > 0)) return;
+  const mmToPx = W / wMm;
+
+  ctx.save();
+  // Keep the guides one screen pixel wide whatever the zoom, so they never
+  // compete with the pattern for attention.
+  ctx.lineWidth = 1 / Math.max(0.0001, scale || 1);
+  ctx.setLineDash([]);
+
+  if (S.exportFrame) {
+    ctx.strokeStyle = S.darkBg ? 'rgba(255,255,255,.85)' : 'rgba(0,0,0,.75)';
+    ctx.strokeRect(0, 0, W, H);
+  }
+  if (S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0) {
+    // Dashed and blue: a panel division is a guide, not part of the artwork.
+    ctx.strokeStyle = '#0a7aff';
+    ctx.setLineDash([6 / Math.max(0.0001, scale || 1), 4 / Math.max(0.0001, scale || 1)]);
+    const { ox, oy } = panelOffsets();
+    ctx.beginPath();
+    for (let x = ox > 1e-6 ? ox : S.panelWmm; x < wMm - 1e-6; x += S.panelWmm) {
+      const px = x * mmToPx;
+      ctx.moveTo(px, 0); ctx.lineTo(px, H);
+    }
+    for (let y = oy > 1e-6 ? oy : S.panelHmm; y < hMm - 1e-6; y += S.panelHmm) {
+      // Canvas Y runs down from the top while the sheet is measured up from
+      // the bottom, which is how the exporters read it.
+      const py = H - y * mmToPx;
+      ctx.moveTo(0, py); ctx.lineTo(W, py);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function updateViewCanvas() {
   const { sc, tx, ty } = zoom.getTransform();
   const vW = vCanvas.width, vH = vCanvas.height;
@@ -2887,6 +2968,7 @@ function updateViewCanvas() {
         vCtx.drawImage(_ishStamp, s.x - s.r, s.y - s.r, d, d);
       }
       _applyMixLayer(vCtx, fg);
+      _drawSheetGuides(vCtx, sc);
       vCtx.restore();
       return;
     }
@@ -2914,6 +2996,7 @@ function updateViewCanvas() {
     }
     if (isContour && S.fill) vCtx.fill('evenodd'); else vCtx.stroke();
     _applyMixLayer(vCtx, fg);
+    _drawSheetGuides(vCtx, sc);
     vCtx.restore();
     return;
   }
@@ -2925,6 +3008,7 @@ function updateViewCanvas() {
       _drawLineRows(vCtx, S.lineRows, S.lrNx, S.lrNy);
     }
     _applyMixLayer(vCtx, fg);
+    _drawSheetGuides(vCtx, sc);
     vCtx.restore();
     return;
   }
@@ -2952,6 +3036,7 @@ function updateViewCanvas() {
       }
     }
     _applyMixLayer(vCtx, fg);
+    _drawSheetGuides(vCtx, sc);
     vCtx.restore();
     return;
   }
@@ -2962,6 +3047,7 @@ function updateViewCanvas() {
   _batchDrawShapes(vCtx, S.shapes, S.pattern, S.patRot, _minDrawR, S.fill);
 
   _applyMixLayer(vCtx, fg);
+  _drawSheetGuides(vCtx, sc);
 
   vCtx.restore();
 }
@@ -3257,7 +3343,68 @@ $('togExportFrame').addEventListener('click', function() {
   S.exportFrame = !S.exportFrame;
   this.classList.toggle('on', S.exportFrame);
   if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+  updateViewCanvas();
 });
+
+// Splitting the sheet into panels. Draws the division lines only — the pattern
+// itself is untouched, so a panel is a place to cut the material, not a change
+// to the design.
+$('togSplitPanels').addEventListener('click', function() {
+  S.splitPanels = !S.splitPanels;
+  this.classList.toggle('on', S.splitPanels);
+  $('splitPanelBox').style.display = S.splitPanels ? '' : 'none';
+  updateSplitNote();
+  if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+  updateViewCanvas();          // the guides are a view overlay — no re-generate needed
+});
+['nPanelW','nPanelH'].forEach(id => {
+  const el = $(id); if (!el) return;
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    S[id === 'nPanelW' ? 'panelWmm' : 'panelHmm'] = (isFinite(v) && v > 0) ? v : 0;
+    updateSplitNote();
+    updateViewCanvas();
+  });
+});
+$('panelAnchorGrid').addEventListener('click', e => {
+  const b = e.target.closest('[data-anchor]');
+  if (!b) return;
+  S.panelAnchor = b.dataset.anchor;
+  $('panelAnchorGrid').querySelectorAll('button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  updateSplitNote();
+  updateViewCanvas();
+  if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+});
+
+function updateSplitNote() {
+  const n = $('splitNote');
+  if (!n) return;
+  if (!S.splitPanels) { n.textContent = ''; return; }
+  const wW = workWmm(), wH = workHmm(), pw = S.panelWmm, ph = S.panelHmm;
+  if (!(pw > 0 && ph > 0 && wW > 0 && wH > 0)) { n.textContent = 'ใส่ขนาดแผ่นให้ครบก่อน'; return; }
+  const cols = Math.ceil(wW / pw), rows = Math.ceil(wH / ph);
+  const lastW = +(wW - (cols - 1) * pw).toFixed(2), lastH = +(wH - (rows - 1) * ph).toFixed(2);
+  const fmt = v => (+v.toFixed(2)).toString();
+  n.textContent = `${cols}×${rows} = ${cols*rows} แผ่น · เต็มแผ่น ${fmt(pw)}×${fmt(ph)} mm` +
+    ((lastW < pw - 0.01 || lastH < ph - 0.01)
+      ? ` · แผ่นริม ${fmt(lastW)}×${fmt(lastH)} mm` : '') +
+    ' · เส้นแบ่งอยู่ใน DXF/SVG เท่านั้น ไม่ถูกกัด';
+
+  const an = $('anchorNote');
+  if (an) {
+    const remX = +(wW % pw).toFixed(2), remY = +(wH % ph).toFixed(2);
+    if (remX < 0.01 && remY < 0.01) {
+      an.textContent = 'ลงตัวพอดี ไม่มีเศษ — ตำแหน่งเริ่มไม่มีผล';
+    } else {
+      const a = S.panelAnchor || 'bl';
+      const xWord = a[1] === 'l' ? 'เศษไปอยู่ขวา' : a[1] === 'r' ? 'เศษไปอยู่ซ้าย' : 'เศษแบ่งซ้าย-ขวาเท่ากัน';
+      const yWord = a[0] === 'b' ? 'เศษไปอยู่บน'  : a[0] === 't' ? 'เศษไปอยู่ล่าง' : 'เศษแบ่งบน-ล่างเท่ากัน';
+      an.textContent = (remX > 0.01 ? xWord : '') + (remX > 0.01 && remY > 0.01 ? ' · ' : '') +
+                       (remY > 0.01 ? yWord : '');
+    }
+  }
+}
 
 // Blend-with-photo switch. Shows its options and says whether there is a photo
 // to blend with, because the control does nothing without one.
@@ -3435,7 +3582,7 @@ function generateSpecialXYPattern(o, emit) {
 // first line, and in every export filename — so a file and a screenshot
 // always say which build produced them. Several rounds have been lost
 // analysing output from a stale copy of this page.
-const BUILD_TAG = '26Aug-b28';
+const BUILD_TAG = '26Aug-b33';
 
 const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
 function updateSpacingNote() {
@@ -4316,6 +4463,22 @@ function _batchDrawShapes(ctx, list, pat, rot, minR, fill, batch) {
   if (n % B !== 0) { if (fill) ctx.fill(); else ctx.stroke(); }
 }
 
+// Where the panel grid starts, and therefore which side the offcut lands on.
+// Returned in millimetres from the sheet's bottom-left corner, so the preview,
+// the DXF and the SVG all place the divisions identically.
+function panelOffsets() {
+  const wW = workWmm(), hH = workHmm();
+  const pw = S.panelWmm, ph = S.panelHmm;
+  if (!(pw > 0 && ph > 0 && wW > 0 && hH > 0)) return { ox: 0, oy: 0 };
+  const remX = wW % pw, remY = hH % ph;          // the offcut, if it does not divide evenly
+  const a = S.panelAnchor || 'bl';
+  const col = a[1], row = a[0];                  // l/c/r  and  t/m/b
+  const ox = col === 'l' ? 0 : col === 'r' ? remX : remX / 2;
+  // Sheet Y runs up from the bottom: anchoring to the top pushes the offcut down.
+  const oy = row === 'b' ? 0 : row === 't' ? remY : remY / 2;
+  return { ox, oy };
+}
+
 // Canvas Y (down from the top) -> sheet Y (up from the bottom), in mm.
 //
 // Every exporter used to do `(H - s.y) * sc`, treating the CANVAS height as the
@@ -5031,10 +5194,22 @@ function buildSVGString(units) {
   const bg = S.darkBg ? '#111111' : '#ffffff';
   const fg = S.darkBg ? '#ffffff' : '#000000';
   // The work-area outline. Stroked, never filled, so it reads as a boundary.
-  const frame = S.exportFrame
+  const _sw = (0.2*sc).toFixed(3);
+  let frame = S.exportFrame
     ? `\n  <rect x="0" y="0" width="${wW}" height="${wH}" fill="none" stroke="${fg}" ` +
-      `stroke-width="${(0.2*sc).toFixed(3)}" vector-effect="non-scaling-stroke"/>`
+      `stroke-width="${_sw}" vector-effect="non-scaling-stroke"/>`
     : '';
+  if (S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0) {
+    const { ox, oy } = panelOffsets();
+    for (let x = ox > 1e-6 ? ox : S.panelWmm; x < wW - 1e-6; x += S.panelWmm)
+      frame += `\n  <line x1="${x}" y1="0" x2="${x}" y2="${wH}" stroke="${fg}" ` +
+               `stroke-width="${_sw}" vector-effect="non-scaling-stroke"/>`;
+    for (let y = oy > 1e-6 ? oy : S.panelHmm; y < wH - 1e-6; y += S.panelHmm) {
+      const sy = wH - y;   // SVG measures down from the top
+      frame += `\n  <line x1="0" y1="${sy}" x2="${wW}" y2="${sy}" stroke="${fg}" ` +
+               `stroke-width="${_sw}" vector-effect="non-scaling-stroke"/>`;
+    }
+  }
   const hdr = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${wW}${un}" height="${wH}${un}" viewBox="0 0 ${wW} ${wH}">\n  <!-- CNC Pattern Generator ${BUILD_TAG} | Pattern: ${patName(S.pattern)} -->\n  <rect width="${wW}" height="${wH}" fill="${bg}"/>${frame}`;
 
   // ── Line Raster SVG: filled polyline strips ───────────────
@@ -9290,7 +9465,7 @@ function buildDXF12() {
   let _hnd = 0x100;
   const nh = () => (_hnd++).toString(16).toUpperCase();
 
-  const polyline = pts => {
+  const polyline = (pts, closed = true) => {
     // getShapePoints() repeats the first point at the end so the canvas can
     // stroke a closed outline. In a POLYLINE flagged closed (70=1) that repeat
     // is a zero-length segment — harmless on screen, but it makes CAM emit a
@@ -9303,7 +9478,7 @@ function buildDXF12() {
     // 10/20/30 on the POLYLINE header is the mandatory "dummy" point — it was
     // missing in the first version. 70=1 marks the polyline closed.
     let s = g(0,'POLYLINE') + g(5,nh()) + g(8,'0') + g(66,'1') +
-            g(10,'0.0') + g(20,'0.0') + g(30,'0.0') + g(70,'1');
+            g(10,'0.0') + g(20,'0.0') + g(30,'0.0') + g(70, closed ? '1' : '0');
     for (const [x, y] of pts) {
       track(x, y);
       s += g(0,'VERTEX') + g(5,nh()) + g(8,'0') +
@@ -9369,6 +9544,19 @@ function buildDXF12() {
   if (S.exportFrame) {
     const fw = wW, fh = workHmm();
     ents.push(polyline([[0,0],[fw,0],[fw,fh],[0,fh]]));
+    track(0, 0); track(fw, fh);
+  }
+
+  // Panel divisions: straight lines across the sheet, open polylines so CAM
+  // does not read them as closed shapes. Only the interior lines are drawn —
+  // the outer edge is the frame's job, and doubling it up makes CAM cut twice.
+  if (S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0) {
+    const fw = wW, fh = workHmm();
+    const { ox, oy } = panelOffsets();
+    for (let x = ox > 1e-6 ? ox : S.panelWmm; x < fw - 1e-6; x += S.panelWmm)
+      ents.push(polyline([[x, 0], [x, fh]], false));
+    for (let y = oy > 1e-6 ? oy : S.panelHmm; y < fh - 1e-6; y += S.panelHmm)
+      ents.push(polyline([[0, y], [fw, y]], false));
     track(0, 0); track(fw, fh);
   }
 
@@ -9486,7 +9674,7 @@ function buildDXF() {
           if (arcPath.length < 2) continue;
           const verts = arcPath.map(v => ({
             x: (s.x + v.x * s.r) * sc,
-            y: (H - (s.y + v.y * s.r)) * sc,
+            y: _sheetY(s.y + v.y * s.r, sc),
             bulge: -v.bulge
           }));
           entities += polyline(verts, false);
@@ -9496,8 +9684,76 @@ function buildDXF() {
     } else {
       const raw = getShapePoints(s.x, s.y, s.r, S.pattern, S.patRot);
       if (raw.length < 2) continue;
-      const verts = raw.map(([px, py]) => ({x: px*sc, y: (H-py)*sc, bulge: 0}));
+      const verts = raw.map(([px, py]) => ({x: px*sc, y: _sheetY(py, sc), bulge: 0}));
       entities += polyline(verts, true);
+    }
+  }
+
+  // ── Everything else the drawing contains ─────────────────────────────
+  // This writer only ever knew about S.shapes and S.pattern, so the R2000 file
+  // was missing the mix layer, the traced letter outlines, the work frame and
+  // the panel divisions — it did not match what the app showed or what the R12
+  // file contained. Same geometry, same helpers, emitted here too.
+  if (S.pattern === 'textraster') {
+    const chars = layerChars({ mix: false });
+    S.shapes.forEach((s, i) => {
+      const ch = (S.textMode === 'rnd')
+        ? chars[Math.floor(Math.random() * chars.length)]
+        : chars[i % chars.length];
+      for (const gp of GLYPH.paths(ch, S.textFont || 'Arial')) {
+        if (!gp || gp.length < 2) continue;
+        const rr = s.r * sc, cx0 = s.x * sc, cy0 = _sheetY(s.y, sc);
+        entities += polyline(gp.map(pt => ({ x: cx0 + pt.x*rr, y: cy0 - pt.y*rr, bulge: 0 })), true);
+      }
+    });
+  }
+
+  if (S.mixEnabled && S.mixPat && S.mixShapes && S.mixShapes.length) {
+    const MS = mixShapeSrc();
+    const mrot = S.mixPatRot || 0;
+    const mchars = layerChars({ mix: true });
+    S.mixShapes.forEach((s, i) => {
+      const sx = s.x * sc, sy = _sheetY(s.y, sc), sr = s.r * sc;
+      if (S.mixPat === 'circle' || S.mixPat === 'dot') {
+        if (!(sr > 0)) return;
+        entities += `  0\nCIRCLE\n  5\n${nh()}\n330\n${MS_OWNER}\n100\nAcDbEntity\n  8\n0\n100\nAcDbCircle\n 10\n${ff(sx)}\n 20\n${ff(sy)}\n 30\n0.0\n 40\n${ff(sr)}\n`;
+      } else if (S.mixPat === 'textraster') {
+        const ch = (S.textMode === 'rnd')
+          ? mchars[Math.floor(Math.random() * mchars.length)]
+          : mchars[i % mchars.length];
+        for (const gp of GLYPH.paths(ch, S.textFont || 'Arial')) {
+          if (!gp || gp.length < 2) continue;
+          entities += polyline(gp.map(pt => ({ x: sx + pt.x*sr, y: sy - pt.y*sr, bulge: 0 })), true);
+        }
+      } else if (S.mixPat === 'imgshape' && MS.normPaths && MS.normPaths.length) {
+        const rot = ((parseInt(($(mixShapeRotId()) || {}).value) || 0) + mrot) * Math.PI / 180;
+        const c2 = Math.cos(rot), s2 = Math.sin(rot);
+        for (const path of MS.normPaths) {
+          if (!path || path.length < 2) continue;
+          entities += polyline(path.map(pt => ({
+            x: sx + (pt.x*c2 - pt.y*s2) * sr,
+            y: sy - (pt.x*s2 + pt.y*c2) * sr, bulge: 0 })), !!MS.isContour);
+        }
+      } else {
+        const raw = getShapePoints(s.x, s.y, s.r, S.mixPat, mrot);
+        if (raw.length < 2) return;
+        entities += polyline(raw.map(([px, py]) => ({ x: px*sc, y: _sheetY(py, sc), bulge: 0 })), true);
+      }
+    });
+  }
+
+  {
+    const fw = wW, fh = workHmm();
+    if (S.exportFrame) {
+      entities += polyline([{x:0,y:0,bulge:0},{x:fw,y:0,bulge:0},
+                            {x:fw,y:fh,bulge:0},{x:0,y:fh,bulge:0}], true);
+    }
+    if (S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0) {
+      const { ox, oy } = panelOffsets();
+      for (let x = ox > 1e-6 ? ox : S.panelWmm; x < fw - 1e-6; x += S.panelWmm)
+        entities += polyline([{x, y:0, bulge:0}, {x, y:fh, bulge:0}], false);
+      for (let y = oy > 1e-6 ? oy : S.panelHmm; y < fh - 1e-6; y += S.panelHmm)
+        entities += polyline([{x:0, y, bulge:0}, {x:fw, y, bulge:0}], false);
     }
   }
 
@@ -9864,6 +10120,92 @@ $('expDXF').addEventListener('click', () => {
   // actually accepts. The AC1015 writer stays available on the button below.
   download(`cnc-pattern_${BUILD_TAG}.dxf`, buildDXF12(), 'application/dxf');
 });
+// PNG / JPG / PDF used to hand over pCanvas itself. That canvas is sized to
+// the viewport — a few hundred pixels — so a 2 m sheet exported at about
+// 6 pixels per centimetre and every dot came out as a blurry blob. The geometry
+// is resolution-independent (it lives in millimetres), so redraw it as large as
+// the format sensibly allows instead of upscaling a small bitmap.
+const RASTER_MAX_SIDE = 16000;      // browsers refuse canvases much past this
+const RASTER_MAX_PX   = 80e6;       // ~320 MB at 4 bytes/px, the practical ceiling
+
+function renderRasterCanvas(dpi) {
+  const W = pCanvas.width, H = pCanvas.height;
+  const wMm = workWmm(), hMm = workHmm();
+  if (!(W > 0 && H > 0)) return pCanvas;
+
+  // Target: the real sheet size at the requested dots per inch.
+  let k = 1;
+  if (wMm > 0 && dpi > 0) k = (wMm / 25.4 * dpi) / W;
+  k = Math.max(1, k);
+  k = Math.min(k, RASTER_MAX_SIDE / Math.max(W, H));
+  k = Math.min(k, Math.sqrt(RASTER_MAX_PX / (W * H)));
+  if (!(k > 1.01)) return pCanvas;                 // already big enough
+
+  const oc = document.createElement('canvas');
+  // Round DOWN. Rounding to nearest can push the finished canvas a few thousand
+  // pixels past the budget it was just clamped to.
+  oc.width  = Math.max(1, Math.floor(W * k));
+  oc.height = Math.max(1, Math.floor(H * k));
+  const c = oc.getContext('2d');
+  const fg = S.darkBg ? '#ffffff' : '#000000';
+  const bg = S.darkBg ? '#111111' : '#ffffff';
+  c.fillStyle = bg; c.fillRect(0, 0, oc.width, oc.height);
+
+  // Everything below is drawn in pCanvas coordinates; the scale does the rest,
+  // so the shapes are re-rasterised at the new size rather than stretched.
+  c.save();
+  c.scale(k, k);
+  c.fillStyle = fg; c.strokeStyle = fg; c.lineWidth = 0.7;
+  c.imageSmoothingEnabled = true;
+  c.imageSmoothingQuality = 'high';
+
+  if (S.pattern === 'textraster') {
+    const chars = layerChars({ mix: false });
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    const rot = (S.patRot || 0) * Math.PI / 180;
+    S.shapes.forEach((s, i) => {
+      const dr = Math.max(s.r, 0.5);
+      const ch = S.textMode === 'rnd'
+        ? chars[Math.floor(Math.random() * chars.length)]
+        : chars[i % chars.length];
+      c.font = `bold ${Math.max(1, dr * 1.9).toFixed(2)}px ${S.textFont || 'Arial'}`;
+      if (rot) { c.save(); c.translate(s.x, s.y); c.rotate(rot); c.fillText(ch, 0, 0); c.restore(); }
+      else c.fillText(ch, s.x, s.y);
+    });
+  } else if (S.pattern === 'imgshape' && IMGSHAPE.normPaths && IMGSHAPE.normPaths.length) {
+    const rot = ((parseInt(($('shRot') || {}).value) || 0) + (S.patRot || 0)) * Math.PI / 180;
+    const cosR = Math.cos(rot), sinR = Math.sin(rot);
+    c.beginPath();
+    for (const s of S.shapes) {
+      for (const path of IMGSHAPE.normPaths) {
+        if (!path || path.length < 2) continue;
+        path.forEach((pt, i) => {
+          const x = s.x + (pt.x*cosR - pt.y*sinR) * s.r;
+          const y = s.y + (pt.x*sinR + pt.y*cosR) * s.r;
+          if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+        });
+        if (IMGSHAPE.isContour) c.closePath();
+      }
+    }
+    if (S.fill && IMGSHAPE.isContour) c.fill(); else c.stroke();
+  } else {
+    // Floor the drawn radius in DEVICE pixels, not canvas units, or the floor
+    // itself would scale up and fatten every small dot.
+    _batchDrawShapes(c, S.shapes, S.pattern, S.patRot, 0.35 / k, S.fill);
+  }
+
+  if (S.mixEnabled && S.mixPat && S.mixShapes && S.mixShapes.length) {
+    c.globalAlpha = S.mixAlpha;
+    c.fillStyle = fg; c.strokeStyle = fg;
+    _drawMixPass(c);
+    c.globalAlpha = 1;
+  }
+
+  _drawSheetGuides(c, k);
+  c.restore();
+  return oc;
+}
+
 const _expDxf2000 = $('expDXF2000');
 if (_expDxf2000) _expDxf2000.addEventListener('click', () => {
   if (!requireShapes()) return;
@@ -9872,22 +10214,26 @@ if (_expDxf2000) _expDxf2000.addEventListener('click', () => {
 
 $('expPNG').addEventListener('click', () => {
   if (!requireShapes()) return;
+  const hi = renderRasterCanvas(300);
+  status2(`🖼 PNG ${hi.width}×${hi.height} px (${(hi.width*hi.height/1e6).toFixed(1)} MP)`, true);
   // Blob is produced lazily so the save dialog opens while the click's
   // user-activation is still valid (canvas encoding is slow enough to lose it)
   FILESAVE.save(`cnc-pattern_${BUILD_TAG}.png`,
-    () => new Promise(res => pCanvas.toBlob(res, 'image/png')), 'image/png');
+    () => new Promise(res => hi.toBlob(res, 'image/png')), 'image/png');
 });
 
 $('expJPG').addEventListener('click', () => {
   if (!requireShapes()) return;
+  const hi = renderRasterCanvas(300);
+  status2(`🖼 JPG ${hi.width}×${hi.height} px (${(hi.width*hi.height/1e6).toFixed(1)} MP)`, true);
   FILESAVE.save(`cnc-pattern_${BUILD_TAG}.jpg`, () => new Promise(res => {
     // Draw on white bg first — JPEG has no alpha
     const tmp = document.createElement('canvas');
-    tmp.width = pCanvas.width; tmp.height = pCanvas.height;
+    tmp.width = hi.width; tmp.height = hi.height;
     const tctx = tmp.getContext('2d');
     tctx.fillStyle = '#ffffff'; tctx.fillRect(0, 0, tmp.width, tmp.height);
-    tctx.drawImage(pCanvas, 0, 0);
-    tmp.toBlob(res, 'image/jpeg', 0.92);
+    tctx.drawImage(hi, 0, 0);
+    tmp.toBlob(res, 'image/jpeg', 0.95);
   }), 'image/jpeg');
 });
 
@@ -9898,8 +10244,10 @@ $('expPDF').addEventListener('click', () => {
   const wW = workWmm(), wH = workHmm();
   const orient = wW >= wH ? 'landscape' : 'portrait';
   const doc = new jsPDF({ orientation: orient, unit: 'mm', format: [wW, wH] });
-  const imgData = pCanvas.toDataURL('image/png');
-  doc.addImage(imgData, 'PNG', 0, 0, wW, wH);
+  // 300 dpi so the PDF prints at the same quality it exports
+  const hi = renderRasterCanvas(300);
+  const imgData = hi.toDataURL('image/png');
+  doc.addImage(imgData, 'PNG', 0, 0, wW, wH, undefined, 'FAST');
   // doc.save() writes straight to Downloads — route through the picker instead
   FILESAVE.save(`cnc-pattern_${BUILD_TAG}.pdf`, () => doc.output('blob'), 'application/pdf');
 });
@@ -9916,10 +10264,14 @@ $('expCSV').addEventListener('click', () => {
   const W = pCanvas.width, H = pCanvas.height;
   const wW = workWmm();
   const sc = wW / W;
-  let csv = 'Index,X_mm,Y_mm,Radius_mm,SizeFraction,Pattern\n';
-  S.shapes.forEach((s,i) => {
-    csv += `${i+1},${f(s.x*sc)},${f((H-s.y)*sc)},${f(s.r*sc)},${s.frac.toFixed(4)},${S.pattern}\n`;
-  });
+  let csv = 'Index,X_mm,Y_mm,Radius_mm,SizeFraction,Pattern,Layer\n';
+  let _n = 0;
+  for (const L of exportLayers()) {
+    for (const s of L.shapes) {
+      csv += `${++_n},${f(s.x*sc)},${f(_sheetY(s.y, sc))},${f(s.r*sc)},` +
+             `${(s.frac != null ? s.frac : 0).toFixed(4)},${L.pat},${L.mix ? 'mix' : 'main'}\n`;
+    }
+  }
   download('cnc-points.csv', csv, 'text/csv');
   status2(`✅ CSV exported (${S.shapes.length.toLocaleString()} rows)`);
 });
@@ -12041,6 +12393,8 @@ const PROJECT = {
       ctrls, toggles, panels,
       pattern: S.pattern, mixPat: S.mixPat, mode: S.mode,
       patternEngine: S.patternEngine, exportFrame: !!S.exportFrame,
+      splitPanels: !!S.splitPanels, panelWmm: S.panelWmm, panelHmm: S.panelHmm,
+      panelAnchor: S.panelAnchor,
       // Without this a restored pattern was treated as an imported photo, so
       // the canvas took the generated image's square shape instead of the work
       // area's — a 500 x 2000 job came back drawn square after an undo.
@@ -12116,6 +12470,24 @@ const PROJECT = {
         S.exportFrame = st.exportFrame;
         const ef = $('togExportFrame');
         if (ef) ef.classList.toggle('on', S.exportFrame);
+      }
+      if (typeof st.splitPanels === 'boolean') {
+        S.splitPanels = st.splitPanels;
+        if (st.panelWmm > 0) S.panelWmm = st.panelWmm;
+        if (st.panelHmm > 0) S.panelHmm = st.panelHmm;
+        const sp = $('togSplitPanels');
+        if (sp) sp.classList.toggle('on', S.splitPanels);
+        const box = $('splitPanelBox');
+        if (box) box.style.display = S.splitPanels ? '' : 'none';
+        if ($('nPanelW')) $('nPanelW').value = S.panelWmm;
+        if ($('nPanelH')) $('nPanelH').value = S.panelHmm;
+        if (st.panelAnchor) {
+          S.panelAnchor = st.panelAnchor;
+          const gr = $('panelAnchorGrid');
+          if (gr) gr.querySelectorAll('button').forEach(x =>
+            x.classList.toggle('on', x.dataset.anchor === S.panelAnchor));
+        }
+        if (typeof updateSplitNote === 'function') updateSplitNote();
       }
       if (st.mode) setMode(st.mode);
       if (st.shapeMode) setShapeMode(st.shapeMode);
