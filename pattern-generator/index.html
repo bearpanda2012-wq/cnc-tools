@@ -2132,8 +2132,8 @@ pre.gcode-content {
         </button>
         <button class="exp-btn" id="expAI">
           <span class="exp-icon">🎨</span>
-          <span class="exp-name">.AI / .SVG</span>
-          <span class="exp-desc">Illustrator-ready</span>
+          <span class="exp-name">.AI</span>
+          <span class="exp-desc">Illustrator (vector)</span>
         </button>
         <button class="exp-btn" id="expDXF">
           <span class="exp-icon">📏</span>
@@ -3582,7 +3582,7 @@ function generateSpecialXYPattern(o, emit) {
 // first line, and in every export filename — so a file and a screenshot
 // always say which build produced them. Several rounds have been lost
 // analysing output from a stale copy of this page.
-const BUILD_TAG = '26Aug-b33';
+const BUILD_TAG = '27Aug-b35';
 
 const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
 function updateSpacingNote() {
@@ -9595,17 +9595,31 @@ function buildDXF() {
     const ph = nh();
     let s = `  0\nPOLYLINE\n  5\n${ph}\n330\n${MS_OWNER}\n`;
     s += '100\nAcDbEntity\n  8\n0\n';
-    s += `100\nAcDb2dPolyline\n 66\n1\n 70\n${closed ? 1 : 0}\n 10\n0.0\n 20\n0.0\n 30\n0.0\n`;
+    // Group order inside AcDb2dPolyline must match what AutoCAD's reader expects:
+    // 66 (vertices follow), then the elevation point, then 70. ezdxf writes it in
+    // exactly this order and AutoCAD accepts those files.
+    s += `100\nAcDb2dPolyline\n 66\n1\n 10\n0.0\n 20\n0.0\n 30\n0.0\n 70\n${closed ? 1 : 0}\n`;
     for (const v of verts) {
       const vh = nh();
-      s += `  0\nVERTEX\n  5\n${vh}\n330\n${ph}\n`;
+      // A VERTEX is owned by the *Model_Space block record, NOT by its POLYLINE.
+      // Pointing 330 at the polyline handle is what made AutoCAD abort with
+      // "Premature end of object".
+      s += `  0\nVERTEX\n  5\n${vh}\n330\n${MS_OWNER}\n`;
       s += '100\nAcDbEntity\n  8\n0\n';
+      // AcDbVertex sits between AcDbEntity and AcDb2dVertex in the R2000 class
+      // chain. Leaving it out is what made AutoCAD say
+      //   "Class separator for class AcDbVertex expected"
+      // and discard the whole drawing.
+      s += '100\nAcDbVertex\n';
       s += `100\nAcDb2dVertex\n 10\n${ff(v.x)}\n 20\n${ff(v.y)}\n 30\n0.0\n 70\n0\n`;
       if (Math.abs(v.bulge) > 1e-6) s += ` 42\n${f6(v.bulge)}\n`;
     }
     const sq = nh();
     s += `  0\nSEQEND\n  5\n${sq}\n330\n${ph}\n`;
-    s += '100\nAcDbEntity\n  8\n0\n100\nAcDbSequenceEnd\n';
+    // SEQEND has NO second subclass marker in the DXF spec. Emitting
+    // "100 AcDbSequenceEnd" makes AutoCAD's reader run past the end of the
+    // object → "Premature end of object / drawing discarded".
+    s += '100\nAcDbEntity\n  8\n0\n';
     return s;
   }
 
@@ -10047,6 +10061,9 @@ $('exportClose').addEventListener('click',  () => $('exportModal').classList.rem
 $('exportClose2').addEventListener('click', () => $('exportModal').classList.remove('show'));
 
 function requireShapes() {
+  // Every export goes through here, so it is the natural place to release a
+  // held status message: whatever it said belonged to the previous action.
+  statusClearHold();
   if (!S.shapes.length) { alert('กรุณาเลือกรูปภาพและสร้าง Pattern ก่อน'); return false; }
   return true;
 }
@@ -10059,27 +10076,77 @@ $('expSVG').addEventListener('click', () => {
 
 $('expAI').addEventListener('click', () => {
   if (!requireShapes()) return;
-  const W = pCanvas.width, H = pCanvas.height;
+  if (typeof window.jspdf === 'undefined') { alert('กำลังโหลด jsPDF...'); return; }
+  if (!_confirmHugeExport('AI')) { status2('ยกเลิกการส่งออก'); return; }
+
+  // Illustrator's own .ai format is PDF underneath, and Illustrator opens a
+  // PDF-based .ai natively. The old export wrote SVG and merely called it AI —
+  // renaming it .ai would have produced a file Illustrator refuses. Emit real
+  // vector PDF instead: every dot stays an editable path, not a picture.
+  const { jsPDF } = window.jspdf;
+  const W = pCanvas.width;
   const wW = workWmm(), wH = workHmm();
   const sc = wW / W;
-  let d = '';
-  for (const s of S.shapes) d += svgShapePath(s.x*sc, (H-s.y)*sc, s.r*sc, S.pattern, S.patRot);
-  const bg = S.darkBg ? '#111111' : '#ffffff';
-  const fg = S.darkBg ? '#ffffff' : '#000000';
-  // AI-compatible SVG (Illustrator can open SVG with ai: namespace)
-  const ai = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-     xmlns:a="http://ns.adobe.com/AdobeSVGViewerExtensions/3.0/"
-     x="0px" y="0px" width="${wW}mm" height="${wH}mm" viewBox="0 0 ${wW} ${wH}"
-     xml:space="preserve">
-<!-- Adobe Illustrator compatible SVG -->
-<!-- CNC Pattern Generator | ${patName(S.pattern)} | ${exportShapeCount()} shapes -->
-<rect width="${wW}" height="${wH}" fill="${bg}"/>
-<path d="${d.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${f(0.15*sc)}"/>
-</svg>`;
-  download('cnc-pattern-ai.svg', ai, 'image/svg+xml');
-  status2('✅ AI-compatible SVG exported');
+  const doc = new jsPDF({ orientation: wW >= wH ? 'landscape' : 'portrait',
+                          unit: 'mm', format: [wW, wH] });
+  doc.setLineWidth(Math.max(0.05, 0.15 * sc));
+  doc.setDrawColor(0); doc.setFillColor(0);
+  const style = S.fill ? 'F' : 'S';
+  // PDF measures Y down from the top, and so does the canvas, so shape
+  // coordinates carry over directly once scaled.
+  const px = v => v * sc;
+
+  for (const L of exportLayers()) {
+    if (L.pat === 'circle' || L.pat === 'dot') {
+      for (const s of L.shapes) {
+        const r = px(s.r);
+        if (r > 0.001) doc.circle(px(s.x), px(s.y), r, style);
+      }
+    } else if (L.pat === 'textraster') {
+      const chars = layerChars(L);
+      L.shapes.forEach((s, i) => {
+        const ch = S.textMode === 'rnd'
+          ? chars[Math.floor(Math.random() * chars.length)]
+          : chars[i % chars.length];
+        for (const gp of GLYPH.paths(ch, S.textFont || 'Arial')) {
+          if (!gp || gp.length < 2) continue;
+          const x0 = px(s.x) + gp[0].x * px(s.r), y0 = px(s.y) + gp[0].y * px(s.r);
+          const deltas = [];
+          for (let k = 1; k < gp.length; k++)
+            deltas.push([(gp[k].x - gp[k-1].x) * px(s.r), (gp[k].y - gp[k-1].y) * px(s.r)]);
+          deltas.push([(gp[0].x - gp[gp.length-1].x) * px(s.r),
+                       (gp[0].y - gp[gp.length-1].y) * px(s.r)]);
+          doc.lines(deltas, x0, y0, [1, 1], style);
+        }
+      });
+    } else {
+      const src = L.mix ? mixShapeSrc() : IMGSHAPE;
+      for (const s of L.shapes) {
+        const pts = getShapePoints(s.x, s.y, s.r, L.pat, L.rot, src);
+        if (!pts || pts.length < 2) continue;
+        const deltas = [];
+        for (let k = 1; k < pts.length; k++)
+          deltas.push([px(pts[k][0] - pts[k-1][0]), px(pts[k][1] - pts[k-1][1])]);
+        doc.lines(deltas, px(pts[0][0]), px(pts[0][1]), [1, 1], style);
+      }
+    }
+  }
+
+  // The reference geometry, stroked so it never fills.
+  if (S.exportFrame || S.splitPanels) {
+    doc.setLineWidth(Math.max(0.05, 0.2 * sc));
+    if (S.exportFrame) doc.rect(0, 0, wW, wH, 'S');
+    if (S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0) {
+      const { ox, oy } = panelOffsets();
+      for (let x = ox > 1e-6 ? ox : S.panelWmm; x < wW - 1e-6; x += S.panelWmm)
+        doc.line(x, 0, x, wH);
+      for (let y = oy > 1e-6 ? oy : S.panelHmm; y < wH - 1e-6; y += S.panelHmm)
+        doc.line(0, wH - y, wW, wH - y);   // sheet Y is up, PDF Y is down
+    }
+  }
+
+  FILESAVE.save(`cnc-pattern_${BUILD_TAG}.ai`, () => doc.output('blob'), 'application/postscript');
+  status2(`🎨 AI (vector, ${exportShapeCount().toLocaleString()} shapes)`, true);
 });
 
 // A DXF is one entity per shape, so the shape count decides whether any CAD
