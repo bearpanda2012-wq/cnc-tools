@@ -807,6 +807,16 @@ pre.gcode-content {
       <div class="in-row" style="margin:6px 0 2px">
         <div class="in-grp"><label>เว้นระยะขอบ (mm)</label>
           <input type="number" class="num-in" id="nEdgeMargin" value="0" min="0" step="1"></div>
+        <div class="in-grp"><label>ลายที่ล้ำเข้ามา</label>
+          <select class="num-in" id="edgeMarginMode">
+            <option value="remove">ลบทั้งรู (ไม่ crop)</option>
+            <option value="crop">ตัดลาย (crop)</option>
+            <option value="keep">เก็บทั้งรู</option>
+          </select></div>
+      </div>
+      <div class="tog-row">
+        <span class="tog-label">ส่งออกเส้นเว้นระยะขอบ</span>
+        <div class="toggle on" id="togExportMargin"></div>
       </div>
       <div id="edgeMarginNote" style="font-size:9px;color:#8e8e94;margin:-2px 0 8px;line-height:1.5"></div>
 
@@ -2216,7 +2226,11 @@ const S = {
   panelAnchor: 'bl',
   // Clear band kept free of pattern around every panel. With "แบ่งแผ่น" off the
   // whole sheet counts as one panel, so the same number is a plain sheet margin.
-  edgeMarginMm: 0,
+  // Mode decides what happens to a shape that reaches into the band:
+  //   'remove' — drop the whole shape (default, and the original behaviour)
+  //   'crop'   — cut it at the band line, keeping the part outside
+  //   'keep'   — leave it whole as long as its centre is clear
+  edgeMarginMm: 0, edgeMarginMode: 'remove', exportMarginLines: true,
   mixEnabled: false, mixPat: 'circle', mixDiamMm: 2.0, mixPatRot: 0, mixAlpha: 0.7,
   // Mix layer used to be one fixed diameter, preview-only. It can now vary
   // with tone exactly like the main pattern, and it is exported with it.
@@ -2907,8 +2921,11 @@ const zoom = (() => {
 // The export frame and the panel divisions, drawn on screen in the same place
 // they will appear in the file. Deciding a panel size without seeing where the
 // cuts land is guesswork.
-function _drawSheetGuides(ctx, scale) {
-  if (!S.exportFrame && !S.splitPanels && !(S.edgeMarginMm > 0)) return;
+// showBand marks the edge keep-out strip. It is an on-screen aid only — the
+// raster export draws the frame and the divisions, which are real reference
+// geometry, but not a band that exists purely to explain where holes went.
+function _drawSheetGuides(ctx, scale, showBand) {
+  if (!S.exportFrame && !S.splitPanels && !(showBand && S.edgeMarginMm > 0)) return;
   const W = pCanvas.width, H = pCanvas.height;
   const wMm = workWmm(), hMm = workHmm();
   if (!(wMm > 0 && hMm > 0)) return;
@@ -2926,7 +2943,8 @@ function _drawSheetGuides(ctx, scale) {
   }
   if (S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0) {
     // Dashed and blue: a panel division is a guide, not part of the artwork.
-    ctx.strokeStyle = '#0a7aff';
+    // Same colour the exporters write, so screen and file agree.
+    ctx.strokeStyle = GUIDE_COLORS.panel.hex;
     ctx.setLineDash([6 / Math.max(0.0001, scale || 1), 4 / Math.max(0.0001, scale || 1)]);
     const { ox, oy } = panelOffsets();
     ctx.beginPath();
@@ -2945,9 +2963,9 @@ function _drawSheetGuides(ctx, scale) {
 
   // The keep-out band, as an inset rectangle inside each panel. Screen only —
   // it marks where the pattern was removed, it is not geometry to cut.
-  if (S.edgeMarginMm > 0) {
+  if (showBand && S.edgeMarginMm > 0) {
     const g = panelGridMm();
-    ctx.strokeStyle = '#ff9f0a';
+    ctx.strokeStyle = GUIDE_COLORS.margin.hex;
     const d = 1 / Math.max(0.0001, scale || 1);
     ctx.setLineDash([3 * d, 3 * d]);
     ctx.beginPath();
@@ -3000,7 +3018,7 @@ function updateViewCanvas() {
         vCtx.drawImage(_ishStamp, s.x - s.r, s.y - s.r, d, d);
       }
       _applyMixLayer(vCtx, fg);
-      _drawSheetGuides(vCtx, sc);
+      _drawSheetGuides(vCtx, sc, true);
       vCtx.restore();
       return;
     }
@@ -3028,7 +3046,7 @@ function updateViewCanvas() {
     }
     if (isContour && S.fill) vCtx.fill('evenodd'); else vCtx.stroke();
     _applyMixLayer(vCtx, fg);
-    _drawSheetGuides(vCtx, sc);
+    _drawSheetGuides(vCtx, sc, true);
     vCtx.restore();
     return;
   }
@@ -3040,7 +3058,7 @@ function updateViewCanvas() {
       _drawLineRows(vCtx, S.lineRows, S.lrNx, S.lrNy);
     }
     _applyMixLayer(vCtx, fg);
-    _drawSheetGuides(vCtx, sc);
+    _drawSheetGuides(vCtx, sc, true);
     vCtx.restore();
     return;
   }
@@ -3068,7 +3086,7 @@ function updateViewCanvas() {
       }
     }
     _applyMixLayer(vCtx, fg);
-    _drawSheetGuides(vCtx, sc);
+    _drawSheetGuides(vCtx, sc, true);
     vCtx.restore();
     return;
   }
@@ -3079,7 +3097,7 @@ function updateViewCanvas() {
   _batchDrawShapes(vCtx, S.shapes, S.pattern, S.patRot, _minDrawR, S.fill);
 
   _applyMixLayer(vCtx, fg);
-  _drawSheetGuides(vCtx, sc);
+  _drawSheetGuides(vCtx, sc, true);
 
   vCtx.restore();
 }
@@ -3431,6 +3449,28 @@ $('panelAnchorGrid').addEventListener('click', e => {
     if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
     scheduleRender();
   });
+  const tg = $('togExportMargin');
+  if (tg) tg.addEventListener('click', function() {
+    S.exportMarginLines = !S.exportMarginLines;
+    this.classList.toggle('on', S.exportMarginLines);
+    updateEdgeMarginNote();
+    if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+    updateViewCanvas();     // export-only geometry — no re-generate needed
+  });
+  const md = $('edgeMarginMode');
+  if (md) md.addEventListener('change', () => {
+    S.edgeMarginMode = md.value || 'remove';
+    updateEdgeMarginNote();
+    if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+    _edgeMarginReflow();
+  });
+}
+
+// Crop needs one outline per shape to cut. Letters and imported outlines carry
+// several sub-paths each and are placed by their own writers in every export,
+// so there is no single outline to clip — those fall back to removing.
+function edgeCropSupported(pat) {
+  return pat !== 'textraster' && pat !== 'imgshape' && pat !== 'lineraster';
 }
 
 function updateEdgeMarginNote() {
@@ -3456,9 +3496,19 @@ function updateEdgeMarginNote() {
                     `ลายจะหายหมด (ต้องน้อยกว่า ${fmt(Math.min(pw, ph) / 2)} mm)`;
     return;
   }
-  n.style.color = '#8e8e94';
+  const mode = S.edgeMarginMode || 'remove';
+  const modeWord =
+    mode === 'crop' ? 'ลายที่ล้ำเข้ามาถูกตัดตรงเส้นขอบ เหลือเป็นลายบางส่วน'
+  : mode === 'keep' ? 'ลายที่ศูนย์กลางอยู่นอกแถบยังอยู่ครบ ยอมให้ล้ำเข้ามาบางส่วน'
+  :                   'ลายที่ล้ำเข้ามาถูกลบทั้งรู ขอบว่างสนิท';
+  const noCrop = (mode === 'crop' && !edgeCropSupported(S.pattern))
+    ? ` · ลาย ${patName(S.pattern)} ตัดไม่ได้ ใช้ลบทั้งรูแทน` : '';
+  const lineWord = S.exportMarginLines
+    ? ' · เส้นขอบสีส้มถูกส่งออกไปด้วย (ไม่ถูกกัด)'
+    : ' · เส้นขอบแสดงบนจอเท่านั้น ไม่ถูกส่งออก';
+  n.style.color = noCrop ? '#d9a441' : '#8e8e94';
   n.textContent = `เว้น ${fmt(m)} mm รอบ${where} · เหลือพื้นที่ลาย ${fmt(useW)}×${fmt(useH)} mm ต่อแผ่น · ` +
-                  'ลายในแถบนี้ถูกลบออกจริง ทั้งพรีวิว G-code และไฟล์ส่งออก';
+                  modeWord + noCrop + lineWord;
 }
 
 function updateSplitNote() {
@@ -3669,7 +3719,7 @@ function generateSpecialXYPattern(o, emit) {
 // first line, and in every export filename — so a file and a screenshot
 // always say which build produced them. Several rounds have been lost
 // analysing output from a stale copy of this page.
-const BUILD_TAG = '27Aug-b36';
+const BUILD_TAG = '27Aug-b38';
 
 const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
 function updateSpacingNote() {
@@ -4250,8 +4300,11 @@ function _generate() {
       if (r < minRealPx) return;
       // Tested here, after the size is known, because the band is measured to
       // the shape's edge — a large dot has to start further in than a small one.
-      if (!insideEdgeMargin(_mg, rx / mmToPx, workH_mm - ry / mmToPx, r / mmToPx)) return;
-      shapes.push({ x: rx, y: ry, r, rMm, frac: t });
+      const _sh = { x: rx, y: ry, r, rMm, frac: t };
+      const _keep = edgeMarginClip(_mg, _sh, S.pattern, S.patRot, mmToPx, workH_mm);
+      if (!_keep) return;
+      if (_keep !== true) _sh.poly = _keep;      // cropped: carries its own outline
+      shapes.push(_sh);
       if (shapes.length >= MAX_SHAPES) { limitHit = true; return false; }
     }
   });
@@ -4351,8 +4404,11 @@ function _generate() {
       if (mr < minRealPx) continue;
       // The mix layer obeys the same band. Leaving it out would fill the strip
       // the main pattern was just cleared out of.
-      if (!insideEdgeMargin(_mg, mx / mmToPx, workH_mm - my / mmToPx, mr / mmToPx)) continue;
-      mixShapes.push({ x: mx, y: my, r: mr, rMm: mrMm, frac: mt });
+      const _ms = { x: mx, y: my, r: mr, rMm: mrMm, frac: mt };
+      const _mk = edgeMarginClip(_mg, _ms, S.mixPat, S.mixPatRot, mmToPx, workH_mm);
+      if (!_mk) continue;
+      if (_mk !== true) _ms.poly = _mk;
+      mixShapes.push(_ms);
     }
     S.mixShapes = mixShapes;
   }
@@ -4468,11 +4524,15 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
     const _lrG = panelGridMm();
     if (_lrG.m > 0) {
       const mmToPx = W / workWmm(), hMm = workHmm();
+      // A ribbon has no "whole shape" to drop, so remove and crop both mean
+      // trim. Only 'keep' differs: it lets the ribbon's width overhang.
+      const _lrKeepMode = (S.edgeMarginMode === 'keep');
       const trimmed = [];
       for (const row of lineRows) {
         let run = [];
         for (const p of row) {
-          const ok = insideEdgeMargin(_lrG, p.cx / mmToPx, hMm - p.cy / mmToPx, p.hw / mmToPx);
+          const ok = insideEdgeMargin(_lrG, p.cx / mmToPx, hMm - p.cy / mmToPx,
+                                      _lrKeepMode ? 0 : p.hw / mmToPx);
           if (ok) run.push(p);
           else { if (run.length > 1) trimmed.push(run); run = []; }
         }
@@ -4528,8 +4588,11 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
           mr = _lrMixFixP;
         }
         if (mr < _lrMinR) continue;
-        if (!insideEdgeMargin(_lrMg, mx / _lrMmToPx, workHmm() - my / _lrMmToPx, mr / _lrMmToPx)) continue;
-        mixShapes.push({ x: mx, y: my, r: mr, rMm: mrMm, frac: mt });
+        const _lms = { x: mx, y: my, r: mr, rMm: mrMm, frac: mt };
+        const _lmk = edgeMarginClip(_lrMg, _lms, S.mixPat, S.mixPatRot, _lrMmToPx, workHmm());
+        if (!_lmk) continue;
+        if (_lmk !== true) _lms.poly = _lmk;
+        mixShapes.push(_lms);
       }
     }
     S.mixShapes = mixShapes;
@@ -4577,7 +4640,16 @@ function _batchDrawShapes(ctx, list, pat, rot, minR, fill, batch) {
   let n = 0;
   ctx.beginPath();
   for (const s of list) {
-    shapePath(ctx, s.x, s.y, Math.max(s.r, minR), pat, rot);
+    if (s.poly) {
+      // Cropped by the edge band — it carries its own outline, so the pattern's
+      // own shape would draw the part that was supposed to be cut away.
+      const p = s.poly;
+      ctx.moveTo(p[0][0], p[0][1]);
+      for (let i = 1; i < p.length; i++) ctx.lineTo(p[i][0], p[i][1]);
+      ctx.closePath();
+    } else {
+      shapePath(ctx, s.x, s.y, Math.max(s.r, minR), pat, rot);
+    }
     if (++n % B === 0) {
       if (fill) ctx.fill(); else ctx.stroke();
       ctx.beginPath();
@@ -4647,6 +4719,126 @@ function insideEdgeMargin(g, xMm, yMm, rMm) {
   if (!g || !(g.m > 0)) return true;  // no band set — behaviour unchanged
   const r = rMm > 0 ? rMm : 0;
   return _clearsBand(xMm, r, g.xs, g.m) && _clearsBand(yMm, r, g.ys, g.m);
+}
+
+// One colour per kind of reference line, so a file opened in CAD reads the same
+// way the screen does. DXF carries an ACI index (code 62) rather than the hex —
+// R12 has no true-colour group, and an index is what CAM filters on anyway.
+const GUIDE_COLORS = {
+  frame:  { hex: '#000000', aci:  7 },   // work outline — default black/white
+  panel:  { hex: '#0a7aff', aci:  5 },   // panel divisions — blue, as on screen
+  margin: { hex: '#ff9f0a', aci: 30 }    // keep-out band — orange, as on screen
+};
+
+// The band drawn as one closed rectangle per panel, in sheet millimetres
+// (X from the left, Y up from the bottom). Empty when there is nothing to draw,
+// so every exporter can call it unconditionally.
+function marginRectsMm() {
+  if (!(S.edgeMarginMm > 0) || !S.exportMarginLines) return [];
+  const g = panelGridMm();
+  const out = [];
+  for (let i = 0; i < g.xs.length - 1; i++) {
+    for (let j = 0; j < g.ys.length - 1; j++) {
+      const x0 = g.xs[i] + g.m, x1 = g.xs[i+1] - g.m;
+      const y0 = g.ys[j] + g.m, y1 = g.ys[j+1] - g.m;
+      if (x1 > x0 && y1 > y0) out.push({ x0, y0, x1, y1 });
+    }
+  }
+  return out;
+}
+
+// Which cut lines bracket v, or null when v is off the sheet.
+function _cellRange(v, cuts) {
+  for (let i = 0; i < cuts.length - 1; i++)
+    if (v >= cuts[i] - 1e-6 && v <= cuts[i + 1] + 1e-6) return [cuts[i], cuts[i + 1]];
+  return null;
+}
+
+// The usable rectangle of the panel a point falls in, already shrunk by the
+// band. Null when the point is off the sheet, or the band swallowed the panel.
+function edgeCellRect(g, xMm, yMm) {
+  const cx = _cellRange(xMm, g.xs), cy = _cellRange(yMm, g.ys);
+  if (!cx || !cy) return null;
+  const r = { x0: cx[0] + g.m, x1: cx[1] - g.m, y0: cy[0] + g.m, y1: cy[1] - g.m };
+  return (r.x1 > r.x0 && r.y1 > r.y0) ? r : null;
+}
+
+// Sutherland–Hodgman: clip a closed polygon to an axis-aligned rectangle.
+// Space-agnostic — the polygon and the rectangle just have to agree.
+function _clipPolyRect(pts, x0, y0, x1, y1) {
+  const ins = (p, e) => e === 0 ? p[0] >= x0 : e === 1 ? p[0] <= x1
+                      : e === 2 ? p[1] >= y0 : p[1] <= y1;
+  const cut = (a, b, e) => {
+    const d = e < 2 ? (b[0] - a[0]) : (b[1] - a[1]);
+    if (Math.abs(d) < 1e-12) return a.slice();
+    const t = e === 0 ? (x0 - a[0]) / d : e === 1 ? (x1 - a[0]) / d
+            : e === 2 ? (y0 - a[1]) / d : (y1 - a[1]) / d;
+    return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
+  };
+  let out = pts.slice();
+  // The ring is implicit here, so a repeated closing point would be clipped
+  // twice and leave a zero-length edge behind.
+  if (out.length > 1) {
+    const a = out[0], b = out[out.length - 1];
+    if (Math.abs(a[0]-b[0]) < 1e-9 && Math.abs(a[1]-b[1]) < 1e-9) out = out.slice(0, -1);
+  }
+  for (let e = 0; e < 4 && out.length; e++) {
+    const inp = out; out = [];
+    for (let i = 0; i < inp.length; i++) {
+      const cur = inp[i], prev = inp[(i - 1 + inp.length) % inp.length];
+      const ci = ins(cur, e), pi = ins(prev, e);
+      if (ci) { if (!pi) out.push(cut(prev, cur, e)); out.push(cur); }
+      else if (pi) out.push(cut(prev, cur, e));
+    }
+  }
+  return out;
+}
+
+// A circle as a polygon, so it can be clipped. Segment count follows the radius
+// so a big dot does not come back as a visible polygon.
+function _circleAsPoly(x, y, r) {
+  const n = Math.max(32, Math.min(180, Math.ceil(r * 1.6)));
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2;
+    pts.push([x + r * Math.cos(a), y + r * Math.sin(a)]);
+  }
+  pts.push(pts[0].slice());
+  return pts;
+}
+
+// Decide what the band does to one shape. Returns true (keep whole), false
+// (drop), or the clipped outline in CANVAS pixels — the space every consumer
+// already knows how to convert from.
+function edgeMarginClip(g, s, pat, rot, mmToPx, hMm) {
+  if (!g || !(g.m > 0)) return true;
+  const xMm = s.x / mmToPx, yMm = hMm - s.y / mmToPx, rMm = s.r / mmToPx;
+  const mode = S.edgeMarginMode || 'remove';
+  // 'keep' judges the centre only, so shapes may overhang into the band.
+  if (mode === 'keep') return insideEdgeMargin(g, xMm, yMm, 0);
+  if (insideEdgeMargin(g, xMm, yMm, rMm)) return true;   // already clear
+  if (mode !== 'crop' || !edgeCropSupported(pat)) return false;
+
+  const rect = edgeCellRect(g, xMm, yMm);
+  if (!rect) return false;
+  const src = (pat === 'circle' || pat === 'dot')
+    ? _circleAsPoly(s.x, s.y, s.r)
+    : getShapePoints(s.x, s.y, s.r, pat, rot);
+  if (!src || src.length < 3) return false;
+  // mm -> canvas pixels. Sheet Y runs up, the canvas runs down, so the
+  // rectangle's top and bottom swap over.
+  const X0 = rect.x0 * mmToPx,        X1 = rect.x1 * mmToPx;
+  const Y0 = (hMm - rect.y1) * mmToPx, Y1 = (hMm - rect.y0) * mmToPx;
+  const out = _clipPolyRect(src, X0, Y0, X1, Y1);
+  if (out.length < 3) return false;                       // nothing survived
+  out.push(out[0].slice());                               // closed, like getShapePoints
+  return out;
+}
+
+// The outline to draw or export for one shape, in canvas pixels. A cropped
+// shape carries its own; everything else is the pattern's own geometry.
+function shapeOutline(s, pat, rot, src) {
+  return (s && s.poly) ? s.poly : getShapePoints(s.x, s.y, s.r, pat, rot, src);
 }
 
 // Canvas Y (down from the top) -> sheet Y (up from the bottom), in mm.
@@ -4905,7 +5097,14 @@ function renderSheet() {
       ctx.fillStyle = fg; ctx.strokeStyle = fg; ctx.lineWidth = 0.4;
       ctx.beginPath();
       for (const s of S.shapes) {
-        shapePath(ctx, ox + s.x*patScale, oy + s.y*patScale, s.r*patScale, S.pattern, S.patRot);
+        if (s.poly) {
+          const p = s.poly;
+          ctx.moveTo(ox + p[0][0]*patScale, oy + p[0][1]*patScale);
+          for (let i = 1; i < p.length; i++) ctx.lineTo(ox + p[i][0]*patScale, oy + p[i][1]*patScale);
+          ctx.closePath();
+        } else {
+          shapePath(ctx, ox + s.x*patScale, oy + s.y*patScale, s.r*patScale, S.pattern, S.patRot);
+        }
       }
       if (S.fill) ctx.fill(); else ctx.stroke();
       ctx.restore();
@@ -4941,11 +5140,18 @@ function buildSimMoves() {
 
   for (const s of S.shapes) {
     const cx = s.x, cy = s.y, cr = s.r;
-    // Rapid to start point
-    const startX = cx + cr, startY = cy;
+    // Rapid to start point — a cropped outline starts at its own first vertex,
+    // not at the right edge of a circle that no longer exists.
+    const startX = s.poly ? s.poly[0][0] : cx + cr;
+    const startY = s.poly ? s.poly[0][1] : cy;
     moves.push({ type: 'rapid', x1: lastX, y1: lastY, x2: startX, y2: startY });
-    // Arc (circle → arc; others → polygon)
-    if (S.pattern === 'circle' || S.pattern === 'dot') {
+    // Arc (circle → arc; others → polygon). A cropped shape is never a full
+    // circle any more, so it has to go down the polygon path.
+    if (s.poly) {
+      const pts = s.poly;
+      for (let i = 1; i < pts.length; i++)
+        moves.push({ type: 'cut', x1: pts[i-1][0], y1: pts[i-1][1], x2: pts[i][0], y2: pts[i][1] });
+    } else if (S.pattern === 'circle' || S.pattern === 'dot') {
       moves.push({ type: 'arc', cx, cy, r: cr });
     } else {
       const pts = getShapePoints(cx, cy, cr, S.pattern, S.patRot);
@@ -5035,7 +5241,14 @@ function drawSimFrame(upTo) {
   ctx.strokeStyle = S.darkBg ? '#fff' : '#000';
   ctx.lineWidth = 0.5;
   ctx.beginPath();
-  for (const s of S.shapes) shapePath(ctx, s.x*sx, s.y*sy, s.r*Math.min(sx,sy), S.pattern, S.patRot);
+  for (const s of S.shapes) {
+    if (s.poly) {
+      const p = s.poly;
+      ctx.moveTo(p[0][0]*sx, p[0][1]*sy);
+      for (let i = 1; i < p.length; i++) ctx.lineTo(p[i][0]*sx, p[i][1]*sy);
+      ctx.closePath();
+    } else shapePath(ctx, s.x*sx, s.y*sy, s.r*Math.min(sx,sy), S.pattern, S.patRot);
+  }
   if (S.fill) ctx.fill(); else ctx.stroke();
   ctx.globalAlpha = 1;
 
@@ -5235,7 +5448,8 @@ function buildGcode(offsetX=0, offsetY=0) {
           parseFloat((s.x * sc + offsetX).toFixed(3)),
           parseFloat(((pCanvas.height - s.y) * sc + offsetY).toFixed(3)),
           parseFloat((s.r * sc).toFixed(3)),
-          L.pat, depth, feed, plunge, safeZ, ++_mixN, fmt, toolDia, L.rot, mixShapeSrc());
+          L.pat, depth, feed, plunge, safeZ, ++_mixN, fmt, toolDia, L.rot, mixShapeSrc(),
+          s.poly ? s.poly.map(p => [p[0]*sc + offsetX, (pCanvas.height - p[1])*sc + offsetY]) : null);
       }
     }
     g += `\n${cm('── End of job ──')}`;
@@ -5295,8 +5509,13 @@ function buildGcode(offsetX=0, offsetY=0) {
       const sx = parseFloat((s.x * sc + offsetX).toFixed(3));
       const sy = parseFloat((_sheetY(s.y, sc) + offsetY).toFixed(3));
       const sr = parseFloat((s.r * sc).toFixed(3));
+      // A cropped shape brings its own outline in canvas pixels; convert it to
+      // the same sheet millimetres the rest of this loop works in.
+      const _poly = s.poly
+        ? s.poly.map(p => [p[0]*sc + offsetX, _sheetY(p[1], sc) + offsetY])
+        : null;
       g += gcodeShape(sx, sy, sr, L.pat, depth, feed, plunge, safeZ, ++_n, fmt, toolDia, L.rot,
-                      L.mix ? mixShapeSrc() : IMGSHAPE);
+                      L.mix ? mixShapeSrc() : IMGSHAPE, _poly);
     }
   }
 
@@ -5313,10 +5532,21 @@ function buildGcode(offsetX=0, offsetY=0) {
   return g;
 }
 
-function gcodeShape(x, y, r, pat, depth, feed, plunge, safeZ, n, fmt, toolDia = 0, rot = 0, src = null) {
+function gcodeShape(x, y, r, pat, depth, feed, plunge, safeZ, n, fmt, toolDia = 0, rot = 0, src = null, poly = null) {
   const cmChar = (fmt==='fanuc'||fmt==='siemens') ? '(' : ';';
   const cmEnd  = (fmt==='fanuc'||fmt==='siemens') ? ')' : '';
   let g = `${cmChar} #${n}${cmEnd}\n`;
+  // Cropped by the edge band: cut the outline it carries, whatever the pattern
+  // would normally be. Tool compensation does not apply — the crop line is a
+  // boundary the cut must not cross, not an offset contour.
+  if (poly && poly.length > 1) {
+    let first = true;
+    for (const [px, py] of poly) {
+      if (first) { g += `G0 X${f(px)} Y${f(py)}\nG1 Z${depth} F${plunge}\n`; first = false; }
+      else g += `G1 X${f(px)} Y${f(py)} F${feed}\n`;
+    }
+    return g + `G0 Z${safeZ}\n`;
+  }
   switch (pat) {
     case 'circle': case 'dot': {
       // Compensate for tool radius: move tool center on circle of (r - toolR)
@@ -5345,7 +5575,12 @@ function gcodeShape(x, y, r, pat, depth, feed, plunge, safeZ, n, fmt, toolDia = 
 }
 
 // ── SVG helpers ───────────────────────────────────────────
-function svgShapePath(x, y, r, pat, rot) {
+function svgShapePath(x, y, r, pat, rot, poly) {
+  if (poly && poly.length > 1) {
+    let dp = `M${f(poly[0][0])} ${f(poly[0][1])} `;
+    for (let i = 1; i < poly.length; i++) dp += `L${f(poly[i][0])} ${f(poly[i][1])} `;
+    return dp + 'Z ';
+  }
   if (pat === 'circle' || pat === 'dot')
     return `M${f(x+r)} ${f(y)} A${f(r)} ${f(r)} 0 1 0 ${f(x-r)} ${f(y)} A${f(r)} ${f(r)} 0 1 0 ${f(x+r)} ${f(y)} Z `;
   const pts = getShapePoints(x, y, r, pat, rot);
@@ -5365,20 +5600,30 @@ function buildSVGString(units) {
   const fg = S.darkBg ? '#ffffff' : '#000000';
   // The work-area outline. Stroked, never filled, so it reads as a boundary.
   const _sw = (0.2*sc).toFixed(3);
+  // Same colours the app draws on screen, so the file reads the same way.
+  const _fcol = S.darkBg ? '#ffffff' : GUIDE_COLORS.frame.hex;
   let frame = S.exportFrame
-    ? `\n  <rect x="0" y="0" width="${wW}" height="${wH}" fill="none" stroke="${fg}" ` +
+    ? `\n  <rect x="0" y="0" width="${wW}" height="${wH}" fill="none" stroke="${_fcol}" ` +
       `stroke-width="${_sw}" vector-effect="non-scaling-stroke"/>`
     : '';
   if (S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0) {
+    const pc = GUIDE_COLORS.panel.hex;
     const { ox, oy } = panelOffsets();
     for (let x = ox > 1e-6 ? ox : S.panelWmm; x < wW - 1e-6; x += S.panelWmm)
-      frame += `\n  <line x1="${x}" y1="0" x2="${x}" y2="${wH}" stroke="${fg}" ` +
+      frame += `\n  <line x1="${x}" y1="0" x2="${x}" y2="${wH}" stroke="${pc}" ` +
                `stroke-width="${_sw}" vector-effect="non-scaling-stroke"/>`;
     for (let y = oy > 1e-6 ? oy : S.panelHmm; y < wH - 1e-6; y += S.panelHmm) {
       const sy = wH - y;   // SVG measures down from the top
-      frame += `\n  <line x1="0" y1="${sy}" x2="${wW}" y2="${sy}" stroke="${fg}" ` +
+      frame += `\n  <line x1="0" y1="${sy}" x2="${wW}" y2="${sy}" stroke="${pc}" ` +
                `stroke-width="${_sw}" vector-effect="non-scaling-stroke"/>`;
     }
+  }
+  for (const r of marginRectsMm()) {
+    // Sheet Y runs up, SVG runs down, so the rectangle's top edge is y1.
+    frame += `\n  <rect x="${r.x0}" y="${(wH - r.y1).toFixed(3)}" ` +
+             `width="${(r.x1 - r.x0).toFixed(3)}" height="${(r.y1 - r.y0).toFixed(3)}" ` +
+             `fill="none" stroke="${GUIDE_COLORS.margin.hex}" stroke-width="${_sw}" ` +
+             `vector-effect="non-scaling-stroke"/>`;
   }
   const hdr = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${wW}${un}" height="${wH}${un}" viewBox="0 0 ${wW} ${wH}">\n  <!-- CNC Pattern Generator ${BUILD_TAG} | Pattern: ${patName(S.pattern)} -->\n  <rect width="${wW}" height="${wH}" fill="${bg}"/>${frame}`;
 
@@ -5390,9 +5635,9 @@ function buildSVGString(units) {
       if (pts.length < 2) continue;
       // Edge A (+normal side) then Edge B (-normal side) reversed → closed polygon
       let edgeA = pts.map(p =>
-        `${((p.cx + p.hw*lnx)*sc).toFixed(3)},${((H - p.cy - p.hw*lny)*sc).toFixed(3)}`).join(' ');
+        `${((p.cx + p.hw*lnx)*sc).toFixed(3)},${((p.cy + p.hw*lny)*sc).toFixed(3)}`).join(' ');
       let edgeB = pts.slice().reverse().map(p =>
-        `${((p.cx - p.hw*lnx)*sc).toFixed(3)},${((H - p.cy + p.hw*lny)*sc).toFixed(3)}`).join(' ');
+        `${((p.cx - p.hw*lnx)*sc).toFixed(3)},${((p.cy - p.hw*lny)*sc).toFixed(3)}`).join(' ');
       strips += `  <polygon points="${edgeA} ${edgeB}" fill="${fg}"/>\n`;
     }
     return `${hdr}\n${strips}${_mixSvg()}</svg>`;
@@ -5413,7 +5658,7 @@ function buildSVGString(units) {
         const ch = S.textMode === 'rnd'
           ? chars[Math.floor(Math.random() * chars.length)]
           : chars[i % chars.length];
-        t += `  <text x="${(s.x*sc).toFixed(3)}" y="${((H-s.y)*sc).toFixed(3)}" ` +
+        t += `  <text x="${(s.x*sc).toFixed(3)}" y="${(s.y*sc).toFixed(3)}" ` +
              `font-size="${(s.r*1.9*sc).toFixed(3)}" font-family="${S.textFont||'Arial'}" ` +
              `font-weight="bold" text-anchor="middle" dominant-baseline="middle" ` +
              `fill="${fg}" opacity="${op}">${ch}</text>\n`;
@@ -5426,12 +5671,12 @@ function buildSVGString(units) {
       const rot = ((parseInt(($(mixShapeRotId())||{}).value) || 0) + (S.mixPatRot || 0)) * Math.PI / 180;
       const cosR = Math.cos(rot), sinR = Math.sin(rot);
       for (const s of S.mixShapes) {
-        const r = s.r * sc, cx2 = s.x * sc, cy2 = _sheetY(s.y, sc);
+        const r = s.r * sc, cx2 = s.x * sc, cy2 = s.y * sc;
         for (const path of _MS.normPaths) {
           if (!path || path.length < 2) continue;
           path.forEach((pt, i) => {
             const x2 = cx2 + (pt.x*cosR - pt.y*sinR) * r;
-            const y2 = cy2 - (pt.x*sinR + pt.y*cosR) * r;   // SVG Y is up here
+            const y2 = cy2 + (pt.x*sinR + pt.y*cosR) * r;   // SVG Y runs down, like the canvas
             d2 += `${i ? 'L' : 'M'}${x2.toFixed(3)},${y2.toFixed(3)} `;
           });
           if (_MS.isContour) d2 += 'Z ';
@@ -5439,7 +5684,8 @@ function buildSVGString(units) {
       }
     } else {
       for (const s of S.mixShapes) {
-        d2 += svgShapePath(s.x*sc, _sheetY(s.y, sc), Math.max(0.001, s.r*sc), S.mixPat, S.mixPatRot);
+        d2 += svgShapePath(s.x*sc, s.y*sc, Math.max(0.001, s.r*sc), S.mixPat, S.mixPatRot,
+                           s.poly ? s.poly.map(p => [p[0]*sc, p[1]*sc]) : null);
       }
     }
     if (!d2) return '';
@@ -5459,7 +5705,7 @@ function buildSVGString(units) {
         ? chars[Math.floor(Math.random() * chars.length)]
         : chars[i % chars.length];
       const fs = (s.r * 1.9 * sc).toFixed(3);
-      const tx = (s.x * sc).toFixed(3), ty = _sheetY(s.y, sc).toFixed(3);
+      const tx = (s.x * sc).toFixed(3), ty = (s.y * sc).toFixed(3);
       texts += `  <text x="${tx}" y="${ty}" font-size="${fs}" font-family="${S.textFont||'Arial'}" font-weight="bold" text-anchor="middle" dominant-baseline="middle" fill="${fg}">${ch}</text>\n`;
     }
     return `${hdr}\n${texts}${_mixSvg()}</svg>`;
@@ -5468,8 +5714,9 @@ function buildSVGString(units) {
   // ── Standard shapes SVG ───────────────────────────────────
   let d = '';
   for (const s of S.shapes) {
-    const sx = s.x * sc, sy = _sheetY(s.y, sc), sr = s.r * sc;
-    d += svgShapePath(sx, sy, sr, S.pattern, S.patRot);
+    const sx = s.x * sc, sy = s.y * sc, sr = s.r * sc;
+    d += svgShapePath(sx, sy, sr, S.pattern, S.patRot,
+                      s.poly ? s.poly.map(p => [p[0]*sc, p[1]*sc]) : null);
   }
   let svg = `${hdr}\n  <path d="${d.trim()}" fill="${S.fill?fg:'none'}" stroke="${S.fill?'none':fg}" stroke-width="${(0.15*sc).toFixed(3)}"/>`;
   const _mx = _mixSvg();
@@ -9635,7 +9882,7 @@ function buildDXF12() {
   let _hnd = 0x100;
   const nh = () => (_hnd++).toString(16).toUpperCase();
 
-  const polyline = (pts, closed = true) => {
+  const polyline = (pts, closed = true, color = 0) => {
     // getShapePoints() repeats the first point at the end so the canvas can
     // stroke a closed outline. In a POLYLINE flagged closed (70=1) that repeat
     // is a zero-length segment — harmless on screen, but it makes CAM emit a
@@ -9647,7 +9894,10 @@ function buildDXF12() {
     if (pts.length < 2) return '';
     // 10/20/30 on the POLYLINE header is the mandatory "dummy" point — it was
     // missing in the first version. 70=1 marks the polyline closed.
-    let s = g(0,'POLYLINE') + g(5,nh()) + g(8,'0') + g(66,'1') +
+    // Colour code 62 sits right after the layer. 0 means BYBLOCK, which is not
+    // what an entity on layer 0 wants — omit it entirely and it stays BYLAYER.
+    let s = g(0,'POLYLINE') + g(5,nh()) + g(8,'0') +
+            (color ? g(62, String(color)) : '') + g(66,'1') +
             g(10,'0.0') + g(20,'0.0') + g(30,'0.0') + g(70, closed ? '1' : '0');
     for (const [x, y] of pts) {
       track(x, y);
@@ -9694,6 +9944,12 @@ function buildDXF12() {
       }
     } else if (L.pat === 'circle' || L.pat === 'dot') {
       for (const s of L.shapes) {
+        // A circle cropped by the edge band is no longer a circle — it has to
+        // go out as the clipped outline, or the file would show the whole hole.
+        if (s.poly) {
+          ents.push(polyline(s.poly.map(p => [p[0]*sc, _sheetY(p[1], sc)])));
+          continue;
+        }
         const x = s.x*sc, y = _sheetY(s.y, sc), r = s.r*sc;
         if (!(r > 0)) continue;                     // AutoCAD rejects a zero-radius circle
         track(x, y, r);
@@ -9701,7 +9957,7 @@ function buildDXF12() {
       }
     } else {
       for (const s of L.shapes) {
-        const pts = getShapePoints(s.x, s.y, s.r, L.pat, lrot, _LS);
+        const pts = shapeOutline(s, L.pat, lrot, _LS);
         if (!pts || pts.length < 2) continue;
         ents.push(polyline(pts.map(p => [p[0]*sc, _sheetY(p[1], sc)])));
       }
@@ -9713,7 +9969,7 @@ function buildDXF12() {
   // sheet up with, not a cut.
   if (S.exportFrame) {
     const fw = wW, fh = workHmm();
-    ents.push(polyline([[0,0],[fw,0],[fw,fh],[0,fh]]));
+    ents.push(polyline([[0,0],[fw,0],[fw,fh],[0,fh]], true, GUIDE_COLORS.frame.aci));
     track(0, 0); track(fw, fh);
   }
 
@@ -9724,11 +9980,17 @@ function buildDXF12() {
     const fw = wW, fh = workHmm();
     const { ox, oy } = panelOffsets();
     for (let x = ox > 1e-6 ? ox : S.panelWmm; x < fw - 1e-6; x += S.panelWmm)
-      ents.push(polyline([[x, 0], [x, fh]], false));
+      ents.push(polyline([[x, 0], [x, fh]], false, GUIDE_COLORS.panel.aci));
     for (let y = oy > 1e-6 ? oy : S.panelHmm; y < fh - 1e-6; y += S.panelHmm)
-      ents.push(polyline([[0, y], [fw, y]], false));
+      ents.push(polyline([[0, y], [fw, y]], false, GUIDE_COLORS.panel.aci));
     track(0, 0); track(fw, fh);
   }
+
+  // The keep-out band, one closed rectangle per panel. Optional, because it is
+  // a reference for setting the job up rather than anything to cut.
+  for (const r of marginRectsMm())
+    ents.push(polyline([[r.x0,r.y0],[r.x1,r.y0],[r.x1,r.y1],[r.x0,r.y1]],
+                       true, GUIDE_COLORS.margin.aci));
 
   if (!isFinite(minX)) { minX = minY = 0; maxX = wW; maxY = workHmm(); }
 
@@ -9760,11 +10022,13 @@ function buildDXF() {
   const nh = () => (_h++).toString(16).toUpperCase();
   const MS_OWNER = '17'; // *Model_Space BLOCK_RECORD handle (ezdxf boilerplate)
 
-  function polyline(verts, closed) {
+  function polyline(verts, closed, color) {
     if (verts.length < 2) return '';
     const ph = nh();
     let s = `  0\nPOLYLINE\n  5\n${ph}\n330\n${MS_OWNER}\n`;
-    s += '100\nAcDbEntity\n  8\n0\n';
+    // Colour code 62 belongs inside AcDbEntity, straight after the layer —
+    // verified against ezdxf's own output, which AutoCAD accepts.
+    s += '100\nAcDbEntity\n  8\n0\n' + (color ? ` 62\n${color}\n` : '');
     // Group order inside AcDb2dPolyline must match what AutoCAD's reader expects:
     // 66 (vertices follow), then the elevation point, then 70. ezdxf writes it in
     // exactly this order and AutoCAD accepts those files.
@@ -9828,10 +10092,17 @@ function buildDXF() {
     }
   }
 
+  // Cropped by the edge band — the clipped outline replaces whatever the
+  // pattern would have drawn, circle included.
+  const _cropVerts = s => s.poly.map(([px, py]) => ({ x: px*sc, y: _sheetY(py, sc), bulge: 0 }));
+
   for (const s of S.shapes) {
     const sx = s.x * sc, sy = _sheetY(s.y, sc), sr = s.r * sc;
 
-    if (S.pattern === 'circle' || S.pattern === 'dot') {
+    if (s.poly) {
+      entities += polyline(_cropVerts(s), true);
+
+    } else if (S.pattern === 'circle' || S.pattern === 'dot') {
       const ch = nh();
       entities += `  0\nCIRCLE\n  5\n${ch}\n330\n${MS_OWNER}\n100\nAcDbEntity\n  8\n0\n100\nAcDbCircle\n 10\n${ff(sx)}\n 20\n${ff(sy)}\n 30\n0.0\n 40\n${ff(sr)}\n`;
 
@@ -9873,6 +10144,7 @@ function buildDXF() {
     }
   }
 
+
   // ── Everything else the drawing contains ─────────────────────────────
   // This writer only ever knew about S.shapes and S.pattern, so the R2000 file
   // was missing the mix layer, the traced letter outlines, the work frame and
@@ -9898,7 +10170,9 @@ function buildDXF() {
     const mchars = layerChars({ mix: true });
     S.mixShapes.forEach((s, i) => {
       const sx = s.x * sc, sy = _sheetY(s.y, sc), sr = s.r * sc;
-      if (S.mixPat === 'circle' || S.mixPat === 'dot') {
+      if (s.poly) {
+        entities += polyline(_cropVerts(s), true);
+      } else if (S.mixPat === 'circle' || S.mixPat === 'dot') {
         if (!(sr > 0)) return;
         entities += `  0\nCIRCLE\n  5\n${nh()}\n330\n${MS_OWNER}\n100\nAcDbEntity\n  8\n0\n100\nAcDbCircle\n 10\n${ff(sx)}\n 20\n${ff(sy)}\n 30\n0.0\n 40\n${ff(sr)}\n`;
       } else if (S.mixPat === 'textraster') {
@@ -9930,15 +10204,22 @@ function buildDXF() {
     const fw = wW, fh = workHmm();
     if (S.exportFrame) {
       entities += polyline([{x:0,y:0,bulge:0},{x:fw,y:0,bulge:0},
-                            {x:fw,y:fh,bulge:0},{x:0,y:fh,bulge:0}], true);
+                            {x:fw,y:fh,bulge:0},{x:0,y:fh,bulge:0}], true,
+                           GUIDE_COLORS.frame.aci);
     }
     if (S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0) {
       const { ox, oy } = panelOffsets();
       for (let x = ox > 1e-6 ? ox : S.panelWmm; x < fw - 1e-6; x += S.panelWmm)
-        entities += polyline([{x, y:0, bulge:0}, {x, y:fh, bulge:0}], false);
+        entities += polyline([{x, y:0, bulge:0}, {x, y:fh, bulge:0}], false,
+                             GUIDE_COLORS.panel.aci);
       for (let y = oy > 1e-6 ? oy : S.panelHmm; y < fh - 1e-6; y += S.panelHmm)
-        entities += polyline([{x:0, y, bulge:0}, {x:fw, y, bulge:0}], false);
+        entities += polyline([{x:0, y, bulge:0}, {x:fw, y, bulge:0}], false,
+                             GUIDE_COLORS.panel.aci);
     }
+    for (const r of marginRectsMm())
+      entities += polyline([{x:r.x0,y:r.y0,bulge:0},{x:r.x1,y:r.y0,bulge:0},
+                            {x:r.x1,y:r.y1,bulge:0},{x:r.x0,y:r.y1,bulge:0}], true,
+                           GUIDE_COLORS.margin.aci);
   }
 
   // Patch $HANDSEED in boilerplate to be above our highest entity handle
@@ -10266,9 +10547,19 @@ $('expAI').addEventListener('click', () => {
   // coordinates carry over directly once scaled.
   const px = v => v * sc;
 
+  // Cropped by the edge band. PDF measures Y down like the canvas, so the
+  // stored outline needs nothing but the scale.
+  const _aiPoly = s => {
+    const p = s.poly, deltas = [];
+    for (let k = 1; k < p.length; k++)
+      deltas.push([px(p[k][0] - p[k-1][0]), px(p[k][1] - p[k-1][1])]);
+    doc.lines(deltas, px(p[0][0]), px(p[0][1]), [1, 1], style);
+  };
+
   for (const L of exportLayers()) {
     if (L.pat === 'circle' || L.pat === 'dot') {
       for (const s of L.shapes) {
+        if (s.poly) { _aiPoly(s); continue; }
         const r = px(s.r);
         if (r > 0.001) doc.circle(px(s.x), px(s.y), r, style);
       }
@@ -10292,7 +10583,7 @@ $('expAI').addEventListener('click', () => {
     } else {
       const src = L.mix ? mixShapeSrc() : IMGSHAPE;
       for (const s of L.shapes) {
-        const pts = getShapePoints(s.x, s.y, s.r, L.pat, L.rot, src);
+        const pts = shapeOutline(s, L.pat, L.rot, src);
         if (!pts || pts.length < 2) continue;
         const deltas = [];
         for (let k = 1; k < pts.length; k++)
@@ -10303,16 +10594,30 @@ $('expAI').addEventListener('click', () => {
   }
 
   // The reference geometry, stroked so it never fills.
-  if (S.exportFrame || S.splitPanels) {
+  const _mRects = marginRectsMm();
+  if (S.exportFrame || S.splitPanels || _mRects.length) {
     doc.setLineWidth(Math.max(0.05, 0.2 * sc));
-    if (S.exportFrame) doc.rect(0, 0, wW, wH, 'S');
+    // Same colours as the screen. Illustrator keeps them as stroke colours, so
+    // the guides can be selected and switched off without hunting for them.
+    const hex = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+    if (S.exportFrame) {
+      doc.setDrawColor(...hex(GUIDE_COLORS.frame.hex));
+      doc.rect(0, 0, wW, wH, 'S');
+    }
     if (S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0) {
+      doc.setDrawColor(...hex(GUIDE_COLORS.panel.hex));
       const { ox, oy } = panelOffsets();
       for (let x = ox > 1e-6 ? ox : S.panelWmm; x < wW - 1e-6; x += S.panelWmm)
         doc.line(x, 0, x, wH);
       for (let y = oy > 1e-6 ? oy : S.panelHmm; y < wH - 1e-6; y += S.panelHmm)
         doc.line(0, wH - y, wW, wH - y);   // sheet Y is up, PDF Y is down
     }
+    if (_mRects.length) {
+      doc.setDrawColor(...hex(GUIDE_COLORS.margin.hex));
+      for (const r of _mRects)
+        doc.rect(r.x0, wH - r.y1, r.x1 - r.x0, r.y1 - r.y0, 'S');
+    }
+    doc.setDrawColor(0);
   }
 
   FILESAVE.save(`cnc-pattern_${BUILD_TAG}.ai`, () => doc.output('blob'), 'application/postscript');
@@ -10438,7 +10743,8 @@ function renderRasterCanvas(dpi) {
     c.globalAlpha = 1;
   }
 
-  _drawSheetGuides(c, k);
+  // The raster export follows the same switch the vector exports do.
+  _drawSheetGuides(c, k, S.exportMarginLines);
   c.restore();
   return oc;
 }
@@ -10567,7 +10873,8 @@ $('expSheetGcode').addEventListener('click', () => {
         const sx = parseFloat((s.x*sc + ox).toFixed(3));
         const sy = parseFloat(((H-s.y)*sc + oy).toFixed(3));
         const sr = parseFloat((s.r*sc).toFixed(3));
-        g += gcodeShape(sx,sy,sr,S.pattern,depth,feed,plunge,safeZ,i+1,fmt,0,S.patRot);
+        g += gcodeShape(sx,sy,sr,S.pattern,depth,feed,plunge,safeZ,i+1,fmt,0,S.patRot,null,
+          s.poly ? s.poly.map(p => [p[0]*sc + ox, (H - p[1])*sc + oy]) : null);
       }
       g += '\n';
     }
@@ -12609,7 +12916,8 @@ const PROJECT = {
     togInvert: 'invert', togFill: 'fill', togDarkBg: 'darkBg',
     togQuantRandom: 'quantRandom', togMixLayer: 'mixEnabled',
     togSkipBlank: 'skipBlank', togMixVar: 'mixVar',
-    togMixQuantRandom: 'mixQuantRandom'
+    togMixQuantRandom: 'mixQuantRandom',
+    togExportMargin: 'exportMarginLines'
   },
 
   collect(withImages = true) {
