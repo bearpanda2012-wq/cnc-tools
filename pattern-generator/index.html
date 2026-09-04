@@ -802,6 +802,14 @@ pre.gcode-content {
         <div id="splitNote" style="font-size:9px;color:#8e8e94;margin:-2px 0 8px;line-height:1.5"></div>
       </div>
 
+      <!-- Keep-out band. Lives outside splitPanelBox on purpose: with the split
+           off it still works, measured from the sheet edge instead. -->
+      <div class="in-row" style="margin:6px 0 2px">
+        <div class="in-grp"><label>เว้นระยะขอบ (mm)</label>
+          <input type="number" class="num-in" id="nEdgeMargin" value="0" min="0" step="1"></div>
+      </div>
+      <div id="edgeMarginNote" style="font-size:9px;color:#8e8e94;margin:-2px 0 8px;line-height:1.5"></div>
+
       <!-- Work size with aspect lock -->
       <div class="worksize-row">
         <div class="in-grp"><label>ขนาดงาน W</label>
@@ -2206,6 +2214,9 @@ const S = {
   patternEngine: 'std45', xSpacingMm: 100, ySpacingMm: 100, sourcePhoto: null,
   exportFrame: true, splitPanels: false, panelWmm: 1200, panelHmm: 2400,
   panelAnchor: 'bl',
+  // Clear band kept free of pattern around every panel. With "แบ่งแผ่น" off the
+  // whole sheet counts as one panel, so the same number is a plain sheet margin.
+  edgeMarginMm: 0,
   mixEnabled: false, mixPat: 'circle', mixDiamMm: 2.0, mixPatRot: 0, mixAlpha: 0.7,
   // Mix layer used to be one fixed diameter, preview-only. It can now vary
   // with tone exactly like the main pattern, and it is exported with it.
@@ -2897,7 +2908,7 @@ const zoom = (() => {
 // they will appear in the file. Deciding a panel size without seeing where the
 // cuts land is guesswork.
 function _drawSheetGuides(ctx, scale) {
-  if (!S.exportFrame && !S.splitPanels) return;
+  if (!S.exportFrame && !S.splitPanels && !(S.edgeMarginMm > 0)) return;
   const W = pCanvas.width, H = pCanvas.height;
   const wMm = workWmm(), hMm = workHmm();
   if (!(wMm > 0 && hMm > 0)) return;
@@ -2928,6 +2939,27 @@ function _drawSheetGuides(ctx, scale) {
       // the bottom, which is how the exporters read it.
       const py = H - y * mmToPx;
       ctx.moveTo(0, py); ctx.lineTo(W, py);
+    }
+    ctx.stroke();
+  }
+
+  // The keep-out band, as an inset rectangle inside each panel. Screen only —
+  // it marks where the pattern was removed, it is not geometry to cut.
+  if (S.edgeMarginMm > 0) {
+    const g = panelGridMm();
+    ctx.strokeStyle = '#ff9f0a';
+    const d = 1 / Math.max(0.0001, scale || 1);
+    ctx.setLineDash([3 * d, 3 * d]);
+    ctx.beginPath();
+    for (let i = 0; i < g.xs.length - 1; i++) {
+      for (let j = 0; j < g.ys.length - 1; j++) {
+        const x0 = g.xs[i] + g.m, x1 = g.xs[i+1] - g.m;
+        const y0 = g.ys[j] + g.m, y1 = g.ys[j+1] - g.m;
+        if (!(x1 > x0 && y1 > y0)) continue;      // band swallowed this panel
+        // Sheet Y runs up from the bottom; the canvas runs down from the top.
+        ctx.rect(x0 * mmToPx, H - y1 * mmToPx,
+                 (x1 - x0) * mmToPx, (y1 - y0) * mmToPx);
+      }
     }
     ctx.stroke();
   }
@@ -3356,6 +3388,7 @@ $('togSplitPanels').addEventListener('click', function() {
   updateSplitNote();
   if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
   updateViewCanvas();          // the guides are a view overlay — no re-generate needed
+  _edgeMarginReflow();         // …unless the keep-out band depends on them
 });
 ['nPanelW','nPanelH'].forEach(id => {
   const el = $(id); if (!el) return;
@@ -3364,8 +3397,16 @@ $('togSplitPanels').addEventListener('click', function() {
     S[id === 'nPanelW' ? 'panelWmm' : 'panelHmm'] = (isFinite(v) && v > 0) ? v : 0;
     updateSplitNote();
     updateViewCanvas();
+    _edgeMarginReflow();
   });
 });
+
+// Where the panel edges are decides where the keep-out band is, so anything
+// that moves them has to rebuild the pattern — but only when a band is set,
+// otherwise panel controls stay the cheap view-only overlay they have been.
+function _edgeMarginReflow() {
+  if ((S.edgeMarginMm || 0) > 0) scheduleRender();
+}
 $('panelAnchorGrid').addEventListener('click', e => {
   const b = e.target.closest('[data-anchor]');
   if (!b) return;
@@ -3374,10 +3415,56 @@ $('panelAnchorGrid').addEventListener('click', e => {
   b.classList.add('on');
   updateSplitNote();
   updateViewCanvas();
+  _edgeMarginReflow();
   if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
 });
 
+// The keep-out band changes which shapes exist, not just what is drawn on top
+// of them, so unlike the panel lines this one has to re-generate.
+{
+  const el = $('nEdgeMargin');
+  if (el) el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    // Millimetres, like the panel sizes right above it — not the unit selector.
+    S.edgeMarginMm = (isFinite(v) && v > 0) ? v : 0;
+    updateEdgeMarginNote();
+    if (typeof PROJECT !== 'undefined') PROJECT.markDirty();
+    scheduleRender();
+  });
+}
+
+function updateEdgeMarginNote() {
+  const n = $('edgeMarginNote');
+  if (!n) return;
+  const m = S.edgeMarginMm || 0;
+  if (!(m > 0)) {
+    n.style.color = '#8e8e94';
+    n.textContent = 'ใส่ 0 = ไม่เว้น · ใส่ค่ามากกว่า 0 จะลบลายที่อยู่ในแถบขอบออก';
+    return;
+  }
+  const wW = workWmm(), hH = workHmm();
+  const on = !!(S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0);
+  const pw = on ? S.panelWmm : wW, ph = on ? S.panelHmm : hH;
+  const where = on ? 'ทุกแผ่นที่แบ่ง' : 'ขอบชิ้นงาน';
+  // Two bands eat into each panel from opposite sides, so the usable strip is
+  // the panel minus 2 x margin. Saying this out loud beats a blank preview.
+  const useW = pw - 2 * m, useH = ph - 2 * m;
+  const fmt = v => (+v.toFixed(2)).toString();
+  if (!(useW > 0) || !(useH > 0)) {
+    n.style.color = '#d9a441';
+    n.textContent = `เว้น ${fmt(m)} mm รอบ${where} — กว้างเกินแผ่น ${fmt(pw)}×${fmt(ph)} mm ` +
+                    `ลายจะหายหมด (ต้องน้อยกว่า ${fmt(Math.min(pw, ph) / 2)} mm)`;
+    return;
+  }
+  n.style.color = '#8e8e94';
+  n.textContent = `เว้น ${fmt(m)} mm รอบ${where} · เหลือพื้นที่ลาย ${fmt(useW)}×${fmt(useH)} mm ต่อแผ่น · ` +
+                  'ลายในแถบนี้ถูกลบออกจริง ทั้งพรีวิว G-code และไฟล์ส่งออก';
+}
+
 function updateSplitNote() {
+  // The band is measured per panel, so its note is only correct once the panel
+  // size is known — refresh it from here rather than duplicating the triggers.
+  updateEdgeMarginNote();
   const n = $('splitNote');
   if (!n) return;
   if (!S.splitPanels) { n.textContent = ''; return; }
@@ -3582,7 +3669,7 @@ function generateSpecialXYPattern(o, emit) {
 // first line, and in every export filename — so a file and a screenshot
 // always say which build produced them. Several rounds have been lost
 // analysing output from a stale copy of this page.
-const BUILD_TAG = '27Aug-b35';
+const BUILD_TAG = '27Aug-b36';
 
 const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
 function updateSpacingNote() {
@@ -4079,6 +4166,10 @@ function _generate() {
   const _tSpan = Math.max(1e-6, _tHi - _tLo);
 
   let limitHit = false;
+  // The keep-out band. Resolved once here so the per-shape test is just a few
+  // comparisons; every layer below judges itself against this same grid, which
+  // is what keeps the preview, the G-code and every export file identical.
+  const _mg = panelGridMm();
   // Which engine lays out the cells. Everything after this point — blank
   // skipping, tone sampling, sizing, the shape budget — is shared and behaves
   // identically whichever engine produced the position.
@@ -4157,6 +4248,9 @@ function _generate() {
       // Threshold in real millimetres, not canvas pixels: on a large work area
       // every dot is sub-pixel on screen yet still perfectly valid G-code.
       if (r < minRealPx) return;
+      // Tested here, after the size is known, because the band is measured to
+      // the shape's edge — a large dot has to start further in than a small one.
+      if (!insideEdgeMargin(_mg, rx / mmToPx, workH_mm - ry / mmToPx, r / mmToPx)) return;
       shapes.push({ x: rx, y: ry, r, rMm, frac: t });
       if (shapes.length >= MAX_SHAPES) { limitHit = true; return false; }
     }
@@ -4255,6 +4349,9 @@ function _generate() {
       // Same reasoning as the main grid: no silent 0.40 x pitch clamp, and the
       // "too small" test is scale-relative instead of a fixed 0.25 canvas px.
       if (mr < minRealPx) continue;
+      // The mix layer obeys the same band. Leaving it out would fill the strip
+      // the main pattern was just cleared out of.
+      if (!insideEdgeMargin(_mg, mx / mmToPx, workH_mm - my / mmToPx, mr / mmToPx)) continue;
       mixShapes.push({ x: mx, y: my, r: mr, rMm: mrMm, frac: mt });
     }
     S.mixShapes = mixShapes;
@@ -4362,6 +4459,30 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
     lineRows.push(pts);
   }
 
+  // ── Keep-out band ──────────────────────────────────────────
+  // A scan line is a continuous ribbon, so it cannot simply be dropped: cut it
+  // into the runs that stay clear of the band and keep each run as its own row.
+  // Everything downstream — preview, G-code, DXF, SVG — reads lineRows, so
+  // trimming here trims all of them at once.
+  {
+    const _lrG = panelGridMm();
+    if (_lrG.m > 0) {
+      const mmToPx = W / workWmm(), hMm = workHmm();
+      const trimmed = [];
+      for (const row of lineRows) {
+        let run = [];
+        for (const p of row) {
+          const ok = insideEdgeMargin(_lrG, p.cx / mmToPx, hMm - p.cy / mmToPx, p.hw / mmToPx);
+          if (ok) run.push(p);
+          else { if (run.length > 1) trimmed.push(run); run = []; }
+        }
+        if (run.length > 1) trimmed.push(run);
+      }
+      lineRows.length = 0;
+      for (const r of trimmed) lineRows.push(r);
+    }
+  }
+
   // ── 2. Draw to pCanvas (no canvas rotation — lines ARE angled geometrically) ──
   pCtx.fillStyle = fg;
   _drawLineRows(pCtx, lineRows, nx, ny);
@@ -4373,6 +4494,7 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
   // ── Compute mix layer positions between scan lines ──────────
   {
     const mixShapes = [];
+    const _lrMg = panelGridMm();
     const _lrMmToPx = W / workWmm();
     const _lrMixQ   = (S.mixVar && S.mixQuant && S.mixQuant.length) ? S.mixQuant : null;
     const _lrMixQPx = _lrMixQ ? _lrMixQ.map(d => (d / 2) * _lrMmToPx) : null;
@@ -4406,6 +4528,7 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
           mr = _lrMixFixP;
         }
         if (mr < _lrMinR) continue;
+        if (!insideEdgeMargin(_lrMg, mx / _lrMmToPx, workHmm() - my / _lrMmToPx, mr / _lrMmToPx)) continue;
         mixShapes.push({ x: mx, y: my, r: mr, rMm: mrMm, frac: mt });
       }
     }
@@ -4477,6 +4600,53 @@ function panelOffsets() {
   // Sheet Y runs up from the bottom: anchoring to the top pushes the offcut down.
   const oy = row === 'b' ? 0 : row === 't' ? remY : remY / 2;
   return { ox, oy };
+}
+
+// ── Keep-out band around every panel ──────────────────────────────────
+// The cut lines along one axis, in sheet millimetres, including the two sheet
+// edges. Mirrors the loops that DRAW the divisions, so a shape is judged
+// against exactly the lines the user can see.
+function _panelCutsMm(total, size, off) {
+  const cuts = [0];
+  if (size > 0.01 && total > 0) {
+    for (let v = off; v < total - 1e-6; v += size) if (v > 1e-6) cuts.push(v);
+  }
+  cuts.push(total);
+  return cuts;
+}
+
+// Built once per generate; the per-shape test below reads it thousands of times.
+// With the split off the sheet is one panel, so the same margin becomes a plain
+// sheet margin — which is what the control promises when the split is hidden.
+function panelGridMm() {
+  const wW = workWmm(), hH = workHmm();
+  const on = !!(S.splitPanels && S.panelWmm > 0 && S.panelHmm > 0);
+  const off = on ? panelOffsets() : { ox: 0, oy: 0 };
+  return {
+    m:  Math.max(0, S.edgeMarginMm || 0),
+    xs: _panelCutsMm(wW, on ? S.panelWmm : 0, off.ox),
+    ys: _panelCutsMm(hH, on ? S.panelHmm : 0, off.oy)
+  };
+}
+
+// Does a feature of half-width r, centred at v, clear the band on both sides of
+// the cell it falls in? The uneven offcut strips count as cells too — they are
+// real pieces of material and need the same clear edge.
+function _clearsBand(v, r, cuts, m) {
+  for (let i = 0; i < cuts.length - 1; i++) {
+    if (v < cuts[i] - 1e-6 || v > cuts[i + 1] + 1e-6) continue;
+    return (v - r >= cuts[i] + m - 1e-6) && (v + r <= cuts[i + 1] - m + 1e-6);
+  }
+  return false;                       // outside the sheet entirely
+}
+
+// xMm from the left, yMm UP from the bottom — the frame the exporters write and
+// the user measures in CAD. Measured to the shape's EDGE, not its centre, so the
+// band is genuinely empty material rather than merely free of centre points.
+function insideEdgeMargin(g, xMm, yMm, rMm) {
+  if (!g || !(g.m > 0)) return true;  // no band set — behaviour unchanged
+  const r = rMm > 0 ? rMm : 0;
+  return _clearsBand(xMm, r, g.xs, g.m) && _clearsBand(yMm, r, g.ys, g.m);
 }
 
 // Canvas Y (down from the top) -> sheet Y (up from the bottom), in mm.
