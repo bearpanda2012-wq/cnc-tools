@@ -3501,8 +3501,14 @@ function updateEdgeMarginNote() {
     mode === 'crop' ? 'ลายที่ล้ำเข้ามาถูกตัดตรงเส้นขอบ เหลือเป็นลายบางส่วน'
   : mode === 'keep' ? 'ลายที่ศูนย์กลางอยู่นอกแถบยังอยู่ครบ ยอมให้ล้ำเข้ามาบางส่วน'
   :                   'ลายที่ล้ำเข้ามาถูกลบทั้งรู ขอบว่างสนิท';
-  const noCrop = (mode === 'crop' && !edgeCropSupported(S.pattern))
-    ? ` · ลาย ${patName(S.pattern)} ตัดไม่ได้ ใช้ลบทั้งรูแทน` : '';
+  // The mix layer has its own pattern, and it can be a kind that cannot be cut.
+  const _nc = [];
+  if (mode === 'crop') {
+    if (!edgeCropSupported(S.pattern)) _nc.push(patName(S.pattern));
+    if (S.mixEnabled && S.mixPat && !edgeCropSupported(S.mixPat) && S.mixPat !== S.pattern)
+      _nc.push('ลายผสม ' + patName(S.mixPat));
+  }
+  const noCrop = _nc.length ? ` · ${_nc.join(' และ ')} ตัดไม่ได้ ใช้ลบทั้งรูแทน` : '';
   const lineWord = S.exportMarginLines
     ? ' · เส้นขอบสีส้มถูกส่งออกไปด้วย (ไม่ถูกกัด)'
     : ' · เส้นขอบแสดงบนจอเท่านั้น ไม่ถูกส่งออก';
@@ -3719,7 +3725,7 @@ function generateSpecialXYPattern(o, emit) {
 // first line, and in every export filename — so a file and a screenshot
 // always say which build produced them. Several rounds have been lost
 // analysing output from a stale copy of this page.
-const BUILD_TAG = '27Aug-b38';
+const BUILD_TAG = '27Aug-b40';
 
 const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
 function updateSpacingNote() {
@@ -4301,10 +4307,12 @@ function _generate() {
       // Tested here, after the size is known, because the band is measured to
       // the shape's edge — a large dot has to start further in than a small one.
       const _sh = { x: rx, y: ry, r, rMm, frac: t };
-      const _keep = edgeMarginClip(_mg, _sh, S.pattern, S.patRot, mmToPx, workH_mm);
+      const _keep = edgeMarginClip(_mg, _sh, S.pattern, S.patRot, mmToPx, workH_mm, IMGSHAPE);
       if (!_keep) return;
-      if (_keep !== true) _sh.poly = _keep;      // cropped: carries its own outline
-      shapes.push(_sh);
+      // Cropping can split one shape across a division into two pieces, so this
+      // returns a list of outlines rather than a single one.
+      if (_keep === true) shapes.push(_sh);
+      else for (const poly of _keep) shapes.push(Object.assign({}, _sh, { poly }));
       if (shapes.length >= MAX_SHAPES) { limitHit = true; return false; }
     }
   });
@@ -4405,10 +4413,12 @@ function _generate() {
       // The mix layer obeys the same band. Leaving it out would fill the strip
       // the main pattern was just cleared out of.
       const _ms = { x: mx, y: my, r: mr, rMm: mrMm, frac: mt };
-      const _mk = edgeMarginClip(_mg, _ms, S.mixPat, S.mixPatRot, mmToPx, workH_mm);
+      // The mix layer has its own uploaded shape — judging it against the main
+      // layer's outline would measure the wrong picture.
+      const _mk = edgeMarginClip(_mg, _ms, S.mixPat, S.mixPatRot, mmToPx, workH_mm, mixShapeSrc());
       if (!_mk) continue;
-      if (_mk !== true) _ms.poly = _mk;
-      mixShapes.push(_ms);
+      if (_mk === true) mixShapes.push(_ms);
+      else for (const poly of _mk) mixShapes.push(Object.assign({}, _ms, { poly }));
     }
     S.mixShapes = mixShapes;
   }
@@ -4526,15 +4536,51 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
       const mmToPx = W / workWmm(), hMm = workHmm();
       // A ribbon has no "whole shape" to drop, so remove and crop both mean
       // trim. Only 'keep' differs: it lets the ribbon's width overhang.
-      const _lrKeepMode = (S.edgeMarginMode === 'keep');
+      const keepMode = (S.edgeMarginMode === 'keep');
+
+      // A scan line is a RIBBON: its half-width runs perpendicular to the line,
+      // not in every direction. Testing the centre with hw as a RADIUS pulled
+      // the ends back by the ribbon's own thickness — and hw varies with tone,
+      // so each wedge stopped a different distance short of the band line
+      // instead of meeting it. Test the two real edges (and the centre, for a
+      // ribbon thick enough to straddle a division) instead.
+      const okAt = p => {
+        const off = keepMode ? [0] : [0, 1, -1];
+        for (const sgn of off) {
+          const ex = p.cx + sgn * p.hw * nx, ey = p.cy + sgn * p.hw * ny;
+          if (!insideEdgeMargin(_lrG, ex / mmToPx, hMm - ey / mmToPx, 0)) return false;
+        }
+        return true;
+      };
+      // Land the cut ON the band line rather than at the previous sample: the
+      // step along a line is up to 2.5% of the pitch, which is a visible gap.
+      const edgePt = (good, bad) => {
+        let lo = 0, hi = 1, mid = null;
+        for (let k = 0; k < 14; k++) {
+          const t = (lo + hi) / 2;
+          const q = { cx: good.cx + (bad.cx - good.cx) * t,
+                      cy: good.cy + (bad.cy - good.cy) * t,
+                      hw: good.hw + (bad.hw - good.hw) * t };
+          if (okAt(q)) { lo = t; mid = q; } else hi = t;
+        }
+        return mid;
+      };
+
       const trimmed = [];
       for (const row of lineRows) {
         let run = [];
-        for (const p of row) {
-          const ok = insideEdgeMargin(_lrG, p.cx / mmToPx, hMm - p.cy / mmToPx,
-                                      _lrKeepMode ? 0 : p.hw / mmToPx);
-          if (ok) run.push(p);
-          else { if (run.length > 1) trimmed.push(run); run = []; }
+        for (let i = 0; i < row.length; i++) {
+          const p = row[i];
+          if (okAt(p)) {
+            if (!run.length && i > 0) {                 // entering the panel
+              const e = edgePt(p, row[i - 1]); if (e) run.push(e);
+            }
+            run.push(p);
+          } else if (run.length) {                      // leaving it
+            const e = edgePt(run[run.length - 1], p); if (e) run.push(e);
+            if (run.length > 1) trimmed.push(run);
+            run = [];
+          }
         }
         if (run.length > 1) trimmed.push(run);
       }
@@ -4589,10 +4635,10 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
         }
         if (mr < _lrMinR) continue;
         const _lms = { x: mx, y: my, r: mr, rMm: mrMm, frac: mt };
-        const _lmk = edgeMarginClip(_lrMg, _lms, S.mixPat, S.mixPatRot, _lrMmToPx, workHmm());
+        const _lmk = edgeMarginClip(_lrMg, _lms, S.mixPat, S.mixPatRot, _lrMmToPx, workHmm(), mixShapeSrc());
         if (!_lmk) continue;
-        if (_lmk !== true) _lms.poly = _lmk;
-        mixShapes.push(_lms);
+        if (_lmk === true) mixShapes.push(_lms);
+        else for (const poly of _lmk) mixShapes.push(Object.assign({}, _lms, { poly }));
       }
     }
     S.mixShapes = mixShapes;
@@ -4763,6 +4809,60 @@ function edgeCellRect(g, xMm, yMm) {
   return (r.x1 > r.x0 && r.y1 > r.y0) ? r : null;
 }
 
+// Every panel's usable rectangle that a box (sheet mm) actually touches. A
+// shape sitting across a division belongs to BOTH panels — clipping it only to
+// the one its centre fell in threw the other half away.
+function edgeCellsFor(g, x0, y0, x1, y1) {
+  const out = [];
+  for (let i = 0; i < g.xs.length - 1; i++) {
+    const cx0 = g.xs[i] + g.m, cx1 = g.xs[i+1] - g.m;
+    if (!(cx1 > cx0) || cx1 <= x0 + 1e-6 || cx0 >= x1 - 1e-6) continue;
+    for (let j = 0; j < g.ys.length - 1; j++) {
+      const cy0 = g.ys[j] + g.m, cy1 = g.ys[j+1] - g.m;
+      if (!(cy1 > cy0) || cy1 <= y0 + 1e-6 || cy0 >= y1 - 1e-6) continue;
+      out.push({ x0: cx0, y0: cy0, x1: cx1, y1: cy1 });
+    }
+  }
+  return out;
+}
+
+// How far the shape's OUTLINE really reaches, in canvas pixels.
+//
+// Only a circle reaches exactly r in every direction. A square's corners are at
+// r on both axes, so rotate it and the box grows to r*1.414 — which is how a
+// rotated square ended up sitting 7 mm inside a band the radius test said it
+// cleared. Circles were the only pattern the old test got right.
+function shapeBoxPx(s, pat, rot, src) {
+  const box = { x0: s.x - s.r, x1: s.x + s.r, y0: s.y - s.r, y1: s.y + s.r };
+  if (pat === 'circle' || pat === 'dot') return box;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  const eat = (x, y) => {
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  };
+  if (pat === 'imgshape') {
+    // A traced outline is normalised into a SQUARE, so its corners reach
+    // r*1.414 as well — and every sub-path counts, not just the first one
+    // getShapePoints() hands back.
+    const store = src || ((typeof IMGSHAPE !== 'undefined') ? IMGSHAPE : null);
+    const np = store && store.normPaths;
+    if (!np || !np.length) return box;
+    const rotId = (store === (typeof MIXSHAPE !== 'undefined' ? MIXSHAPE : null)) ? 'mxRot' : 'shRot';
+    const a = (rot || 0) * Math.PI / 180 +
+              (parseInt(($(rotId) || {}).value) || 0) * Math.PI / 180;
+    const c2 = Math.cos(a), s2 = Math.sin(a);
+    for (const path of np) for (const pt of (path || []))
+      eat(s.x + (pt.x*c2 - pt.y*s2) * s.r, s.y + (pt.x*s2 + pt.y*c2) * s.r);
+    return isFinite(x0) ? { x0, x1, y0, y1 } : box;
+  }
+  const pts = getShapePoints(s.x, s.y, s.r, pat, rot, src);
+  // Letters return no usable polygon here; the radius box is the honest
+  // fallback, and it matches the size the glyph is stamped at.
+  if (!pts || pts.length < 3) return box;
+  for (const [x, y] of pts) eat(x, y);
+  return { x0, x1, y0, y1 };
+}
+
 // Sutherland–Hodgman: clip a closed polygon to an axis-aligned rectangle.
 // Space-agnostic — the polygon and the rectangle just have to agree.
 function _clipPolyRect(pts, x0, y0, x1, y1) {
@@ -4810,29 +4910,46 @@ function _circleAsPoly(x, y, r) {
 // Decide what the band does to one shape. Returns true (keep whole), false
 // (drop), or the clipped outline in CANVAS pixels — the space every consumer
 // already knows how to convert from.
-function edgeMarginClip(g, s, pat, rot, mmToPx, hMm) {
+function edgeMarginClip(g, s, pat, rot, mmToPx, hMm, src) {
   if (!g || !(g.m > 0)) return true;
   const xMm = s.x / mmToPx, yMm = hMm - s.y / mmToPx, rMm = s.r / mmToPx;
   const mode = S.edgeMarginMode || 'remove';
   // 'keep' judges the centre only, so shapes may overhang into the band.
   if (mode === 'keep') return insideEdgeMargin(g, xMm, yMm, 0);
-  if (insideEdgeMargin(g, xMm, yMm, rMm)) return true;   // already clear
+
+  // Cheap accept first: no pattern reaches further than r*sqrt(2) from its
+  // centre, so anything clearing the band by that much needs no outline built.
+  // Most shapes take this path, which keeps the cost off the dense interior.
+  if (insideEdgeMargin(g, xMm, yMm, rMm * 1.45)) return true;
+
+  // Otherwise measure the outline itself — the radius is only exact for a circle.
+  const b = shapeBoxPx(s, pat, rot, src);
+  const bx0 = b.x0 / mmToPx,       bx1 = b.x1 / mmToPx;
+  const by0 = hMm - b.y1 / mmToPx, by1 = hMm - b.y0 / mmToPx;   // canvas Y down -> sheet Y up
+
+  const cells = edgeCellsFor(g, bx0, by0, bx1, by1);
+  for (const c of cells) {
+    if (bx0 >= c.x0 - 1e-6 && bx1 <= c.x1 + 1e-6 &&
+        by0 >= c.y0 - 1e-6 && by1 <= c.y1 + 1e-6) return true;   // clear of every band
+  }
   if (mode !== 'crop' || !edgeCropSupported(pat)) return false;
 
-  const rect = edgeCellRect(g, xMm, yMm);
-  if (!rect) return false;
-  const src = (pat === 'circle' || pat === 'dot')
+  const outline = (pat === 'circle' || pat === 'dot')
     ? _circleAsPoly(s.x, s.y, s.r)
-    : getShapePoints(s.x, s.y, s.r, pat, rot);
-  if (!src || src.length < 3) return false;
-  // mm -> canvas pixels. Sheet Y runs up, the canvas runs down, so the
-  // rectangle's top and bottom swap over.
-  const X0 = rect.x0 * mmToPx,        X1 = rect.x1 * mmToPx;
-  const Y0 = (hMm - rect.y1) * mmToPx, Y1 = (hMm - rect.y0) * mmToPx;
-  const out = _clipPolyRect(src, X0, Y0, X1, Y1);
-  if (out.length < 3) return false;                       // nothing survived
-  out.push(out[0].slice());                               // closed, like getShapePoints
-  return out;
+    : getShapePoints(s.x, s.y, s.r, pat, rot, src);
+  if (!outline || outline.length < 3) return false;
+  // One piece per panel the shape reaches into. mm -> canvas pixels; sheet Y
+  // runs up and the canvas runs down, so the rectangle's top and bottom swap.
+  const out = [];
+  for (const c of cells) {
+    const X0 = c.x0 * mmToPx,        X1 = c.x1 * mmToPx;
+    const Y0 = (hMm - c.y1) * mmToPx, Y1 = (hMm - c.y0) * mmToPx;
+    const piece = _clipPolyRect(outline, X0, Y0, X1, Y1);
+    if (piece.length < 3) continue;                       // nothing survived here
+    piece.push(piece[0].slice());                         // closed, like getShapePoints
+    out.push(piece);
+  }
+  return out.length ? out : false;
 }
 
 // The outline to draw or export for one shape, in canvas pixels. A cropped
