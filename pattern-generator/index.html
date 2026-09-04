@@ -3725,7 +3725,7 @@ function generateSpecialXYPattern(o, emit) {
 // first line, and in every export filename — so a file and a screenshot
 // always say which build produced them. Several rounds have been lost
 // analysing output from a stale copy of this page.
-const BUILD_TAG = '27Aug-b40';
+const BUILD_TAG = '27Aug-b41';
 
 const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
 function updateSpacingNote() {
@@ -4538,51 +4538,98 @@ function _generateLineRaster(W, H, spacingPx, minRpx, maxRpx, bright, isBlank) {
       // trim. Only 'keep' differs: it lets the ribbon's width overhang.
       const keepMode = (S.edgeMarginMode === 'keep');
 
-      // A scan line is a RIBBON: its half-width runs perpendicular to the line,
-      // not in every direction. Testing the centre with hw as a RADIUS pulled
-      // the ends back by the ribbon's own thickness — and hw varies with tone,
-      // so each wedge stopped a different distance short of the band line
-      // instead of meeting it. Test the two real edges (and the centre, for a
-      // ribbon thick enough to straddle a division) instead.
-      const okAt = p => {
-        const off = keepMode ? [0] : [0, 1, -1];
-        for (const sgn of off) {
-          const ex = p.cx + sgn * p.hw * nx, ey = p.cy + sgn * p.hw * ny;
-          if (!insideEdgeMargin(_lrG, ex / mmToPx, hMm - ey / mmToPx, 0)) return false;
-        }
-        return true;
+      // A scan line is a RIBBON, and the band cuts ACROSS its width. Judging a
+      // point by whether its edges are clear only ever answers keep-or-drop, so
+      // wherever the ribbon was too thick the whole chunk disappeared and only
+      // the thin tips survived — a band line running parallel to the lines ate
+      // holes out of the row instead of cutting it flat.
+      //
+      // The ribbon is symmetric about its centre, so the surviving part of the
+      // width is still a straight segment: clip the thickness to the panel and
+      // hand back a NEW centre and half-width. That keeps the (cx, cy, hw)
+      // shape every consumer downstream already reads, and the ribbon comes out
+      // with a flat edge along the band line.
+      const clipT = (p, X0, Y0, X1, Y1) => {
+        let t0 = -p.hw, t1 = p.hw;
+        const lim = (den, num) => {              // den*t <= num  (Liang–Barsky)
+          if (Math.abs(den) < 1e-12) return num >= 0;
+          const t = num / den;
+          if (den > 0) { if (t < t1) t1 = t; } else if (t > t0) t0 = t;
+          return t0 <= t1;
+        };
+        if (!lim(-nx, p.cx - X0)) return null;
+        if (!lim( nx, X1 - p.cx)) return null;
+        if (!lim(-ny, p.cy - Y0)) return null;
+        if (!lim( ny, Y1 - p.cy)) return null;
+        if (!(t1 - t0 > 1e-9)) return null;
+        const mid = (t0 + t1) / 2;
+        return { cx: p.cx + nx * mid, cy: p.cy + ny * mid, hw: (t1 - t0) / 2 };
       };
-      // Land the cut ON the band line rather than at the previous sample: the
-      // step along a line is up to 2.5% of the pitch, which is a visible gap.
-      const edgePt = (good, bad) => {
-        let lo = 0, hi = 1, mid = null;
+      const lerp = (a, b, t) => ({ cx: a.cx + (b.cx - a.cx) * t,
+                                   cy: a.cy + (b.cy - a.cy) * t,
+                                   hw: a.hw + (b.hw - a.hw) * t });
+      // Land the end of a run ON the band line rather than at the previous
+      // sample: the step along a line is up to 2.5% of the pitch.
+      const edgePt = (good, bad, R) => {
+        let lo = 0, hi = 1, best = null;
         for (let k = 0; k < 14; k++) {
           const t = (lo + hi) / 2;
-          const q = { cx: good.cx + (bad.cx - good.cx) * t,
-                      cy: good.cy + (bad.cy - good.cy) * t,
-                      hw: good.hw + (bad.hw - good.hw) * t };
-          if (okAt(q)) { lo = t; mid = q; } else hi = t;
+          const q = clipT(lerp(good, bad, t), R[0], R[1], R[2], R[3]);
+          if (q) { lo = t; best = q; } else hi = t;
         }
-        return mid;
+        return best;
       };
 
       const trimmed = [];
-      for (const row of lineRows) {
-        let run = [];
-        for (let i = 0; i < row.length; i++) {
-          const p = row[i];
-          if (okAt(p)) {
-            if (!run.length && i > 0) {                 // entering the panel
-              const e = edgePt(p, row[i - 1]); if (e) run.push(e);
-            }
-            run.push(p);
-          } else if (run.length) {                      // leaving it
-            const e = edgePt(run[run.length - 1], p); if (e) run.push(e);
-            if (run.length > 1) trimmed.push(run);
-            run = [];
+      if (keepMode) {
+        // Centre-line only, width free to overhang — unchanged behaviour.
+        for (const row of lineRows) {
+          let run = [];
+          for (const p of row) {
+            if (insideEdgeMargin(_lrG, p.cx / mmToPx, hMm - p.cy / mmToPx, 0)) run.push(p);
+            else { if (run.length > 1) trimmed.push(run); run = []; }
+          }
+          if (run.length > 1) trimmed.push(run);
+        }
+      } else {
+        // One ribbon per panel the row crosses, so a row spanning a division
+        // comes back as two ribbons rather than one with a bite taken out.
+        const cells = [];
+        for (let i = 0; i < _lrG.xs.length - 1; i++) {
+          for (let j = 0; j < _lrG.ys.length - 1; j++) {
+            const x0 = _lrG.xs[i] + _lrG.m, x1 = _lrG.xs[i+1] - _lrG.m;
+            const y0 = _lrG.ys[j] + _lrG.m, y1 = _lrG.ys[j+1] - _lrG.m;
+            if (x1 > x0 && y1 > y0)
+              cells.push([x0 * mmToPx, (hMm - y1) * mmToPx, x1 * mmToPx, (hMm - y0) * mmToPx]);
           }
         }
-        if (run.length > 1) trimmed.push(run);
+        for (const row of lineRows) {
+          // cheap reject: the row's own box against the panel's
+          let rx0 = Infinity, rx1 = -Infinity, ry0 = Infinity, ry1 = -Infinity;
+          for (const p of row) {
+            const e = Math.abs(p.hw);
+            rx0 = Math.min(rx0, p.cx - e); rx1 = Math.max(rx1, p.cx + e);
+            ry0 = Math.min(ry0, p.cy - e); ry1 = Math.max(ry1, p.cy + e);
+          }
+          for (const R of cells) {
+            if (R[0] > rx1 || R[2] < rx0 || R[1] > ry1 || R[3] < ry0) continue;
+            let run = [], lastGood = -1;
+            for (let i = 0; i < row.length; i++) {
+              const q = clipT(row[i], R[0], R[1], R[2], R[3]);
+              if (q) {
+                if (!run.length && i > 0) {
+                  const e = edgePt(row[i], row[i - 1], R); if (e) run.push(e);
+                }
+                run.push(q); lastGood = i;
+              } else if (run.length) {
+                const e = edgePt(row[lastGood], row[i], R); if (e) run.push(e);
+                if (run.length > 1) trimmed.push(run);
+                run = [];
+              }
+            }
+            if (run.length > 1) trimmed.push(run);
+          }
+        }
       }
       lineRows.length = 0;
       for (const r of trimmed) lineRows.push(r);
