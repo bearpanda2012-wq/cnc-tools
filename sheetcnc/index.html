@@ -231,10 +231,29 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g48</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g58</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
-  <button class="btn btn-ghost btn-sm" onclick="exportExcel()">📊 Excel</button>
-  <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ Print</button>
+  <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
+  <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
+  <input type="file" id="projFi" accept=".json,.sheetcnc,.sheetcnc.json" style="display:none" onchange="openProjectFile(this.files[0])">
+  <button class="btn btn-ghost btn-sm" id="btnUndo" onclick="undoAction()" title="ย้อนกลับ (Ctrl+Z)" style="min-width:34px;">↶</button>
+  <button class="btn btn-ghost btn-sm" id="btnRedo" onclick="redoAction()" title="เดินหน้า (Ctrl+Y)" style="min-width:34px;">↷</button>
+  <div style="position:relative;display:inline-block;">
+    <button class="btn btn-ghost btn-sm" onclick="toggleExportMenu(event)">⬇️ <span data-i18n="exportMenuBtn">Export ไฟล์</span> ▾</button>
+    <div id="exportMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:600;
+         background:var(--card,#1b1e2e);border:1px solid var(--border,#3a3f5c);border-radius:10px;
+         box-shadow:0 12px 34px #000a;min-width:252px;padding:6px;text-align:left;">
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportExcel()">📊 Excel (.xlsx)</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportCSV()">📄 CSV รายการตัด (.csv)</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportDXFmenu()">📐 DXF รวมทุก Layout</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportSVG()">✒️ SVG (layout ที่เปิดอยู่)</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportImage('png')">🖼️ รูปภาพ PNG</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportImage('jpg')">🖼️ รูปภาพ JPG</button>
+      <div style="height:1px;background:var(--border,#3a3f5c);margin:5px 3px;"></div>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportProjectMenu()">💾 ไฟล์โปรเจกต์ (.json)</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="printMenu()">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
+    </div>
+  </div>
   <button class="btn btn-danger btn-sm" id="resetBtn" onclick="resetAll()" data-i18n="resetBtn">🗑️ รีเซ็ต</button>
   <button class="btn btn-ghost btn-sm" id="langBtn" onclick="toggleLang()" style="font-weight:800;letter-spacing:.5px;min-width:68px;">🌐 EN</button>
 </div>
@@ -249,11 +268,11 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
     <div class="sg">
       <div class="field">
         <label data-i18n="sheetW">ความกว้างแผ่น (mm)</label>
-        <input type="number" id="sw" value="1200" min="1" onchange="saveSettings()">
+        <input type="number" id="sw" value="1200" min="1" onchange="updateOrientUI();saveSettings()">
       </div>
       <div class="field">
         <label data-i18n="sheetH">ความสูงแผ่น (mm)</label>
-        <input type="number" id="sh" value="2400" min="1" onchange="saveSettings()">
+        <input type="number" id="sh" value="2400" min="1" onchange="updateOrientUI();saveSettings()">
       </div>
       <div class="field">
         <label data-i18n="preset">Preset ขนาดแผ่น</label>
@@ -268,12 +287,27 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
         </select>
       </div>
       <div class="field">
+        <label data-i18n="sheetOrient">แนวแผ่น</label>
+        <div style="display:flex;gap:6px;">
+          <button type="button" id="orientV" class="btn btn-sm btn-ghost" onclick="setSheetOrient('portrait')"
+            style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;">
+            <span style="display:inline-block;width:11px;height:16px;border:2px solid currentColor;border-radius:2px;"></span>
+            <span data-i18n="orientV">แนวตั้ง</span>
+          </button>
+          <button type="button" id="orientH" class="btn btn-sm btn-ghost" onclick="setSheetOrient('landscape')"
+            style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;">
+            <span style="display:inline-block;width:16px;height:11px;border:2px solid currentColor;border-radius:2px;"></span>
+            <span data-i18n="orientH">แนวนอน</span>
+          </button>
+        </div>
+      </div>
+      <div class="field">
         <label data-i18n="edgeMargin">ระยะห่างขอบแผ่นวัสดุ (mm)</label>
-        <input type="number" id="kerf" value="3" min="0" step="0.5" onchange="saveSettings()">
+        <input type="number" id="kerf" value="5" min="0" step="0.5" onchange="saveSettings()">
       </div>
       <div class="field">
         <label data-i18n="pieceGap">ระยะห่างชิ้นงาน (mm)</label>
-        <input type="number" id="pieceGap" value="3" min="0" step="0.5" onchange="saveSettings()">
+        <input type="number" id="pieceGap" value="5" min="0" step="0.5" onchange="saveSettings()">
       </div>
       <div class="field">
         <label data-i18n="stlUnitLbl">หน่วยของไฟล์ STL / OBJ</label>
@@ -306,9 +340,9 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       <div class="field">
         <label data-i18n="startCorner">จุดเริ่มจัดเรียงชิ้นงาน</label>
         <select id="startCorner" onchange="saveSettings()" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:.82rem;">
-          <option value="TL" selected data-i18n="cornerTL">มุมซ้ายบน ↖</option>
+          <option value="TL" data-i18n="cornerTL">มุมซ้ายบน ↖</option>
           <option value="TR" data-i18n="cornerTR">มุมขวาบน ↗</option>
-          <option value="BL" data-i18n="cornerBL">มุมซ้ายล่าง ↙</option>
+          <option value="BL" selected data-i18n="cornerBL">มุมซ้ายล่าง ↙</option>
           <option value="BR" data-i18n="cornerBR">มุมขวาล่าง ↘</option>
         </select>
       </div>
@@ -336,6 +370,31 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       <input type="file" id="mdxfFi" accept=".dxf,.svg,.eps,.ai,.pdf" style="display:none" onchange="handleMdxfFile(this.files[0])">
     </div>
     <div id="mdxfResult" class="mdxf-result" style="display:none;"></div>
+  </div>
+
+  <!-- Piece list from a spreadsheet -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" data-i18n="xlsImportTitle">📊 นำเข้ารายการชิ้นงานจาก Excel / CSV / ไฟล์รูป</div>
+      <span class="badge badge-accent" style="background:#2a9d8f;">NEW</span>
+    </div>
+    <div class="notice" style="margin-bottom:10px;">
+      📋 ทำตารางแค่ <b>ชื่อ · กว้าง · ยาว · จำนวน</b> แล้วลากไฟล์มาวาง โปรแกรมจะสร้างชิ้นงานสี่เหลี่ยมให้ตามขนาดและจำนวน
+      &nbsp;|&nbsp; หัวตารางเป็นไทยหรืออังกฤษก็ได้ &nbsp;|&nbsp; เขียนรวมเป็น <b>400x300</b> ในช่องเดียวก็อ่านออก
+      <br>📷 <b>ถ่ายรูปตารางมาก็ได้</b> — โปรแกรมจะอ่านตัวเลขจากรูป แยกเองว่าช่องไหนคือขนาด ช่องไหนคือจำนวน แล้วให้แก้ในตารางก่อนเพิ่มได้ (ครั้งแรกต้องต่อเน็ตเพื่อโหลดตัวอ่าน)
+      &nbsp;|&nbsp; <a href="#" onclick="downloadXlsTemplate();return false;" style="color:var(--accent);font-weight:700;">⬇️ ดาวน์โหลดไฟล์ตัวอย่าง</a>
+    </div>
+    <div class="dxf-import-drop" id="xlsDrop"
+      onclick="document.getElementById('xlsFi').click()"
+      ondragover="this.classList.add('dragover');event.preventDefault()"
+      ondragleave="this.classList.remove('dragover')"
+      ondrop="handleXlsDrop(event)">
+      <div class="ico">📊</div>
+      <p>คลิกหรือลากไฟล์ตาราง <b>หรือรูปถ่ายตาราง</b> มาวาง</p>
+      <p style="font-size:.74rem;margin-top:4px;">ตาราง: <b>.xlsx &nbsp;.csv &nbsp;.tsv</b> &nbsp;|&nbsp; รูป: <b>.jpg &nbsp;.png &nbsp;.webp</b> (อ่านตัวเลขด้วย OCR)</p>
+      <input type="file" id="xlsFi" accept=".xlsx,.csv,.tsv,.txt,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" style="display:none" onchange="handleXlsFile(this.files[0])">
+    </div>
+    <div id="xlsResult" style="display:none;margin-top:12px;"></div>
   </div>
 
   <!-- Pieces -->
@@ -485,6 +544,9 @@ const TR = {
     emptyPieces:'กด "+ เพิ่มชิ้นงาน" หรือ "ตัวอย่าง" เพื่อเริ่มต้น',
     resultTitle:'📊 ผลการคำนวณ',
     layoutTitle:'✂️ การคำนวณแผ่น',
+    sheetOrient:'แนวแผ่น', orientV:'แนวตั้ง', orientH:'แนวนอน',
+    saveBtn:'บันทึก', openBtn:'เปิดงาน', exportMenuBtn:'Export ไฟล์',
+    xlsImportTitle:'📊 นำเข้ารายการชิ้นงานจาก Excel / CSV / ไฟล์รูป',
     exportAllBtn:'⬇️ Export DXF รวมทุก Layout',
     detailTitle:'รายละเอียด Layout',
     exportBtn:'⬇️ Export DXF Layout นี้', closeBtn:'✕ ปิด',
@@ -551,6 +613,9 @@ const TR = {
     emptyPieces:'Click "+ Add Piece" or "Demo" to get started',
     resultTitle:'📊 Results',
     layoutTitle:'✂️ Sheet Layout',
+    sheetOrient:'Sheet orientation', orientV:'Portrait', orientH:'Landscape',
+    saveBtn:'Save', openBtn:'Open', exportMenuBtn:'Export',
+    xlsImportTitle:'📊 Import piece list from Excel / CSV / Image',
     exportAllBtn:'⬇️ Export DXF All Layouts (Combined)',
     detailTitle:'Layout Detail',
     exportBtn:'⬇️ Export DXF This Layout', closeBtn:'✕ Close',
@@ -601,15 +666,43 @@ function applyPreset(val) {
   if (!val) return;
   const [w, h] = val.split(',').map(Number);
   if (!w || !h) return;
+  const keep = sheetOrient();          // picking a size must not flip the sheet over
   document.getElementById('sw').value = w;
   document.getElementById('sh').value = h;
+  setSheetOrient(keep);
   saveSettings();
 }
 
-function saveSettings() {
-  // No-op persistence placeholder — settings live in the DOM
-  // Called on every input change so applyPreset can chain into it
+// ─── Sheet orientation ────────────────────────────────
+// Same material either way — which side is the long one decides how parts pack,
+// so it is a swap of width and height, not a new setting the engine has to know.
+function sheetOrient(){
+  const we=document.getElementById('sw'), he=document.getElementById('sh');
+  const w=+((we&&we.value)||0), h=+((he&&he.value)||0);
+  return w>h ? 'landscape' : 'portrait';        // square reads as portrait
 }
+function setSheetOrient(o){
+  const we=document.getElementById('sw'), he=document.getElementById('sh');
+  if(!we||!he) return;
+  const w=+we.value, h=+he.value;
+  if(!(w>0)||!(h>0)) return;
+  const lo=Math.min(w,h), hi=Math.max(w,h);
+  we.value = o==='landscape' ? hi : lo;
+  he.value = o==='landscape' ? lo : hi;
+  updateOrientUI();
+  saveSettings();
+}
+function updateOrientUI(){
+  const o=sheetOrient();
+  [['orientV','portrait'],['orientH','landscape']].forEach(([id,val])=>{
+    const b=document.getElementById(id);
+    if(!b||!b.classList||!b.classList.toggle) return;
+    b.classList.toggle('btn-primary', o===val);
+    b.classList.toggle('btn-ghost',  o!==val);
+  });
+}
+
+function saveSettings(){ histPush('settings'); }  // fires on every settings input
 
 function toggleLang() {
   lang = lang === 'th' ? 'en' : 'th';
@@ -644,7 +737,7 @@ let nestResult = null;
 let activeSheet = 0;
 let _pid = 0;
 const uid = () => 'p' + (++_pid);
-function savePieces() { /* state lives in memory — no-op */ }
+function savePieces(){ histPush('pieces'); }   // every mutation already calls this
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function unitFactor(){ const u=document.getElementById('stlUnit')?.value||'mm'; return u==='cm'?10:u==='m'?1000:(u==='in'||u==='inch')?25.4:1; }
 
@@ -3471,6 +3564,619 @@ function mdxfAddSelected() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  SPREADSHEET IMPORT  (.xlsx / .csv / .tsv)
+// ═══════════════════════════════════════════════════════
+// .xlsx is just a ZIP of XML files, and this app already carries a pure-JS
+// DEFLATE decoder for the PDF/AI path — so the sheet is read in the browser with
+// no library and the app stays one offline file.
+
+/** Minimal ZIP reader → {entryName: Uint8Array}. Stored + deflate only. */
+function _unzip(bytes){
+  const dv=new DataView(bytes.buffer, bytes.byteOffset, bytes.length);
+  const u32=o=>dv.getUint32(o,true), u16=o=>dv.getUint16(o,true);
+  let eo=-1;                                   // end-of-central-directory record
+  for(let i=bytes.length-22; i>=0 && i>bytes.length-22-65536; i--)
+    if(u32(i)===0x06054b50){ eo=i; break; }
+  if(eo<0) throw new Error('อ่านไฟล์ไม่ได้ — ไม่ใช่ .xlsx ที่ถูกต้อง');
+  const n=u16(eo+10); let p=u32(eo+16); const out={};
+  const td=new TextDecoder('utf-8');
+  for(let k=0;k<n && p+46<=bytes.length;k++){
+    if(u32(p)!==0x02014b50) break;
+    const method=u16(p+10), csize=u32(p+20), nameLen=u16(p+28),
+          extraLen=u16(p+30), cmtLen=u16(p+32), lho=u32(p+42);
+    const name=td.decode(bytes.subarray(p+46, p+46+nameLen));
+    const dstart=lho+30+u16(lho+26)+u16(lho+28);   // skip the LOCAL header's own fields
+    const raw=bytes.subarray(dstart, dstart+csize);
+    try{ out[name]= method===0 ? raw : _inflateRawJS(raw,0); }catch(e){}
+    p+=46+nameLen+extraLen+cmtLen;
+  }
+  return out;
+}
+
+function _xmlDec(s){
+  return String(s)
+    .replace(/&#x([0-9a-fA-F]+);/g,(m,h)=>String.fromCodePoint(parseInt(h,16)))
+    .replace(/&#(\d+);/g,(m,d)=>String.fromCodePoint(+d))
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');
+}
+
+/** First worksheet of an .xlsx as a 2D array of strings. */
+function _xlsxRows(bytes){
+  const z=_unzip(bytes), td=new TextDecoder('utf-8');
+  const txt=n=>z[n]?td.decode(z[n]):'';
+  const shared=[];
+  const ss=txt('xl/sharedStrings.xml');
+  if(ss) for(const m of ss.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)){
+    let v=''; for(const t of m[1].matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)) v+=t[1];
+    shared.push(_xmlDec(v));
+  }
+  // workbook.xml names the first sheet, its rels file says which XML that is
+  let path='';
+  const wb=txt('xl/workbook.xml'), rels=txt('xl/_rels/workbook.xml.rels');
+  const sm=wb.match(/<sheet\b[^>]*?\/?>/);
+  if(sm){
+    const rid=(sm[0].match(/r:id="([^"]+)"/)||[])[1];
+    if(rid){
+      const rm=rels.match(new RegExp('<Relationship[^>]*Id="'+rid+'"[^>]*>'));
+      let tgt=rm?((rm[0].match(/Target="([^"]+)"/)||[])[1]||''):'';
+      if(tgt) path='xl/'+tgt.replace(/^\/?xl\//,'').replace(/^\//,'');
+    }
+  }
+  if(!z[path]) path=Object.keys(z).find(k=>/^xl\/worksheets\/[^\/]+\.xml$/i.test(k))||'';
+  if(!path) throw new Error('ไม่พบชีตในไฟล์ .xlsx');
+  const sheet=txt(path);
+  const colOf=ref=>{ let c=0; for(const ch of ref){ const u=ch.charCodeAt(0);
+    if(u>=65&&u<=90) c=c*26+(u-64); else break; } return c-1; };
+  const rows=[];
+  for(const rm of sheet.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)){
+    const cells=[];
+    for(const cm of rm[1].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
+      const attr=cm[1]||'', body=cm[2]||'';
+      const ref=(attr.match(/r="([A-Z]+)\d+"/)||[])[1];
+      const ci=ref?colOf(ref):cells.length;
+      const ty=(attr.match(/t="([^"]+)"/)||[])[1]||'n';
+      let val='';
+      if(ty==='inlineStr'){
+        for(const t of body.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)) val+=t[1];
+        val=_xmlDec(val);
+      } else {
+        const v=body.match(/<v>([\s\S]*?)<\/v>/); val=v?_xmlDec(v[1]):'';
+        if(ty==='s'){ const i=+val; val=shared[i]!==undefined?shared[i]:''; }
+      }
+      while(cells.length<ci) cells.push('');
+      cells[ci]=val;
+    }
+    rows.push(cells);
+  }
+  return rows;
+}
+
+/** CSV/TSV → 2D array. Delimiter is detected; quoted fields and "" are handled. */
+function _csvRows(text){
+  text=String(text).replace(/^﻿/,'');
+  const head=(text.split(/\r?\n/).find(l=>l.trim())||'');
+  const cnt=ch=>head.split(ch).length-1;
+  let d=',', best=cnt(',');
+  [['\t',cnt('\t')],[';',cnt(';')],['|',cnt('|')]].forEach(([c,n])=>{ if(n>best){best=n;d=c;} });
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=c;
+    }
+    else if(c==='"') q=true;
+    else if(c===d){ row.push(cur); cur=''; }
+    else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+    else if(c!=='\r') cur+=c;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+
+// Header names understood, Thai and English.
+const XLS_KEYS={
+  name:['ชื่อ','ชื่องาน','ชื่อชิ้น','ชื่อชิ้นงาน','ชื่อรายการ','ชื่อแบบ','ชื่อสินค้า','รายการ','ชิ้นงาน','งาน','แบบ','สินค้า',
+        'name','item','part','piece','panel','product','description','desc','label','title'],
+  w  :['กว้าง','ความกว้าง','ด้านกว้าง','w','width','wide','x'],
+  h  :['ยาว','ความยาว','ด้านยาว','สูง','ความสูง','h','height','length','len','long','depth','y'],
+  qty:['จำนวน','จน','จำนวนชิ้น','ชิ้น','qty','quantity','pcs','pc','count','amount','ea'],
+  size:['ขนาด','ไซส์','ไซร์','size','dimension','dimensions','dim','wxh']
+};
+const _xnorm=s=>String(s==null?'':s).toLowerCase()
+  .replace(/\(.*?\)/g,'').replace(/[\s_\-.:·]/g,'')
+  .replace(/(มม|มิลลิเมตร|mm|ซม|cm|เมตร|m|นิ้ว|inch|in)$/,'').trim();
+
+/** Score a header cell against one field's keywords.
+ *  Exact beats "starts with" beats "contains", so a column headed "ชิ้นงาน"
+ *  is read as the NAME (exact) and not as the quantity (which owns "ชิ้น").
+ *  Plain equality used to be the only test, and a sheet headed "ชื่องาน"
+ *  matched nothing at all — the names silently became "ชิ้น 1, ชิ้น 2…". */
+function _xlsScore(v, words){
+  let best=0;
+  for(const a of words){
+    const k=_xnorm(a); if(!k) continue;
+    let sc=0;
+    if(v===k) sc=100;
+    else if(k.length>=2 && v.startsWith(k)) sc=60+k.length;
+    else if(k.length>=3 && v.includes(k)) sc=30+k.length;
+    if(sc>best) best=sc;
+  }
+  return best;
+}
+
+function _xlsMapHeader(row){
+  const map={}, score={};
+  (row||[]).forEach((c,i)=>{
+    const v=_xnorm(c); if(!v) return;
+    let bk='', bs=0;
+    for(const k in XLS_KEYS){
+      const sc=_xlsScore(v, XLS_KEYS[k]);
+      if(sc>bs){ bs=sc; bk=k; }
+    }
+    if(!bk) return;
+    if(map[bk]===undefined || bs>score[bk]){ map[bk]=i; score[bk]=bs; }
+  });
+  return map;
+}
+
+/** Rows → piece candidates. Each carries its own ok/why so the preview can
+ *  explain every skipped line instead of silently dropping it. */
+function _xlsToItems(rows, unit){
+  const U=({mm:1,cm:10,m:1000,inch:25.4})[unit]||1;
+  // A clean spreadsheet cell parses normally. A cell that came from a photo can
+  // read "5OO" or "l200", so anything with letters in it goes through the OCR
+  // digit repair instead of quietly parsing as 5.
+  const num=v=>{
+    const raw=String(v==null?'':v).trim();
+    const plain=parseFloat(raw.replace(/[, ]/g,''));
+    if(isFinite(plain) && !/[A-Za-zА-Яа-яก-๙|¦]/.test(raw)) return plain;
+    const fixed=_ocrNum(raw);
+    return isFinite(fixed) ? fixed : (isFinite(plain)?plain:NaN);
+  };
+  const pair=v=>{ const m=String(v==null?'':v).match(/(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)/i);
+    return m?[parseFloat(m[1].replace(',','.')), parseFloat(m[2].replace(',','.'))]:null; };
+  let hdr=-1, map={};
+  for(let i=0;i<Math.min(rows.length,12);i++){
+    const m=_xlsMapHeader(rows[i]);
+    if((m.w!==undefined&&m.h!==undefined)||m.size!==undefined){ hdr=i; map=m; break; }
+  }
+  const auto = hdr<0;
+  const out=[];
+  for(let i=(auto?0:hdr+1); i<rows.length; i++){
+    const r=rows[i]||[];
+    if(!r.some(c=>String(c==null?'':c).trim()!=='')) continue;   // blank line
+    let name='', w=NaN, h=NaN, q=1;
+    if(!auto){
+      if(map.name!==undefined) name=String(r[map.name]==null?'':r[map.name]).trim();
+      if(map.size!==undefined){ const p=pair(r[map.size]); if(p){ w=p[0]; h=p[1]; } }
+      if(map.w!==undefined && !(w>0)) w=num(r[map.w]);
+      if(map.h!==undefined && !(h>0)) h=num(r[map.h]);
+      if(map.qty!==undefined){ const n=num(r[map.qty]); if(isFinite(n)) q=n; }
+    } else {
+      const cells=r.map(c=>String(c==null?'':c).trim());
+      let k=0;
+      if(cells.length && isNaN(num(cells[0])) && !pair(cells[0])){ name=cells[0]; k=1; }
+      const p=pair(cells[k]);
+      if(p){ w=p[0]; h=p[1]; k++; } else { w=num(cells[k++]); h=num(cells[k++]); }
+      const n=num(cells[k]); if(isFinite(n)) q=n;
+    }
+    w=w*U; h=h*U;
+    q=Math.round(q);
+    const it={row:i+1, name, w:+(w.toFixed(3)), h:+(h.toFixed(3)), qty:q, ok:true, why:''};
+    if(!(w>0)||!(h>0)){ it.ok=false; it.why='ไม่มีขนาด'; }
+    else if(w>100000||h>100000){ it.ok=false; it.why='ขนาดเกินจริง'; }
+    else if(!(q>0)){ it.ok=false; it.why='จำนวนเป็น 0'; }
+    if(it.ok && !it.name) it.name='ชิ้น '+(out.filter(x=>x.ok).length+1);
+    out.push(it);
+  }
+  // identical name+size on several lines = one piece with the quantities summed
+  const merged=[], byKey={};
+  for(const it of out){
+    if(!it.ok){ merged.push(it); continue; }
+    const k=it.name+'|'+it.w+'|'+it.h;
+    if(byKey[k]){ byKey[k].qty+=it.qty; byKey[k].merged=(byKey[k].merged||1)+1; }
+    else { byKey[k]=it; merged.push(it); }
+  }
+  // keep the file's own column headings so the preview can show them verbatim
+  const labels={};
+  if(hdr>=0) for(const k in map){
+    const v=String((rows[hdr]||[])[map[k]]==null?'':(rows[hdr]||[])[map[k]]).trim();
+    if(v) labels[k]=v;
+  }
+  return {items:merged, hdr, auto, map, labels};
+}
+
+// ═══════════════════════════════════════════════════════
+//  IMAGE (OCR) → PIECE LIST
+// ═══════════════════════════════════════════════════════
+// A photo has no cells, so the table has to be rebuilt from where the words sit.
+// Word boxes give real columns; plain text is only the fallback.
+
+/** OCR mangles digits in predictable ways. Fix those before parsing a number. */
+function _ocrNum(t){
+  let s=String(t==null?'':t).trim()
+    .replace(/[oOоØ]/g,'0').replace(/[lI|¦]/g,'1').replace(/[·•]/g,'.')
+    .replace(/[SsＳ](?=\d)/g,'5').replace(/[บ]/g,'0');
+  s=s.replace(/(\d),(?=\d{3}(\D|$))/g,'$1');     // 1,200 → 1200
+  s=s.replace(/,/g,'.');                          // decimal comma
+  s=s.replace(/[^\d.]/g,'');
+  const parts=s.split('.');
+  if(parts.length>2) s=parts.shift()+'.'+parts.join('');
+  const n=parseFloat(s);
+  return isFinite(n)?n:NaN;
+}
+const _ocrIsNum=t=>isFinite(_ocrNum(t)) && /\d/.test(String(t));
+
+/** Words (with boxes) → a 2D table, using the widest line as the column ruler. */
+function _ocrWordsToRows(words){
+  const ws=(words||[]).filter(w=>w&&w.text&&String(w.text).trim()&&w.bbox);
+  if(!ws.length) return [];
+  // group into lines by vertical overlap
+  const byY=ws.slice().sort((a,b)=>(a.bbox.y0+a.bbox.y1)-(b.bbox.y0+b.bbox.y1));
+  const lines=[];
+  byY.forEach(w=>{
+    const mid=(w.bbox.y0+w.bbox.y1)/2, hgt=Math.max(4,w.bbox.y1-w.bbox.y0);
+    let L=lines.find(l=>Math.abs(l.mid-mid) < Math.max(hgt,l.h)*0.6);
+    if(!L){ L={mid, h:hgt, ws:[]}; lines.push(L); }
+    L.ws.push(w);
+    L.mid=(L.mid*(L.ws.length-1)+mid)/L.ws.length;
+    L.h=Math.max(L.h,hgt);
+  });
+  lines.forEach(l=>l.ws.sort((a,b)=>a.bbox.x0-b.bbox.x0));
+  lines.sort((a,b)=>a.mid-b.mid);
+  // column ruler: prefer a header line, else the line with the most words
+  const isHdrWord=t=>{ const v=_xnorm(t); if(!v) return false;
+    for(const k in XLS_KEYS) if(_xlsScore(v, XLS_KEYS[k])>=60) return true; return false; };
+  let ruler=lines.find(l=>l.ws.filter(w=>isHdrWord(w.text)).length>=2);
+  if(!ruler) ruler=lines.slice().sort((a,b)=>b.ws.length-a.ws.length)[0];
+  // merge ruler words that sit side by side into one column each
+  const cols=[];
+  ruler.ws.forEach(w=>{
+    const last=cols[cols.length-1];
+    if(last && w.bbox.x0-last.x1 < ruler.h*1.1){ last.x1=w.bbox.x1; last.txt+=' '+w.text; }
+    else cols.push({x0:w.bbox.x0, x1:w.bbox.x1, txt:String(w.text)});
+  });
+  if(cols.length<2) return [];
+  const centre=cols.map(c=>(c.x0+c.x1)/2);
+  const pick=w=>{
+    const c=(w.bbox.x0+w.bbox.x1)/2;
+    let bi=0, bd=Infinity;
+    // inside a column's own span wins outright; otherwise nearest centre
+    for(let i=0;i<cols.length;i++){
+      if(c>=cols[i].x0-2 && c<=cols[i].x1+2) return i;
+      const d=Math.abs(c-centre[i]); if(d<bd){ bd=d; bi=i; }
+    }
+    return bi;
+  };
+  return lines.map(l=>{
+    const cells=new Array(cols.length).fill('');
+    l.ws.forEach(w=>{ const i=pick(w); cells[i]=(cells[i]?cells[i]+' ':'')+String(w.text).trim(); });
+    return cells;
+  });
+}
+
+/** Plain OCR text → rows. Used when no word boxes came back. */
+function _ocrTextToRows(text){
+  const rows=[];
+  String(text||'').split(/\r?\n/).forEach(raw=>{
+    const line=raw.replace(/\s+/g,' ').trim();
+    if(!line) return;
+    const toks=line.split(' ');
+    if(toks.some(t=>{ const v=_xnorm(t); return v && Object.keys(XLS_KEYS).some(k=>_xlsScore(v,XLS_KEYS[k])>=60); })
+       && !toks.some(_ocrIsNum)){
+      rows.push(toks);                      // looks like the header line
+      return;
+    }
+    // "400x300" written as one token
+    const pm=line.match(/(\d[\d.,]*)\s*[x×*]\s*(\d[\d.,]*)/i);
+    // Whatever is not a number is the name. Matching digits with a regex left
+    // OCR spellings like "5OO" sitting inside the name.
+    const name=toks.filter(t=>!_ocrIsNum(t)).join(' ').replace(/\s+/g,' ').trim();
+    let nums=toks.filter(_ocrIsNum).map(_ocrNum).filter(n=>isFinite(n));
+    if(pm){ rows.push([name, _ocrNum(pm[1]), _ocrNum(pm[2]), nums.length?nums[nums.length-1]:1]); return; }
+    if(nums.length<2) return;               // not a data line
+    // a bare leading index ("1  ฝาบน  800 600 4") is not a dimension
+    if(nums.length>=4 && Number.isInteger(nums[0]) && nums[0]<=99 && nums[0]<nums[1]/5) nums=nums.slice(1);
+    const w=nums[0], h=nums[1];
+    const qty=nums.length>=3 ? nums[nums.length-1] : 1;
+    rows.push([name, w, h, qty]);
+  });
+  return rows;
+}
+
+let _tessP=null;
+function loadTesseract(){
+  if(typeof Tesseract!=='undefined') return Promise.resolve(Tesseract);
+  if(_tessP) return _tessP;
+  _tessP=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    s.onload=()=>typeof Tesseract!=='undefined'?res(Tesseract):rej(new Error('โหลดตัวอ่านรูปไม่สำเร็จ'));
+    s.onerror=()=>rej(new Error('โหลดตัวอ่านรูปไม่ได้ — ครั้งแรกต้องต่ออินเทอร์เน็ต'));
+    (document.head||document.documentElement).appendChild(s);
+  });
+  return _tessP;
+}
+
+/** Upscale + grey + contrast. Small or soft photos read far better this way. */
+function _ocrPrep(img){
+  const MINW=1500;
+  const sc=Math.min(3, Math.max(1, MINW/(img.naturalWidth||img.width||MINW)));
+  const cv=document.createElement('canvas');
+  cv.width=Math.round((img.naturalWidth||img.width)*sc);
+  cv.height=Math.round((img.naturalHeight||img.height)*sc);
+  const g=cv.getContext('2d');
+  g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';
+  g.drawImage(img,0,0,cv.width,cv.height);
+  try{
+    const d=g.getImageData(0,0,cv.width,cv.height), a=d.data;
+    let lo=255, hi=0;
+    for(let i=0;i<a.length;i+=4){
+      const v=(a[i]*0.299+a[i+1]*0.587+a[i+2]*0.114)|0;
+      a[i]=a[i+1]=a[i+2]=v; if(v<lo)lo=v; if(v>hi)hi=v;
+    }
+    const span=Math.max(1,hi-lo);
+    for(let i=0;i<a.length;i+=4){
+      let v=(a[i]-lo)*255/span;
+      v=v<0?0:v>255?255:v;
+      a[i]=a[i+1]=a[i+2]=v;
+    }
+    g.putImageData(d,0,0);
+  }catch(e){}
+  return cv;
+}
+
+function _xlsBusy(msg, pct){
+  const el=document.getElementById('xlsResult');
+  el.style.display='';
+  const bar = pct==null ? '' :
+    `<div style="height:6px;background:var(--border,#3a3f5c);border-radius:4px;overflow:hidden;margin-top:8px;">
+       <div style="height:100%;width:${Math.round(pct*100)}%;background:#2a9d8f;transition:width .2s;"></div></div>`;
+  el.innerHTML=`<div class="notice">⏳ ${esc(msg)}${bar}</div>`;
+}
+
+async function handleXlsImage(file){
+  xlsFileName=file.name; xlsOCR=null; xlsEdits={};
+  try{
+    _xlsBusy('กำลังเตรียมตัวอ่านรูป… (ครั้งแรกต้องโหลดตัวอ่าน ~3MB)');
+    const T=await loadTesseract();
+    const img=await new Promise((res,rej)=>{
+      const im=new Image();
+      im.onload=()=>res(im); im.onerror=()=>rej(new Error('เปิดรูปไม่ได้'));
+      im.src=URL.createObjectURL(file);
+    });
+    const cv=_ocrPrep(img);
+    _xlsBusy('กำลังอ่านตัวอักษรในรูป…', 0);
+    const worker=await T.createWorker(['tha','eng'],1,{
+      logger:m=>{ if(m&&m.status==='recognizing text') _xlsBusy('กำลังอ่านตัวอักษรในรูป…', m.progress||0); }
+    });
+    const out=await worker.recognize(cv);
+    await worker.terminate();
+    const d=out.data||{};
+    let words=[];
+    if(d.words&&d.words.length) words=d.words;
+    else if(d.lines) d.lines.forEach(l=>(l.words||[]).forEach(w=>words.push(w)));
+    else if(d.blocks) d.blocks.forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>(l.words||[]).forEach(w=>words.push(w)))));
+    let rows=_ocrWordsToRows(words);
+    if(!rows.length || rows.every(r=>r.filter(c=>String(c).trim()).length<2))
+      rows=_ocrTextToRows(d.text||'');
+    xlsOCR={conf: Math.round(d.confidence||0), text:(d.text||'').trim(), words:words.length};
+    if(!rows.length){
+      document.getElementById('xlsResult').innerHTML=
+        `<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ อ่านตัวเลขในรูปไม่ได้เลย — ลองถ่ายให้ตรง สว่างพอ และเห็นตารางเต็ม หรือใช้ไฟล์ Excel/CSV แทน</div>`;
+      return;
+    }
+    xlsRows=rows;
+    renderXlsPreview();
+  }catch(err){
+    const el=document.getElementById('xlsResult'); el.style.display='';
+    el.innerHTML=`<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ ${esc(err.message||err)}</div>`;
+  }
+}
+
+// ─── UI ───────────────────────────────────────────────
+let xlsRows=null, xlsFileName='', xlsUnit='mm', xlsInfo=null;
+let xlsOCR=null;            // {conf,text,words} when the rows came from a photo
+let xlsEdits={};            // row -> hand corrections, so OCR mistakes are fixable
+
+function handleXlsDrop(e){
+  e.preventDefault();
+  document.getElementById('xlsDrop').classList.remove('dragover');
+  const f=e.dataTransfer.files[0]; if(f) handleXlsFile(f);
+}
+
+function handleXlsFile(file){
+  if(!file) return;
+  xlsFileName=file.name; xlsOCR=null; xlsEdits={};
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+  const fail=msg=>{
+    const el=document.getElementById('xlsResult');
+    el.style.display='';
+    el.innerHTML=`<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ ${esc(msg)}</div>`;
+  };
+  if(['png','jpg','jpeg','webp','bmp','gif','tif','tiff'].includes(ext)){
+    handleXlsImage(file); return;
+  }
+  const fr=new FileReader();
+  fr.onerror=()=>fail('อ่านไฟล์ไม่สำเร็จ');
+  if(ext==='xlsx'){
+    fr.onload=ev=>{
+      try{ xlsRows=_xlsxRows(new Uint8Array(ev.target.result)); renderXlsPreview(); }
+      catch(err){ fail(err.message||'อ่านไฟล์ .xlsx ไม่สำเร็จ'); }
+    };
+    fr.readAsArrayBuffer(file);
+  } else if(ext==='xls'){
+    fail('ไฟล์ .xls (รูปแบบเก่า) ยังไม่รองรับ — เปิดใน Excel แล้ว Save As เป็น .xlsx หรือ .csv ก่อน');
+  } else {
+    fr.onload=ev=>{
+      try{
+        const b=new Uint8Array(ev.target.result);
+        let text;
+        // Excel in a Thai locale still writes CSV as windows-874, not UTF-8
+        try{ text=new TextDecoder('utf-8',{fatal:true}).decode(b); }
+        catch(e){ try{ text=new TextDecoder('windows-874').decode(b); }
+                  catch(e2){ text=new TextDecoder('utf-8').decode(b); } }
+        xlsRows=_csvRows(text); renderXlsPreview();
+      }catch(err){ fail(err.message||'อ่านไฟล์ไม่สำเร็จ'); }
+    };
+    fr.readAsArrayBuffer(file);
+  }
+}
+
+function setXlsUnit(u){ xlsUnit=u; renderXlsPreview(); }
+
+function renderXlsPreview(){
+  const el=document.getElementById('xlsResult');
+  el.style.display='';
+  if(!xlsRows||!xlsRows.length){
+    el.innerHTML='<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ ไฟล์ว่าง ไม่มีข้อมูล</div>';
+    return;
+  }
+  xlsInfo=_xlsToItems(xlsRows, xlsUnit);
+  // hand corrections win over what was parsed — essential when the rows came
+  // from a photo, where a 6 can come back as an 8
+  xlsInfo.items.forEach(it=>{
+    const e=xlsEdits[it.row]; if(!e) return;
+    if(e.name!==undefined) it.name=e.name;
+    if(isFinite(e.w)) it.w=e.w;
+    if(isFinite(e.h)) it.h=e.h;
+    if(isFinite(e.qty)) it.qty=Math.round(e.qty);
+    it.ok = it.w>0 && it.h>0 && it.qty>0;
+    it.why = it.ok ? '' : ((!(it.w>0)||!(it.h>0)) ? 'ไม่มีขนาด' : 'จำนวนเป็น 0');
+  });
+  const items=xlsInfo.items;
+  const ok=items.filter(i=>i.ok), bad=items.filter(i=>!i.ok);
+  const totQty=ok.reduce((a,i)=>a+i.qty,0);
+  const sw=+document.getElementById('sw').value, sh=+document.getElementById('sh').value;
+  const em=+document.getElementById('kerf').value||0;
+  const tooBig=i=>{
+    const W=sw-2*em, H=sh-2*em;
+    const fits=(a,b)=>a<=W+1e-6&&b<=H+1e-6;
+    return !(fits(i.w,i.h)||fits(i.h,i.w));
+  };
+  // Show the spreadsheet's OWN column headings, so the preview reads like the file
+  // it came from. Any unit written in the heading is dropped — the numbers below
+  // have already been converted, and they are always mm.
+  const L=xlsInfo.labels||{};
+  const lab=(k,def)=> L[k] ? String(L[k]).replace(/\s*\([^)]*\)\s*/g,' ').trim() || def : def;
+  const unitBtn=(u,t)=>`<button class="btn btn-sm ${xlsUnit===u?'btn-primary':'btn-ghost'}" onclick="setXlsUnit('${u}')">${t}</button>`;
+  // every cell is editable — a parse that got one number wrong should be a quick
+  // fix, not a reason to redo the whole import
+  const inp=(row,f,v,align,w)=>`<input value="${esc(v==null?'':v)}" onchange="xlsEdit(${row},'${f}',this.value)"
+      style="width:${w};text-align:${align};background:transparent;border:1px solid transparent;border-radius:5px;
+      color:inherit;font:inherit;padding:2px 4px;" onfocus="this.style.borderColor='var(--accent,#4cc9f0)'"
+      onblur="this.style.borderColor='transparent'">`;
+  const rowHtml=i=>{
+    const big=i.ok&&tooBig(i);
+    const st=!i.ok ? `<span style="color:#f87171;">✕ ${esc(i.why)}</span>`
+           : big   ? `<span style="color:#fbbf24;">⚠ ใหญ่กว่าแผ่น</span>`
+           :         `<span style="color:#4ade80;">✓</span>`;
+    return `<tr style="border-top:1px solid var(--border);${i.ok?'':'opacity:.6;'}">
+      <td style="padding:2px 8px;color:var(--muted);">${i.row}</td>
+      <td style="padding:2px 4px;">${inp(i.row,'name',i.name,'left','100%')}${i.merged?` <span style="color:var(--muted);font-size:.7rem;">(รวม ${i.merged} แถว)</span>`:''}</td>
+      <td style="padding:2px 4px;text-align:right;">${inp(i.row,'w',isFinite(i.w)&&i.w>0?i.w:'','right','88px')}</td>
+      <td style="padding:2px 4px;text-align:right;">${inp(i.row,'h',isFinite(i.h)&&i.h>0?i.h:'','right','88px')}</td>
+      <td style="padding:2px 4px;text-align:right;font-weight:700;">${inp(i.row,'qty',i.qty,'right','60px')}</td>
+      <td style="padding:2px 8px;">${st}</td></tr>`;
+  };
+  const nBig=ok.filter(tooBig).length;
+  const ocrBanner = !xlsOCR ? '' : `
+    <div class="notice" style="border-color:#f59e0b;color:#fcd34d;margin-bottom:8px;">
+      📷 ตัวเลขชุดนี้อ่านมาจากรูป (ความมั่นใจ ${xlsOCR.conf}%) — <b>ตรวจก่อนกดเพิ่ม</b> แก้ในช่องได้เลย
+      <a href="#" onclick="var d=document.getElementById('ocrRaw');d.style.display=d.style.display==='none'?'block':'none';return false;"
+         style="color:var(--accent);margin-left:6px;">ดูข้อความที่อ่านได้</a>
+      <pre id="ocrRaw" style="display:none;white-space:pre-wrap;font-size:.72rem;max-height:160px;overflow:auto;
+           margin:8px 0 0;padding:8px;background:#0006;border-radius:6px;color:var(--muted);">${esc(xlsOCR.text||'(ว่าง)')}</pre>
+    </div>`;
+  el.innerHTML=`
+    ${ocrBanner}
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+      <b style="font-size:.9rem;">${xlsOCR?'📷':'📄'} ${esc(xlsFileName)}</b>
+      <span style="color:var(--muted);font-size:.8rem;">
+        ${xlsInfo.auto ? 'ไม่พบหัวตาราง — อ่านตามลำดับคอลัมน์ (ชื่อ, กว้าง, ยาว, จำนวน)'
+                       : 'พบหัวตารางแถวที่ '+(xlsInfo.hdr+1)}
+      </span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:5px;">
+        <span style="color:var(--muted);font-size:.8rem;">หน่วยในไฟล์:</span>
+        ${unitBtn('mm','mm')}${unitBtn('cm','cm')}${unitBtn('m','m')}${unitBtn('inch','นิ้ว')}
+      </span>
+    </div>
+    <div style="max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:8px;">
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+        <thead><tr style="background:var(--surface);position:sticky;top:0;">
+          <th style="padding:6px 8px;text-align:left;font-size:.74rem;color:var(--muted);">แถว</th>
+          <th style="padding:6px 8px;text-align:left;font-size:.74rem;color:var(--muted);">${esc(lab('name','ชื่อชิ้นงาน'))}</th>
+          <th style="padding:6px 8px;text-align:right;font-size:.74rem;color:var(--muted);">${esc(lab('w','กว้าง'))} (mm)</th>
+          <th style="padding:6px 8px;text-align:right;font-size:.74rem;color:var(--muted);">${esc(lab('h','ยาว'))} (mm)</th>
+          <th style="padding:6px 8px;text-align:right;font-size:.74rem;color:var(--muted);">${esc(lab('qty','จำนวน'))}</th>
+          <th style="padding:6px 8px;text-align:left;font-size:.74rem;color:var(--muted);">สถานะ</th>
+        </tr></thead>
+        <tbody>${items.map(rowHtml).join('')}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;">
+      <span style="font-size:.86rem;">
+        พร้อมเพิ่ม <b style="color:#4ade80;">${ok.length}</b> รายการ
+        รวม <b style="color:#4ade80;">${totQty}</b> ชิ้น
+        ${bad.length?` · ข้าม <b style="color:#f87171;">${bad.length}</b> แถว`:''}
+        ${nBig?` · <span style="color:#fbbf24;">⚠ ${nBig} รายการใหญ่กว่าแผ่น ${sw}×${sh}</span>`:''}
+      </span>
+      <span style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="clearXls()">✕ ยกเลิก</button>
+        <button class="btn btn-primary btn-sm" onclick="xlsAddAll()" ${ok.length?'':'disabled'}>
+          + เพิ่ม ${ok.length} รายการเข้าลิสต์</button>
+      </span>
+    </div>`;
+}
+
+function xlsEdit(row, field, val){
+  const e = xlsEdits[row] || (xlsEdits[row]={});
+  if(field==='name') e.name=String(val);
+  else e[field]=parseFloat(String(val).replace(/[, ]/g,''));
+  renderXlsPreview();
+}
+
+function clearXls(){
+  xlsRows=null; xlsInfo=null; xlsOCR=null; xlsEdits={};
+  const el=document.getElementById('xlsResult'); el.style.display='none'; el.innerHTML='';
+  const fi=document.getElementById('xlsFi'); if(fi) fi.value='';
+}
+
+function xlsAddAll(){
+  if(!xlsInfo) return;
+  const ok=xlsInfo.items.filter(i=>i.ok);
+  if(!ok.length) return;
+  ok.forEach(i=>{
+    pieces.push({
+      id:uid(), name:i.name, qty:i.qty, source:'manual',
+      w:i.w, h:i.h, area:null, stlData:null, dxfData:null,
+      color:COLORS[pieces.length%COLORS.length], vertices:null, fileName:xlsFileName
+    });
+  });
+  const n=ok.length, q=ok.reduce((a,i)=>a+i.qty,0);
+  clearXls();
+  renderPieces(); savePieces();
+  const el=document.getElementById('xlsResult');
+  el.style.display='';
+  el.innerHTML=`<div class="notice" style="border-color:#22c55e;color:#86efac;">
+    ✓ เพิ่มแล้ว ${n} รายการ (${q} ชิ้น) — เลื่อนลงไปดูในลิสต์ชิ้นงานได้เลย</div>`;
+  document.getElementById('pcList').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/** Blank sheet to fill in. CSV with a BOM so Excel opens Thai correctly. */
+function downloadXlsTemplate(){
+  const rows=[
+    ['ชื่อชิ้นงาน','กว้าง (mm)','ยาว (mm)','จำนวน'],
+    ['แผ่นหน้า A','800','600','4'],
+    ['แผ่นข้าง B','500','300','8'],
+    ['ฝาบน','350','500','2']
+  ];
+  dlText('﻿'+rows.map(r=>r.join(',')).join('\r\n')+'\r\n',
+         'template_ชิ้นงาน_'+BUILD_TAG+'.csv', 'text/csv;charset=utf-8');
+}
+
+// ═══════════════════════════════════════════════════════
 //  PIECE MANAGEMENT
 // ═══════════════════════════════════════════════════════
 function addPiece(data) {
@@ -3966,6 +4672,7 @@ function _runNestingSync() {
   renderResults();
   document.getElementById('resSection').style.display='';
   document.getElementById('resSection').scrollIntoView({behavior:'smooth',block:'start'});
+  histPush('nest');
 }
 
 // ── BITMAP-GRID POLYGON NESTING ENGINE ──────────────────────────────────────
@@ -4739,6 +5446,11 @@ function projName(){
 // ═══════════════════════════════════════════════════════
 function resetAll(){
   if(!confirm(t('resetConfirm'))) return;
+  // A real page reload: every module's state, every canvas, every file picker and
+  // every scroll position goes back to first-open. Clearing variables by hand kept
+  // missing one and left the app in a half-reset state.
+  location.reload();
+  return;
   // Clear all state
   pieces=[]; nestResult=null; activeSheet=0; _pid=0;
   mdxfShapes=[]; mdxfGroups=[]; inspRaw=[]; inspCls=[]; inspFileName='';
@@ -4754,43 +5466,325 @@ function resetAll(){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-function exportExcel(){
-  if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
-  if(typeof XLSX==='undefined'){
-    alert(lang==='en'?'Excel library not loaded (offline). Use Print instead.'
-                     :'ไลบรารี Excel โหลดไม่ได้ (ออฟไลน์) — ใช้ปุ่ม Print แทนได้ครับ');
-    return;
-  }
-  const {sheetGroups,sw,sh}=nestResult;
-  const wb=XLSX.utils.book_new();
-  const th=lang==='en';
-
-  const sumRows=[[th?'Layout':'แบบ', th?'Sheets':'แผ่น', th?'Pieces':'ชิ้น', th?'Efficiency %':'ประสิทธิภาพ %']];
-  sheetGroups.forEach(g=>{
-    const eff=(g.sheet.items.reduce((s,it)=>s+it.w*it.h,0)/(sw*sh)*100).toFixed(1);
-    sumRows.push([`Layout ${g.label}`, g.count, g.sheet.items.length, parseFloat(eff)]);
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sumRows), th?'Summary':'สรุป');
-
-  const pieceRows=[[th?'Piece':'ชิ้นงาน', th?'Source':'แหล่ง', th?'Qty':'จำนวน',
-    th?'Width mm':'กว้าง mm', th?'Height mm':'สูง mm',
-    th?'Area/pc m²':'พื้นที่/ชิ้น m²', th?'Total m²':'รวม m²']];
-  pieces.forEach(p=>{
-    pieceRows.push([p.name, p.src||'manual', p.qty, p.w, p.h,
-      parseFloat((pieceArea(p)/1e6).toFixed(5)),
-      parseFloat((pieceArea(p)*p.qty/1e6).toFixed(5))]);
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pieceRows), th?'Pieces':'ชิ้นงาน');
-
-  XLSX.writeFile(wb, `${projName()}_Report.xlsx`);
-}
-
 function dlText(content,filename,type='text/plain'){
   const b=new Blob([content],{type});
   const url=URL.createObjectURL(b);
   const a=document.createElement('a'); a.href=url; a.download=filename; a.click();
   URL.revokeObjectURL(url);
 }
+
+// ═══════════════════════════════════════════════════════
+//  PROJECT FILE · HISTORY · EXPORT MENU
+// ═══════════════════════════════════════════════════════
+const PROJ_VER=1;
+const SETTING_IDS=['projName','sw','sh','kerf','pieceGap','stlUnit','priceSheet','laborRate','rotMode','startCorner'];
+
+/** Everything that must survive a save/undo. The nesting grid is scratch memory
+ *  (a big typed array) and is dropped; groups keep an INDEX into sheets instead of
+ *  an object reference, so the pair survives a JSON round-trip. */
+function collectState(){
+  const st={v:PROJ_VER, build:BUILD_TAG, saved:new Date().toISOString(), lang, settings:{}};
+  SETTING_IDS.forEach(id=>{ const e=document.getElementById(id); if(e) st.settings[id]=e.value; });
+  st.pieces=pieces;
+  if(nestResult){
+    const sheets=nestResult.sheets||[];
+    st.nest={
+      sheets: sheets.map(s=>({items:s.items||[]})),
+      sheetGroups: (nestResult.sheetGroups||[]).map(g=>({
+        key:g.key, count:g.count, label:g.label, sheetIdx:Math.max(0,sheets.indexOf(g.sheet))})),
+      eff:nestResult.eff, totalPieceArea:nestResult.totalPieceArea,
+      sw:nestResult.sw, sh:nestResult.sh,
+      edgeMargin:nestResult.edgeMargin, pieceGap:nestResult.pieceGap, autoInfo:nestResult.autoInfo
+    };
+  } else st.nest=null;
+  st.activeSheet=activeSheet;
+  return st;
+}
+
+function _projJSON(o){
+  return JSON.stringify(o,(k,v)=>{
+    if(k==='grid') return undefined;                       // scratch, never reused
+    if(typeof v==='number' && isFinite(v)) return Math.abs(v)<1e-9?0:+v.toFixed(6);
+    return v;
+  });
+}
+
+function applyState(st){
+  if(!st) return;
+  const s=st.settings||{};
+  SETTING_IDS.forEach(id=>{ const e=document.getElementById(id); if(e && s[id]!==undefined) e.value=s[id]; });
+  pieces = Array.isArray(st.pieces) ? st.pieces : [];
+  _pid = pieces.reduce((m,p)=>Math.max(m, parseInt(String(p.id).replace(/\D/g,''),10)||0), 0);
+  if(st.nest && Array.isArray(st.nest.sheets) && st.nest.sheets.length){
+    const sheets=st.nest.sheets.map(x=>({items:x.items||[]}));
+    const groups=(st.nest.sheetGroups||[]).map(g=>({
+      key:g.key, count:g.count, label:g.label, sheet:sheets[g.sheetIdx||0]||sheets[0]}));
+    nestResult=Object.assign({}, st.nest, {sheets, sheetGroups:groups});
+  } else nestResult=null;
+  activeSheet=+st.activeSheet||0;
+  try{ updateOrientUI(); }catch(e){}
+  renderPieces();
+  const rs=document.getElementById('resSection');
+  const sd=document.getElementById('sheetDetailCard');
+  if(nestResult){ renderResults(); if(rs) rs.style.display=''; }
+  else { if(rs) rs.style.display='none'; if(sd) sd.style.display='none'; }
+}
+
+// ─── Undo / redo ──────────────────────────────────────
+// Snapshots of the whole state. Cheap to reason about and impossible to get out
+// of step with the real data, which a per-action inverse would not be.
+let HIST=[], HPOS=-1, HLOCK=false;
+const HMAX=40;
+function histPush(label){
+  if(HLOCK) return;
+  let j;
+  try{ j=_projJSON(collectState()); }catch(e){ return; }
+  if(j.length>16e6) return;                       // absurdly large — skip silently
+  if(HPOS>=0 && HIST[HPOS] && HIST[HPOS].j===j) return;   // nothing actually changed
+  HIST=HIST.slice(0,HPOS+1);
+  HIST.push({j,label:label||''});
+  while(HIST.length>HMAX) HIST.shift();
+  HPOS=HIST.length-1;
+  updateHistUI();
+}
+function histGo(d){
+  const n=HPOS+d;
+  if(n<0||n>=HIST.length) return;
+  HPOS=n; HLOCK=true;
+  try{ applyState(JSON.parse(HIST[HPOS].j)); } catch(e){} finally { HLOCK=false; }
+  updateHistUI();
+}
+function undoAction(){ histGo(-1); }
+function redoAction(){ histGo(1); }
+function updateHistUI(){
+  const u=document.getElementById('btnUndo'), r=document.getElementById('btnRedo');
+  if(u){ u.disabled=HPOS<=0; u.style.opacity=u.disabled?.4:1; }
+  if(r){ r.disabled=HPOS>=HIST.length-1; r.style.opacity=r.disabled?.4:1; }
+}
+
+// ─── Save / open a project file ───────────────────────
+function saveProject(){
+  const st=collectState();
+  const name=(projName()||'SheetCNC').replace(/[\\/:*?"<>|]/g,'_');
+  dlText(_projJSON(st), `${name}_${BUILD_TAG}.sheetcnc.json`, 'application/json');
+}
+function openProjectPick(){ const fi=document.getElementById('projFi'); if(fi){ fi.value=''; fi.click(); } }
+function openProjectFile(file){
+  if(!file) return;
+  const fr=new FileReader();
+  fr.onerror=()=>alert('อ่านไฟล์ไม่สำเร็จ');
+  fr.onload=e=>{
+    let st;
+    try{ st=JSON.parse(e.target.result); }
+    catch(err){ alert('เปิดไฟล์ไม่สำเร็จ — ไฟล์เสียหรือไม่ใช่ JSON'); return; }
+    if(!st || !st.settings){ alert('ไฟล์นี้ไม่ใช่โปรเจกต์ SheetCNC'); return; }
+    try{
+      applyState(st);
+      histPush('open');
+      const warn = st.build && st.build!==BUILD_TAG ? `\n(บันทึกจาก build ${st.build} — ปัจจุบัน ${BUILD_TAG})` : '';
+      alert(`เปิดโปรเจกต์แล้ว: ${st.settings.projName||'-'}\nชิ้นงาน ${pieces.length} รายการ`+
+            (nestResult?` · มีผลจัดวาง ${nestResult.sheets.length} แผ่น`:'')+warn);
+    }catch(err){ alert('เปิดไฟล์ไม่สำเร็จ: '+(err.message||err)); }
+  };
+  fr.readAsText(file);
+}
+
+// ─── Export menu ──────────────────────────────────────
+function toggleExportMenu(ev){
+  if(ev) ev.stopPropagation();
+  const m=document.getElementById('exportMenu'); if(!m) return;
+  m.style.display = m.style.display==='none' ? 'block' : 'none';
+}
+function closeExportMenu(){ const m=document.getElementById('exportMenu'); if(m) m.style.display='none'; }
+
+function _needNest(){
+  if(nestResult) return true;
+  alert(lang==='en'?'Please run nesting first':'กรุณากด "จัดวาง CNC & คำนวณ" ก่อน');
+  return false;
+}
+
+/** Cut list as rows — shared by the Excel and CSV exports. */
+function _reportRows(){
+  const th=lang==='en';
+  const {sheetGroups,sw,sh}=nestResult;
+  // Real outline area, not the bounding box. Rotated or curved parts have boxes
+  // that overlap heavily, and summing those reported 194% efficiency on one sheet.
+  const areaOf=it=>{ const p=pieces.find(x=>x.id===it.pieceId); return p?pieceArea(p):(+it.w*+it.h); };
+  const sum=[[th?'Layout':'แบบ', th?'Sheets':'จำนวนแผ่น', th?'Pieces/sheet':'ชิ้น/แผ่น', th?'Efficiency %':'ประสิทธิภาพ %']];
+  sheetGroups.forEach(g=>{
+    const eff=(g.sheet.items.reduce((s,it)=>s+areaOf(it),0)/(sw*sh)*100);
+    sum.push([`Layout ${g.label}`, g.count, g.sheet.items.length, +eff.toFixed(1)]);
+  });
+  sum.push([]);
+  sum.push([th?'Sheet size':'ขนาดแผ่น', `${sw} x ${sh} mm`]);
+  sum.push([th?'Edge margin':'ระยะห่างขอบแผ่น', nestResult.edgeMargin]);
+  sum.push([th?'Piece gap':'ระยะห่างชิ้นงาน', nestResult.pieceGap]);
+  sum.push([th?'Total sheets':'รวมแผ่น', nestResult.sheets.length]);
+  const pcs=[[th?'Piece':'ชิ้นงาน', th?'Qty':'จำนวน', th?'Width mm':'กว้าง mm', th?'Height mm':'ยาว mm',
+              th?'Area/pc m²':'พื้นที่/ชิ้น m²', th?'Total m²':'รวม m²']];
+  pieces.forEach(p=>{
+    pcs.push([p.name, p.qty, p.w, p.h,
+      +(pieceArea(p)/1e6).toFixed(5), +(pieceArea(p)*p.qty/1e6).toFixed(5)]);
+  });
+  const lay=[[th?'Layout':'แบบ', th?'Piece':'ชิ้นงาน', th?'X mm':'X mm', th?'Y mm':'Y mm',
+              th?'Width mm':'กว้าง mm', th?'Height mm':'ยาว mm', th?'Angle':'องศา']];
+  sheetGroups.forEach(g=>g.sheet.items.forEach(it=>{
+    lay.push([g.label, it.name, +(+it.x).toFixed(2), +(+it.y).toFixed(2),
+              +(+it.w).toFixed(2), +(+it.h).toFixed(2), it.angle||0]);
+  }));
+  return {sum, pcs, lay, th};
+}
+
+// ── minimal XLSX writer (stored ZIP + inline strings) ──
+// Built in-page so Excel export works with no library and no network — the old
+// button depended on an XLSX global that is never loaded and always failed.
+const _CRCT=(()=>{ const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; }
+  return t; })();
+function _crc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c=_CRCT[(c^b[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function _zipStore(files){
+  const enc=new TextEncoder(), parts=[], cen=[]; let off=0;
+  const u16=v=>[v&255,(v>>8)&255], u32=v=>[v&255,(v>>8)&255,(v>>16)&255,(v>>>24)&255];
+  files.forEach(f=>{
+    const nm=enc.encode(f.name), data=f.data, crc=_crc32(data);
+    const lh=[].concat([80,75,3,4],u16(20),u16(0),u16(0),u16(0),u16(0),
+                       u32(crc),u32(data.length),u32(data.length),u16(nm.length),u16(0));
+    parts.push(new Uint8Array(lh), nm, data);
+    cen.push({nm,crc,len:data.length,off});
+    off+=lh.length+nm.length+data.length;
+  });
+  const cparts=[]; let clen=0;
+  cen.forEach(e=>{
+    const ch=[].concat([80,75,1,2],u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),
+                       u32(e.crc),u32(e.len),u32(e.len),u16(e.nm.length),
+                       u16(0),u16(0),u16(0),u16(0),u32(0),u32(e.off));
+    cparts.push(new Uint8Array(ch), e.nm); clen+=ch.length+e.nm.length;
+  });
+  const eocd=new Uint8Array([].concat([80,75,5,6],u16(0),u16(0),u16(cen.length),u16(cen.length),
+                                      u32(clen),u32(off),u16(0)));
+  const all=parts.concat(cparts,[eocd]);
+  const total=all.reduce((a,p)=>a+p.length,0);
+  const out=new Uint8Array(total); let p=0;
+  all.forEach(a=>{ out.set(a,p); p+=a.length; });
+  return out;
+}
+function _xesc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _xlsxSheetXml(rows){
+  const colName=n=>{ let s=''; n+=1; while(n){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=(n-1-r)/26; } return s; };
+  let out='';
+  rows.forEach((r,ri)=>{
+    let cs='';
+    (r||[]).forEach((v,ci)=>{
+      if(v===null||v===undefined||v==='') return;
+      const ref=colName(ci)+(ri+1);
+      if(typeof v==='number' && isFinite(v)) cs+=`<c r="${ref}"><v>${v}</v></c>`;
+      else cs+=`<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${_xesc(v)}</t></is></c>`;
+    });
+    out+=`<row r="${ri+1}">${cs}</row>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${out}</sheetData></worksheet>`;
+}
+function buildXlsx(sheets){
+  const enc=new TextEncoder(), E=s=>enc.encode(s);
+  const safe=n=>String(n).replace(/[\[\]:*?\/\\]/g,'_').slice(0,31)||'Sheet';
+  const ct=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+    `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">`+
+    `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>`+
+    `<Default Extension="xml" ContentType="application/xml"/>`+
+    `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>`+
+    sheets.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')+
+    `</Types>`;
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+    `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`+
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+  const wb=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+    `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" `+
+    `xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>`+
+    sheets.map((s,i)=>`<sheet name="${_xesc(safe(s.name))}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')+
+    `</sheets></workbook>`;
+  const wbr=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+    `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`+
+    sheets.map((s,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')+
+    `</Relationships>`;
+  const files=[{name:'[Content_Types].xml',data:E(ct)},
+               {name:'_rels/.rels',data:E(rels)},
+               {name:'xl/workbook.xml',data:E(wb)},
+               {name:'xl/_rels/workbook.xml.rels',data:E(wbr)}];
+  sheets.forEach((s,i)=>files.push({name:`xl/worksheets/sheet${i+1}.xml`, data:E(_xlsxSheetXml(s.rows))}));
+  return _zipStore(files);
+}
+function _dlBlob(data, filename, type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([data],{type}));
+  a.download=filename; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+}
+
+function exportExcel(){
+  closeExportMenu(); if(!_needNest()) return;
+  const {sum,pcs,lay,th}=_reportRows();
+  const data=buildXlsx([
+    {name:th?'Summary':'สรุป',  rows:sum},
+    {name:th?'Pieces':'ชิ้นงาน', rows:pcs},
+    {name:th?'Layout':'ผังวาง',  rows:lay}]);
+  _dlBlob(data, `${projName()}_${BUILD_TAG}.xlsx`,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+function exportCSV(){
+  closeExportMenu(); if(!_needNest()) return;
+  const {sum,pcs,lay}=_reportRows();
+  const q=v=>{ const s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const blk=(t,rows)=>[t].concat(rows.map(r=>(r||[]).map(q).join(','))).join('\r\n');
+  dlText('﻿'+[blk('== สรุป ==',sum), blk('== ชิ้นงาน ==',pcs), blk('== ผังวาง ==',lay)].join('\r\n\r\n')+'\r\n',
+         `${projName()}_${BUILD_TAG}.csv`, 'text/csv;charset=utf-8');
+}
+function exportImage(kind){
+  closeExportMenu(); if(!_needNest()) return;
+  const cv=document.getElementById('nestCanvas');
+  if(!cv || !cv.width){ alert('เปิดดู Layout สักแบบก่อน แล้วค่อยบันทึกรูป'); return; }
+  const out=document.createElement('canvas');
+  out.width=cv.width; out.height=cv.height;
+  const g=out.getContext('2d');
+  g.fillStyle = kind==='jpg' ? '#ffffff' : 'rgba(0,0,0,0)';
+  if(kind==='jpg') g.fillRect(0,0,out.width,out.height);
+  g.drawImage(cv,0,0);
+  const lbl=nestResult.sheetGroups[activeSheet] ? nestResult.sheetGroups[activeSheet].label : 'A';
+  out.toBlob(b=>{ if(b) _dlBlob(b, `${projName()}_layout_${lbl}_${BUILD_TAG}.${kind==='jpg'?'jpg':'png'}`,
+                                b.type); },
+             kind==='jpg'?'image/jpeg':'image/png', kind==='jpg'?0.92:undefined);
+}
+function exportSVG(){
+  closeExportMenu(); if(!_needNest()) return;
+  const {sheetGroups,sw,sh}=nestResult;
+  const idx=Math.min(activeSheet, sheetGroups.length-1);
+  const g=sheetGroups[idx]; if(!g) return;
+  const esc2=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  let body=`<rect x="0" y="0" width="${sw}" height="${sh}" fill="none" stroke="#16a34a" stroke-width="2"/>`;
+  g.sheet.items.forEach(it=>{
+    const v=it.rotatedVerts||it.vertices;
+    const col=it.color||'#e05555';
+    if(v&&v.length>=3){
+      const pts=v.map(p=>`${(+p[0]+ +it.x).toFixed(3)},${(sh-(+p[1]+ +it.y)).toFixed(3)}`).join(' ');
+      body+=`<polygon points="${pts}" fill="${col}22" stroke="${col}" stroke-width="1"/>`;
+    } else {
+      body+=`<rect x="${(+it.x).toFixed(3)}" y="${(sh-it.y-it.h).toFixed(3)}" width="${(+it.w).toFixed(3)}" height="${(+it.h).toFixed(3)}" fill="${col}22" stroke="${col}" stroke-width="1"/>`;
+    }
+    (it.holes||[]).forEach(hv=>{
+      if(hv&&hv.length>=3){
+        const hp=hv.map(p=>`${(+p[0]+ +it.x).toFixed(3)},${(sh-(+p[1]+ +it.y)).toFixed(3)}`).join(' ');
+        body+=`<polygon points="${hp}" fill="none" stroke="${col}" stroke-width="1"/>`;
+      }
+    });
+  });
+  const svg=`<?xml version="1.0" encoding="UTF-8"?>\n`+
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${sw}mm" height="${sh}mm" viewBox="0 0 ${sw} ${sh}">\n`+
+    `<title>${esc2(projName())} — layout ${g.label}</title>\n${body}\n</svg>\n`;
+  dlText(svg, `${projName()}_layout_${g.label}_${BUILD_TAG}.svg`, 'image/svg+xml');
+}
+function exportDXFmenu(){ closeExportMenu(); exportDXF(); }
+function exportProjectMenu(){ closeExportMenu(); saveProject(); }
+function printMenu(){ closeExportMenu(); window.print(); }
 
 // ═══════════════════════════════════════════════════════
 //  DXF EXPORT  (AC1009 / R12 — AutoCAD LT compatible)
@@ -4906,7 +5900,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-g48';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-g58';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
@@ -4983,6 +5977,26 @@ function exportDXFCurrent(){
   const g=nestResult.sheetGroups[idx];
   dlText(dxf,`layout_${g.label}_${BUILD_TAG}.dxf`);
 }
+// first snapshot + keyboard shortcuts + click-away for the export menu
+function _bootUI(){
+  try{ updateOrientUI(); }catch(e){}
+  try{ if(HIST.length===0) histPush('start'); }catch(e){}
+  updateHistUI();
+}
+document.addEventListener('click',e=>{
+  const m=document.getElementById('exportMenu');
+  if(m && m.style.display==='block' && !m.contains(e.target)) closeExportMenu();
+});
+document.addEventListener('keydown',e=>{
+  const k=(e.key||'').toLowerCase();
+  if(!(e.ctrlKey||e.metaKey)) return;
+  if(k==='z' && !e.shiftKey){ e.preventDefault(); undoAction(); }
+  else if(k==='y' || (k==='z'&&e.shiftKey)){ e.preventDefault(); redoAction(); }
+  else if(k==='s'){ e.preventDefault(); saveProject(); }
+});
+document.addEventListener('DOMContentLoaded',_bootUI);
+try{ _bootUI(); }catch(e){}
+
 function exportDXFAll(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
   const {sheetGroups}=nestResult;
