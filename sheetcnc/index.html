@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-g58</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-h9</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -381,7 +381,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
     <div class="notice" style="margin-bottom:10px;">
       📋 ทำตารางแค่ <b>ชื่อ · กว้าง · ยาว · จำนวน</b> แล้วลากไฟล์มาวาง โปรแกรมจะสร้างชิ้นงานสี่เหลี่ยมให้ตามขนาดและจำนวน
       &nbsp;|&nbsp; หัวตารางเป็นไทยหรืออังกฤษก็ได้ &nbsp;|&nbsp; เขียนรวมเป็น <b>400x300</b> ในช่องเดียวก็อ่านออก
-      <br>📷 <b>ถ่ายรูปตารางมาก็ได้</b> — โปรแกรมจะอ่านตัวเลขจากรูป แยกเองว่าช่องไหนคือขนาด ช่องไหนคือจำนวน แล้วให้แก้ในตารางก่อนเพิ่มได้ (ครั้งแรกต้องต่อเน็ตเพื่อโหลดตัวอ่าน)
+      <br>📷 <b>ไฟล์รูป</b> — รูปถ่าย/สกรีนช็อต<b>ตารางรายการที่เป็นตัวพิมพ์</b> → อ่านเป็นชื่อ/ขนาด/จำนวน (ครั้งแรกต้องต่อเน็ตเพื่อโหลดตัวอ่าน)
       &nbsp;|&nbsp; <a href="#" onclick="downloadXlsTemplate();return false;" style="color:var(--accent);font-weight:700;">⬇️ ดาวน์โหลดไฟล์ตัวอย่าง</a>
     </div>
     <div class="dxf-import-drop" id="xlsDrop"
@@ -391,10 +391,36 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       ondrop="handleXlsDrop(event)">
       <div class="ico">📊</div>
       <p>คลิกหรือลากไฟล์ตาราง <b>หรือรูปถ่ายตาราง</b> มาวาง</p>
-      <p style="font-size:.74rem;margin-top:4px;">ตาราง: <b>.xlsx &nbsp;.csv &nbsp;.tsv</b> &nbsp;|&nbsp; รูป: <b>.jpg &nbsp;.png &nbsp;.webp</b> (อ่านตัวเลขด้วย OCR)</p>
+      <p style="font-size:.74rem;margin-top:4px;">ตาราง: <b>.xlsx &nbsp;.csv &nbsp;.tsv</b> &nbsp;|&nbsp; รูป: <b>.jpg &nbsp;.png &nbsp;.webp</b> (ตารางที่เป็นตัวพิมพ์)</p>
       <input type="file" id="xlsFi" accept=".xlsx,.csv,.tsv,.txt,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" style="display:none" onchange="handleXlsFile(this.files[0])">
     </div>
     <div id="xlsResult" style="display:none;margin-top:12px;"></div>
+  </div>
+
+  <!-- 3D import -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📐 นำเข้าไฟล์ 3D — เลือกหน้าที่จะตัด</div>
+      <span class="badge badge-accent" style="background:#2a9d8f;">NEW</span>
+    </div>
+    <div class="notice" style="margin-bottom:10px;">
+      📐 โยนไฟล์โมเดล 3D เข้ามา โปรแกรมจะหา<b>หน้าเรียบ</b>ทุกหน้า วัดขนาดจริง แล้วให้เลือกว่าหน้าไหนต้องตัด
+      &nbsp;|&nbsp; <b>หมุนดูได้ คลิกที่หน้าในภาพเพื่อเลือก</b>
+      <br>✂ หน้าที่ใหญ่กว่าแผ่นวัสดุ โปรแกรมจะ<b>แบ่งเป็นหลายแผ่นให้อัตโนมัติ</b> พร้อมบอกว่าต้องต่อกี่ท่อน
+      &nbsp;|&nbsp; รูปทรงที่ได้เป็นเส้นขอบจริง ไม่ใช่กรอบสี่เหลี่ยม
+    </div>
+    <div class="dxf-import-drop" id="m3Drop"
+      onclick="document.getElementById('m3Fi').click()"
+      ondragover="this.classList.add('dragover');event.preventDefault()"
+      ondragleave="this.classList.remove('dragover')"
+      ondrop="handle3DDrop(event)">
+      <div class="ico">📐</div>
+      <p>คลิกหรือลากไฟล์ <b>3D</b> มาวาง</p>
+      <p style="font-size:.74rem;margin-top:4px;">รองรับ <b>.stl &nbsp;.obj &nbsp;.ply &nbsp;.3mf</b>
+        &nbsp;(STEP / IGES / SKP / 3DM: export เป็น .stl จาก CAD ก่อน)</p>
+      <input type="file" id="m3Fi" accept=".stl,.obj,.ply,.3mf" style="display:none" onchange="handle3DFile(this.files[0])">
+    </div>
+    <div id="m3Result" style="display:none;margin-top:12px;"></div>
   </div>
 
   <!-- Pieces -->
@@ -3685,7 +3711,9 @@ const XLS_KEYS={
 };
 const _xnorm=s=>String(s==null?'':s).toLowerCase()
   .replace(/\(.*?\)/g,'').replace(/[\s_\-.:·]/g,'')
-  .replace(/(มม|มิลลิเมตร|mm|ซม|cm|เมตร|m|นิ้ว|inch|in)$/,'').trim();
+  .replace(/(มม|มิลลิเมตร|mm|ซม|cm|เมตร|m|นิ้ว|inch|in)$/,'')
+  .replace(/[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/g,'')   // tone marks land anywhere in OCR
+  .trim();
 
 /** Score a header cell against one field's keywords.
  *  Exact beats "starts with" beats "contains", so a column headed "ชิ้นงาน"
@@ -3720,6 +3748,55 @@ function _xlsMapHeader(row){
   return map;
 }
 
+/** When OCR mangles the headings ("ชื่องาน" → "ข้องาน"), reading columns by
+ *  position is a coin flip. Read them by what they CONTAIN instead: the column
+ *  full of words is the name, the whole-number column is the quantity, and the
+ *  two remaining number columns are the size. */
+function _inferColumns(rows){
+  if(!rows||rows.length<2) return null;
+  let nc=0;
+  rows.forEach(r=>{ for(let c=(r||[]).length-1;c>=0;c--)
+    if(String(r[c]==null?'':r[c]).trim()){ if(c+1>nc) nc=c+1; break; } });
+  if(nc<2) return null;
+  const txtRow=r=>{
+    const v=(r||[]).map(c=>String(c==null?'':c).trim()).filter(Boolean);
+    return v.length>=2 && v.every(c=>!_ocrIsNum(c));
+  };
+  const start = txtRow(rows[0]) ? 1 : 0;          // an all-words first row is the heading
+  const st=[]; for(let c=0;c<nc;c++) st.push({num:0,txt:0,ints:0});
+  for(let i=start;i<rows.length;i++){
+    const r=rows[i]||[];
+    for(let c=0;c<nc;c++){
+      const raw=String(r[c]==null?'':r[c]).trim();
+      if(!raw) continue;
+      if(_ocrIsNum(raw)){ st[c].num++; if(Number.isInteger(_ocrNum(raw))) st[c].ints++; }
+      else st[c].txt++;
+    }
+  }
+  const numCols=[], txtCols=[];
+  for(let c=0;c<nc;c++){
+    if(st[c].num>0 && st[c].num>=st[c].txt) numCols.push(c);
+    else if(st[c].txt>0) txtCols.push(c);
+  }
+  if(numCols.length<2) return null;
+  const map={};
+  if(txtCols.length) map.name=txtCols[0];
+  if(numCols.length>=3){
+    let q=-1;
+    for(let k=numCols.length-1;k>=0;k--){          // quantities are whole numbers
+      const c=numCols[k];
+      if(st[c].num && st[c].ints===st[c].num){ q=c; break; }
+    }
+    if(q<0) q=numCols[numCols.length-1];
+    const dims=numCols.filter(c=>c!==q).slice(0,2);
+    if(dims.length<2) return null;
+    map.w=dims[0]; map.h=dims[1]; map.qty=q;
+  } else {
+    map.w=numCols[0]; map.h=numCols[1];
+  }
+  return {map, hdr:start-1};
+}
+
 /** Rows → piece candidates. Each carries its own ok/why so the preview can
  *  explain every skipped line instead of silently dropping it. */
 function _xlsToItems(rows, unit){
@@ -3736,12 +3813,33 @@ function _xlsToItems(rows, unit){
   };
   const pair=v=>{ const m=String(v==null?'':v).match(/(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)/i);
     return m?[parseFloat(m[1].replace(',','.')), parseFloat(m[2].replace(',','.'))]:null; };
-  let hdr=-1, map={};
+  let hdr=-1, map={}, inferred=false;
   for(let i=0;i<Math.min(rows.length,12);i++){
     const m=_xlsMapHeader(rows[i]);
     if((m.w!==undefined&&m.h!==undefined)||m.size!==undefined){ hdr=i; map=m; break; }
   }
-  const auto = hdr<0;
+  if(hdr<0){
+    const inf=_inferColumns(rows);
+    if(inf){ map=inf.map; hdr=inf.hdr; inferred=true; }
+  }
+  // A heading can end up one column away from its own values (left-aligned Thai
+  // heading, right-aligned numbers, a grid line in between). Believe the numbers.
+  if(hdr>=0 && !inferred){
+    const body=rows.slice(hdr+1);
+    const hasNum=c=>c>=0 && body.some(r=>{ const v=String((r||[])[c]==null?'':r[c]).trim();
+      return v && _ocrIsNum(v); });
+    const taken=()=>Object.keys(map).map(k=>map[k]);
+    ['w','h','qty'].forEach(k=>{
+      const c=map[k];
+      if(c===undefined || hasNum(c)) return;
+      for(const d of [1,-1,2,-2]){
+        const c2=c+d;
+        if(c2<0 || taken().indexOf(c2)>=0) continue;
+        if(hasNum(c2)){ map[k]=c2; break; }
+      }
+    });
+  }
+  const auto = hdr<0 && !inferred;
   const out=[];
   for(let i=(auto?0:hdr+1); i<rows.length; i++){
     const r=rows[i]||[];
@@ -3784,7 +3882,7 @@ function _xlsToItems(rows, unit){
     const v=String((rows[hdr]||[])[map[k]]==null?'':(rows[hdr]||[])[map[k]]).trim();
     if(v) labels[k]=v;
   }
-  return {items:merged, hdr, auto, map, labels};
+  return {items:merged, hdr, auto, map, labels, inferred};
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3808,11 +3906,56 @@ function _ocrNum(t){
 }
 const _ocrIsNum=t=>isFinite(_ocrNum(t)) && /\d/.test(String(t));
 
-/** Words (with boxes) → a 2D table, using the widest line as the column ruler. */
-function _ocrWordsToRows(words){
+/** Vertical rules in a spreadsheet screenshot ARE the column boundaries.
+ *  Far more reliable than guessing from the space between words, which in a tight
+ *  screenshot is barely wider than the gap between two Thai glyphs. */
+function _gridColumns(id, yTop, yBot){
+  const w=id.width, h=id.height, data=id.data;
+  const y0=Math.max(0, Math.floor(yTop==null?0:yTop)-4);
+  const y1=Math.min(h-1, Math.ceil(yBot==null?h-1:yBot)+4);
+  const span=y1-y0+1;
+  if(span<20) return [];
+  // Excel draws its grid in light grey, not black — a single dark threshold found
+  // nothing at all. Sweep a few and keep the first that yields a sane column count.
+  const scan=(lim,frac)=>{
+    const dark=new Uint32Array(w);
+    for(let y=y0;y<=y1;y++){
+      const row=y*w*4;
+      for(let x=0;x<w;x++){
+        const i=row+x*4;
+        if((data[i]*0.299+data[i+1]*0.587+data[i+2]*0.114) < lim) dark[x]++;
+      }
+    }
+    const thr=span*frac, out=[]; let run=-1;
+    for(let x=0;x<w;x++){
+      if(dark[x]>=thr){ if(run<0) run=x; }
+      else if(run>=0){ if(x-run<=Math.max(4,w*0.01)) out.push((run+x-1)/2); run=-1; }
+    }
+    if(run>=0 && w-run<=Math.max(4,w*0.01)) out.push((run+w-1)/2);
+    const m=[];
+    out.forEach(v=>{ if(!m.length || v-m[m.length-1]>2.5) m.push(v); });
+    return m;
+  };
+  let best=[];
+  for(const lim of [235,215,195,170]){
+    for(const frac of [0.85,0.6]){
+      const m=scan(lim,frac);
+      if(m.length>=3 && m.length<=14){ if(m.length>best.length) best=m; }
+    }
+    if(best.length>=3) break;
+  }
+  return best;
+}
+
+/** Words (with boxes) → a 2D table.
+ *  Columns come from the VERTICAL GAPS shared by the whole page, not from one
+ *  header line. Thai OCR chops a word like "ชื่องาน" into five pieces, so a
+ *  single-line ruler merged the name column into the one beside it and every
+ *  value landed in the wrong place. */
+function _ocrWordsToRows(words, gridX){
   const ws=(words||[]).filter(w=>w&&w.text&&String(w.text).trim()&&w.bbox);
   if(!ws.length) return [];
-  // group into lines by vertical overlap
+  // 1. group into lines by vertical overlap
   const byY=ws.slice().sort((a,b)=>(a.bbox.y0+a.bbox.y1)-(b.bbox.y0+b.bbox.y1));
   const lines=[];
   byY.forEach(w=>{
@@ -3825,35 +3968,89 @@ function _ocrWordsToRows(words){
   });
   lines.forEach(l=>l.ws.sort((a,b)=>a.bbox.x0-b.bbox.x0));
   lines.sort((a,b)=>a.mid-b.mid);
-  // column ruler: prefer a header line, else the line with the most words
-  const isHdrWord=t=>{ const v=_xnorm(t); if(!v) return false;
-    for(const k in XLS_KEYS) if(_xlsScore(v, XLS_KEYS[k])>=60) return true; return false; };
-  let ruler=lines.find(l=>l.ws.filter(w=>isHdrWord(w.text)).length>=2);
-  if(!ruler) ruler=lines.slice().sort((a,b)=>b.ws.length-a.ws.length)[0];
-  // merge ruler words that sit side by side into one column each
-  const cols=[];
-  ruler.ws.forEach(w=>{
-    const last=cols[cols.length-1];
-    if(last && w.bbox.x0-last.x1 < ruler.h*1.1){ last.x1=w.bbox.x1; last.txt+=' '+w.text; }
-    else cols.push({x0:w.bbox.x0, x1:w.bbox.x1, txt:String(w.text)});
+  // 2. column gutters: x ranges no word ever covers
+  let maxX=0, hs=[];
+  ws.forEach(w=>{ if(w.bbox.x1>maxX) maxX=w.bbox.x1; hs.push(w.bbox.y1-w.bbox.y0); });
+  hs.sort((a,b)=>a-b);
+  const medH=hs[hs.length>>1]||10;
+  const W=Math.ceil(maxX)+2;
+  const cover=new Uint8Array(W);
+  ws.forEach(w=>{
+    const a=Math.max(0,Math.floor(w.bbox.x0)), b=Math.min(W-1,Math.ceil(w.bbox.x1));
+    for(let x=a;x<=b;x++) cover[x]=1;
   });
-  if(cols.length<2) return [];
-  const centre=cols.map(c=>(c.x0+c.x1)/2);
-  const pick=w=>{
-    const c=(w.bbox.x0+w.bbox.x1)/2;
-    let bi=0, bd=Infinity;
-    // inside a column's own span wins outright; otherwise nearest centre
-    for(let i=0;i<cols.length;i++){
-      if(c>=cols[i].x0-2 && c<=cols[i].x1+2) return i;
-      const d=Math.abs(c-centre[i]); if(d<bd){ bd=d; bi=i; }
+  // collect every blank run, then keep only the ones that stand out from the
+  // ordinary between-glyph spacing — a fixed multiple of text height guessed wrong
+  const runs=[]; let run=0;
+  for(let x=0;x<W;x++){
+    if(!cover[x]) run++;
+    else { if(run>0 && x-run>0) runs.push({len:run, mid:x-run/2}); run=0; }
+  }
+  let cuts=[];
+  if(runs.length){
+    const lens=runs.map(r=>r.len).sort((a,b)=>a-b);
+    const med=lens[lens.length>>1]||1;
+    const minGap=Math.max(5, medH*0.6, med*1.8);
+    cuts=runs.filter(r=>r.len>=minGap).map(r=>r.mid);
+  }
+  // real grid lines beat any guess
+  const gx=(gridX||[]).filter(v=>v>2 && v<W-2);
+  const bounds = gx.length>=2 ? [0].concat(gx,[W]) : [0].concat(cuts,[W]);
+  const nCol=bounds.length-1;
+  if(nCol<2) return [];
+  // Overlap, not centre: a right-aligned number sits hard against its cell border,
+  // and a boundary off by two pixels threw it into the next column.
+  const colOf=w=>{
+    let bi=nCol-1, bo=-1;
+    for(let i=0;i<nCol;i++){
+      const ov=Math.min(w.bbox.x1,bounds[i+1])-Math.max(w.bbox.x0,bounds[i]);
+      if(ov>bo){ bo=ov; bi=i; }
     }
     return bi;
   };
-  return lines.map(l=>{
-    const cells=new Array(cols.length).fill('');
-    l.ws.forEach(w=>{ const i=pick(w); cells[i]=(cells[i]?cells[i]+' ':'')+String(w.text).trim(); });
-    return cells;
+  let rows=lines.map(l=>{
+    const cells=new Array(nCol).fill('');
+    l.ws.forEach(w=>{ const i=colOf(w); cells[i]=(cells[i]?cells[i]+' ':'')+String(w.text).trim(); });
+    // Thai fragments inside one cell come back as "ชื่ อ ง า น" — glue them
+    return cells.map(c=>c.replace(/(?<=[฀-๿]) (?=[฀-๿])/g,''));
   });
+  // columns that are empty everywhere are spreadsheet padding, not data
+  let nn=0; rows.forEach(r=>{ if(r.length>nn) nn=r.length; });
+  const used=[];
+  for(let c=0;c<nn;c++) if(rows.some(r=>String(r[c]==null?'':r[c]).trim())) used.push(c);
+  if(used.length && used.length<nn) rows=rows.map(r=>used.map(c=>r[c]||''));
+  return _stripSheetChrome(rows);
+}
+
+/** A screenshot of a spreadsheet carries the app's own furniture: a row-number
+ *  column down the left and a lettered header row across the top. Neither is data. */
+function _stripSheetChrome(rows){
+  if(!rows||!rows.length) return rows||[];
+  const letterRow=r=>{
+    const v=(r||[]).map(c=>String(c==null?'':c).trim()).filter(Boolean);
+    if(v.length<2 || !v.every(c=>/^[A-Za-z]$/.test(c))) return false;
+    for(let i=1;i<v.length;i++)
+      if(v[i].toUpperCase().charCodeAt(0)!==v[i-1].toUpperCase().charCodeAt(0)+1) return false;
+    return true;
+  };
+  while(rows.length && letterRow(rows[0])) rows=rows.slice(1);
+  // row numbers that got glued onto the first cell: "1 ชื่องาน", "2 A", …
+  const lead=rows.map(r=>String((r||[])[0]==null?'':r[0]).trim().match(/^(\d{1,3})\s+(.+)$/));
+  const hit=lead.filter(Boolean);
+  if(hit.length>=3 && rows.length-hit.length<=1){
+    const v=hit.map(m=>+m[1]);
+    let seq=true; for(let i=1;i<v.length;i++) if(v[i]!==v[i-1]+1){ seq=false; break; }
+    if(seq) rows=rows.map((r,i)=> lead[i] ? [lead[i][2]].concat(r.slice(1)) : r);
+  }
+  const col0=rows.map(r=>String((r||[])[0]==null?'':r[0]).trim());
+  const idx=[], vals=[];
+  col0.forEach((c,i)=>{ if(/^\d{1,3}$/.test(c)){ idx.push(i); vals.push(+c); } });
+  if(vals.length>=3 && col0.length-vals.length<=1){
+    let seq=true;
+    for(let i=1;i<vals.length;i++) if(vals[i]!==vals[i-1]+1){ seq=false; break; }
+    if(seq) rows=rows.map(r=>r.slice(1));
+  }
+  return rows;
 }
 
 /** Plain OCR text → rows. Used when no word boxes came back. */
@@ -3886,23 +4083,41 @@ function _ocrTextToRows(text){
 }
 
 let _tessP=null;
+const TESS_URLS=[
+  'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+  'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js'
+];
+function _loadScript(url){
+  return new Promise((res,rej)=>{
+    const el=document.createElement('script');
+    el.src=url; el.async=true;
+    el.onload=()=>res();
+    el.onerror=()=>{ try{ el.remove(); }catch(e){} rej(new Error('load failed: '+url)); };
+    (document.head||document.documentElement).appendChild(el);
+  });
+}
+/** One blocked CDN should not kill the feature — try the others, and let the
+ *  next attempt start fresh instead of caching the failure forever. */
 function loadTesseract(){
   if(typeof Tesseract!=='undefined') return Promise.resolve(Tesseract);
   if(_tessP) return _tessP;
-  _tessP=new Promise((res,rej)=>{
-    const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-    s.onload=()=>typeof Tesseract!=='undefined'?res(Tesseract):rej(new Error('โหลดตัวอ่านรูปไม่สำเร็จ'));
-    s.onerror=()=>rej(new Error('โหลดตัวอ่านรูปไม่ได้ — ครั้งแรกต้องต่ออินเทอร์เน็ต'));
-    (document.head||document.documentElement).appendChild(s);
-  });
+  _tessP=(async()=>{
+    for(const u of TESS_URLS){
+      try{ await _loadScript(u); if(typeof Tesseract!=='undefined') return Tesseract; }catch(e){}
+    }
+    _tessP=null;
+    throw new Error('โหลดตัวอ่านตัวอักษร (OCR) ไม่ได้ — ต้องต่ออินเทอร์เน็ตครั้งแรก');
+  })();
   return _tessP;
 }
 
 /** Upscale + grey + contrast. Small or soft photos read far better this way. */
 function _ocrPrep(img){
-  const MINW=1500;
-  const sc=Math.min(3, Math.max(1, MINW/(img.naturalWidth||img.width||MINW)));
+  // A cropped spreadsheet can be only ~280px wide. Capping the zoom at 3x left the
+  // glyphs too small for Thai OCR, and the headers came back as nonsense.
+  const MINW=2000;
+  const sc=Math.min(8, Math.max(1, MINW/(img.naturalWidth||img.width||MINW)));
   const cv=document.createElement('canvas');
   cv.width=Math.round((img.naturalWidth||img.width)*sc);
   cv.height=Math.round((img.naturalHeight||img.height)*sc);
@@ -3937,16 +4152,30 @@ function _xlsBusy(msg, pct){
 }
 
 async function handleXlsImage(file){
-  xlsFileName=file.name; xlsOCR=null; xlsEdits={};
+  xlsFileName=file.name; xlsOCR=null; xlsEdits={}; xlsOcrErr='';
+  let cv=null;
   try{
-    _xlsBusy('กำลังเตรียมตัวอ่านรูป… (ครั้งแรกต้องโหลดตัวอ่าน ~3MB)');
-    const T=await loadTesseract();
+    // The picture is prepared before anything else. Reading the SHAPE needs no
+    // network at all, so a blocked OCR download must not take the feature down
+    // with it — it only costs us the numbers.
+    _xlsBusy('กำลังเปิดรูป…');
     const img=await new Promise((res,rej)=>{
       const im=new Image();
       im.onload=()=>res(im); im.onerror=()=>rej(new Error('เปิดรูปไม่ได้'));
       im.src=URL.createObjectURL(file);
     });
-    const cv=_ocrPrep(img);
+    cv=_ocrPrep(img);
+    const g0=cv.getContext('2d');
+    xlsImg={ imgData:g0.getImageData(0,0,cv.width,cv.height), words:[], text:'', conf:0,
+             url:cv.toDataURL('image/png'), w:cv.width, h:cv.height };
+  }catch(err){
+    const el=document.getElementById('xlsResult'); el.style.display='';
+    el.innerHTML=`<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ ${esc(err.message||err)}</div>`;
+    return;
+  }
+  try{
+    _xlsBusy('กำลังเตรียมตัวอ่านตัวอักษร… (ครั้งแรกโหลด ~3MB)');
+    const T=await loadTesseract();
     _xlsBusy('กำลังอ่านตัวอักษรในรูป…', 0);
     const worker=await T.createWorker(['tha','eng'],1,{
       logger:m=>{ if(m&&m.status==='recognizing text') _xlsBusy('กำลังอ่านตัวอักษรในรูป…', m.progress||0); }
@@ -3958,27 +4187,51 @@ async function handleXlsImage(file){
     if(d.words&&d.words.length) words=d.words;
     else if(d.lines) d.lines.forEach(l=>(l.words||[]).forEach(w=>words.push(w)));
     else if(d.blocks) d.blocks.forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>(l.words||[]).forEach(w=>words.push(w)))));
-    let rows=_ocrWordsToRows(words);
+    let yT=Infinity, yB=-Infinity;
+    words.forEach(w=>{ if(w.bbox){ if(w.bbox.y0<yT) yT=w.bbox.y0; if(w.bbox.y1>yB) yB=w.bbox.y1; } });
+    let gridX=[];
+    try{ gridX=_gridColumns(xlsImg.imgData, isFinite(yT)?yT:null, isFinite(yB)?yB:null); }catch(e){}
+    xlsImg.grid=gridX;
+    let rows=_ocrWordsToRows(words, gridX);
     if(!rows.length || rows.every(r=>r.filter(c=>String(c).trim()).length<2))
       rows=_ocrTextToRows(d.text||'');
     xlsOCR={conf: Math.round(d.confidence||0), text:(d.text||'').trim(), words:words.length};
-    if(!rows.length){
-      document.getElementById('xlsResult').innerHTML=
-        `<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ อ่านตัวเลขในรูปไม่ได้เลย — ลองถ่ายให้ตรง สว่างพอ และเห็นตารางเต็ม หรือใช้ไฟล์ Excel/CSV แทน</div>`;
-      return;
-    }
+    // the preview shows the same pixels the OCR saw, so boxes and picture agree
+    xlsImg.words=words; xlsImg.text=xlsOCR.text; xlsImg.conf=xlsOCR.conf;
     xlsRows=rows;
     renderXlsPreview();
   }catch(err){
-    const el=document.getElementById('xlsResult'); el.style.display='';
-    el.innerHTML=`<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ ${esc(err.message||err)}</div>`;
+    // no OCR → still usable: trace the outline and let the user type one real size
+    xlsOcrErr=err.message||String(err);
+    xlsRows=[]; xlsInfo={};
+    renderXlsPreview();
   }
 }
+
+function retryOCR(){
+  if(!xlsImg) return;
+  _tessP=null; xlsOcrErr='';
+  const f=document.getElementById('xlsFi');
+  if(f && f.files && f.files[0]) handleXlsImage(f.files[0]);
+  else { xlsOcrErr='เลือกไฟล์รูปใหม่อีกครั้งเพื่อลองอ่านตัวอักษร'; renderXlsPreview(); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  IMAGE MODE 1 — a DRAWING with dimensions → a real shape
+// ═══════════════════════════════════════════════════════
+// The picture carries no units. The drawn outline gives the proportions in
+// pixels; the dimension numbers around it give the millimetres. Matching the two
+// is the whole job.
+
 
 // ─── UI ───────────────────────────────────────────────
 let xlsRows=null, xlsFileName='', xlsUnit='mm', xlsInfo=null;
 let xlsOCR=null;            // {conf,text,words} when the rows came from a photo
 let xlsEdits={};            // row -> hand corrections, so OCR mistakes are fixable
+
+// ─── image mode switch (table vs drawing) ─────────────
+let xlsImg=null;            // {imgData, words, text, conf, url, w, h}
+let xlsOcrErr='';           // why the text reader is unavailable, if it is
 
 function handleXlsDrop(e){
   e.preventDefault();
@@ -3988,7 +4241,7 @@ function handleXlsDrop(e){
 
 function handleXlsFile(file){
   if(!file) return;
-  xlsFileName=file.name; xlsOCR=null; xlsEdits={};
+  xlsFileName=file.name; xlsOCR=null; xlsEdits={}; xlsImg=null;
   const ext=(file.name.split('.').pop()||'').toLowerCase();
   const fail=msg=>{
     const el=document.getElementById('xlsResult');
@@ -4030,12 +4283,14 @@ function renderXlsPreview(){
   const el=document.getElementById('xlsResult');
   el.style.display='';
   if(!xlsRows||!xlsRows.length){
-    el.innerHTML='<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ ไฟล์ว่าง ไม่มีข้อมูล</div>';
+    el.innerHTML='<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ '+
+      (xlsOcrErr?'ยังอ่านตัวอักษรไม่ได้ — กดลองโหลดใหม่ หรือใช้ไฟล์ Excel/CSV แทน':'ไฟล์ว่าง ไม่มีข้อมูล')+'</div>';
     return;
   }
   xlsInfo=_xlsToItems(xlsRows, xlsUnit);
   // hand corrections win over what was parsed — essential when the rows came
   // from a photo, where a 6 can come back as an 8
+  xlsInfo.items = xlsInfo.items.filter(it=>!(xlsEdits[it.row]&&xlsEdits[it.row].del));
   xlsInfo.items.forEach(it=>{
     const e=xlsEdits[it.row]; if(!e) return;
     if(e.name!==undefined) it.name=e.name;
@@ -4078,7 +4333,9 @@ function renderXlsPreview(){
       <td style="padding:2px 4px;text-align:right;">${inp(i.row,'w',isFinite(i.w)&&i.w>0?i.w:'','right','88px')}</td>
       <td style="padding:2px 4px;text-align:right;">${inp(i.row,'h',isFinite(i.h)&&i.h>0?i.h:'','right','88px')}</td>
       <td style="padding:2px 4px;text-align:right;font-weight:700;">${inp(i.row,'qty',i.qty,'right','60px')}</td>
-      <td style="padding:2px 8px;">${st}</td></tr>`;
+      <td style="padding:2px 8px;white-space:nowrap;">${st}
+        <a href="#" onclick="xlsDelRow(${i.row});return false;" title="ลบแถวนี้"
+           style="color:#f87171;margin-left:8px;text-decoration:none;">✕</a></td></tr>`;
   };
   const nBig=ok.filter(tooBig).length;
   const ocrBanner = !xlsOCR ? '' : `
@@ -4089,20 +4346,36 @@ function renderXlsPreview(){
       <pre id="ocrRaw" style="display:none;white-space:pre-wrap;font-size:.72rem;max-height:160px;overflow:auto;
            margin:8px 0 0;padding:8px;background:#0006;border-radius:6px;color:var(--muted);">${esc(xlsOCR.text||'(ว่าง)')}</pre>
     </div>`;
+  // Tesseract reads print, not handwriting. When it plainly failed, stop
+  // pretending and make typing it in — with the photo alongside — the fast path.
+  const weak = !!xlsImg && (ok.length<2 || (xlsOCR && xlsOCR.conf<75));
+  const weakBox = !weak ? '' : `
+    <div class="notice" style="border-color:#f59e0b;color:#fcd34d;margin-bottom:8px;">
+      ✋ <b>อ่านจากรูปนี้ได้ไม่ครบ</b> — ตัวอ่าน OCR ทำงานได้ดีกับ<b>ตัวพิมพ์</b> ภาพเบลอหรือเอียงจะอ่านพลาด
+      <br>ดูรูปทางขวาแล้วพิมพ์ทับในตารางได้เลย — กด <b>+ เพิ่มแถว</b> ถ้าต้องการอีกรายการ
+    </div>`;
+  const photo = !xlsImg ? '' : `
+    <div style="flex:0 0 300px;max-width:100%;">
+      <img src="${xlsImg.url}" style="width:100%;height:auto;border:1px solid var(--border);border-radius:8px;background:#fff;">
+      <div style="font-size:.72rem;color:var(--muted);margin-top:4px;text-align:center;">รูปที่นำเข้า — ใช้เทียบขณะพิมพ์</div>
+    </div>`;
   el.innerHTML=`
+    ${weakBox}
     ${ocrBanner}
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
       <b style="font-size:.9rem;">${xlsOCR?'📷':'📄'} ${esc(xlsFileName)}</b>
       <span style="color:var(--muted);font-size:.8rem;">
-        ${xlsInfo.auto ? 'ไม่พบหัวตาราง — อ่านตามลำดับคอลัมน์ (ชื่อ, กว้าง, ยาว, จำนวน)'
-                       : 'พบหัวตารางแถวที่ '+(xlsInfo.hdr+1)}
+        ${xlsInfo.auto     ? 'ไม่พบหัวตาราง — อ่านตามลำดับคอลัมน์ (ชื่อ, กว้าง, ยาว, จำนวน)'
+        : xlsInfo.inferred ? 'หัวตารางอ่านไม่ออก — เดาคอลัมน์จากตัวข้อมูล (ช่องที่เป็นคำ = ชื่อ, ช่องจำนวนเต็ม = จำนวน)'
+        :                    'พบหัวตารางแถวที่ '+(xlsInfo.hdr+1)}
       </span>
       <span style="margin-left:auto;display:flex;align-items:center;gap:5px;">
         <span style="color:var(--muted);font-size:.8rem;">หน่วยในไฟล์:</span>
         ${unitBtn('mm','mm')}${unitBtn('cm','cm')}${unitBtn('m','m')}${unitBtn('inch','นิ้ว')}
       </span>
     </div>
-    <div style="max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:8px;">
+    <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+    <div style="flex:1;min-width:320px;max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:8px;">
       <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
         <thead><tr style="background:var(--surface);position:sticky;top:0;">
           <th style="padding:6px 8px;text-align:left;font-size:.74rem;color:var(--muted);">แถว</th>
@@ -4115,7 +4388,19 @@ function renderXlsPreview(){
         <tbody>${items.map(rowHtml).join('')}</tbody>
       </table>
     </div>
+    ${weak?photo:''}
+    </div>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" onclick="xlsAddRow()">+ เพิ่มแถว</button>
+      <button class="btn btn-ghost btn-sm" onclick="xlsClearRows()">🧹 ล้างแล้วกรอกเอง</button>
+    </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;">
+      ${(() => { // a list whose sizes are all under 10 is almost certainly metres
+        const d=ok.flatMap(i=>[i.w,i.h]).filter(v=>v>0);
+        if(xlsUnit!=='mm' || d.length<2 || Math.max.apply(null,d)>=10) return '';
+        return `<div class="notice" style="border-color:#f59e0b;color:#fcd34d;width:100%;margin:0 0 8px;">
+          💡 ขนาดทุกช่องเล็กกว่า 10 — ไฟล์นี้น่าจะเป็น <b>เมตร</b> หรือ <b>ซม.</b> ไม่ใช่ mm
+          กดเปลี่ยน "หน่วยในไฟล์" ด้านบนให้ตรงก่อน</div>`; })()}
       <span style="font-size:.86rem;">
         พร้อมเพิ่ม <b style="color:#4ade80;">${ok.length}</b> รายการ
         รวม <b style="color:#4ade80;">${totQty}</b> ชิ้น
@@ -4137,8 +4422,35 @@ function xlsEdit(row, field, val){
   renderXlsPreview();
 }
 
+function xlsAddRow(){
+  if(!xlsRows) xlsRows=[];
+  xlsRows.push(['ชิ้นใหม่','','','1']);
+  renderXlsPreview();
+}
+function xlsDelRow(row){
+  const e=xlsEdits[row]||(xlsEdits[row]={});
+  e.del=true;
+  renderXlsPreview();
+}
+function xlsClearRows(){
+  if(!confirm('ล้างค่าที่อ่านจากรูปทั้งหมด แล้วกรอกเองใช่ไหม')) return;
+  xlsEdits={};
+  xlsRows=[['ชิ้นใหม่','','','1']];
+  renderXlsPreview();
+}
+
+function copyOcrText(){
+  const t=(xlsOCR&&xlsOCR.text)||'';
+  if(!t) return;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(()=>alert('คัดลอกข้อความที่ OCR อ่านได้แล้ว'),
+                                          ()=>alert('คัดลอกไม่สำเร็จ — เลือกข้อความแล้วกด Ctrl+C แทน'));
+  } else alert('เลือกข้อความในกล่องแล้วกด Ctrl+C');
+}
+
 function clearXls(){
   xlsRows=null; xlsInfo=null; xlsOCR=null; xlsEdits={};
+  xlsImg=null; xlsOcrErr='';
   const el=document.getElementById('xlsResult'); el.style.display='none'; el.innerHTML='';
   const fi=document.getElementById('xlsFi'); if(fi) fi.value='';
 }
@@ -5482,6 +5794,1351 @@ const SETTING_IDS=['projName','sw','sh','kerf','pieceGap','stlUnit','priceSheet'
 /** Everything that must survive a save/undo. The nesting grid is scratch memory
  *  (a big typed array) and is dropped; groups keep an INDEX into sheets instead of
  *  an object reference, so the pair survives a JSON round-trip. */
+// ═══════════════════════════════════════════════════════
+//  3D IMPORT — mesh → flat faces → pieces
+// ═══════════════════════════════════════════════════════
+// A CNC sheet job only ever cuts FLAT panels, so a 3D model is useful here in
+// exactly one way: find its planar faces, measure them, and let the user pick
+// which ones get cut.
+//
+// Everything is held in typed arrays and every sort is a radix sort, because a
+// real scan or a detailed CAD export runs to millions of triangles and the
+// obvious version (arrays of arrays, string keys in a Map) needs gigabytes to
+// do the same work.
+
+let m3Tri=null;           // Float32Array, 9 numbers per triangle, file units
+let m3NTri=0;
+let m3Faces=[];           // the planar faces worth showing, biggest first
+let m3AllFaces=0;         // how many were found before the small ones were dropped
+let m3Name='', m3Unit='mm', m3Disp='mm', m3Qty=1, m3AutoSplit=true;
+let m3Sel=new Set(), m3Hover=-1;
+let m3Mode='side';        // 'side' = the six faces a person sees · 'face' = every flat patch
+let m3Sides=[], m3SideOf=null, m3CompOf=null;
+let m3Box={cx:0,cy:0,cz:0,span:1};
+let m3GL=null, m3GLErr='';
+let m3Yaw=-0.95, m3Pitch=0.52, m3Zoom=1, m3Drag=null, m3Moved=0;
+let m3Ms=0;
+const M3_KEEP=500;        // faces shown; the rest are slivers, never panels
+
+/* ─────────── a growable Float32Array ─────────── */
+function _m3Buf(){
+  let a=new Float32Array(1<<16), n=0;
+  return { push3(x,y,z){
+      if(n+3>a.length){ const b=new Float32Array(a.length*2); b.set(a); a=b; }
+      a[n++]=x; a[n++]=y; a[n++]=z;
+    },
+    done(){ return a.subarray(0,n).slice(); },
+    get n(){ return n; } };
+}
+
+/* ─────────── parsers · each returns Float32Array(9·N) ─────────── */
+
+function _m3STL(buf){
+  const dv=new DataView(buf);
+  const n = buf.byteLength>=84 ? dv.getUint32(80,true) : 0;
+  if(n>0 && buf.byteLength===84+n*50){                    // binary
+    const t=new Float32Array(n*9);
+    for(let i=0;i<n;i++){ const o=84+i*50, q=i*9;
+      for(let j=0;j<9;j++) t[q+j]=dv.getFloat32(o+12+j*4,true);
+    }
+    return t;
+  }
+  const txt=new TextDecoder().decode(new Uint8Array(buf));
+  const b=_m3Buf();
+  const re=/vertex\s+(-?[\d.]+(?:[eE][-+]?\d+)?)\s+(-?[\d.]+(?:[eE][-+]?\d+)?)\s+(-?[\d.]+(?:[eE][-+]?\d+)?)/g;
+  let m; while((m=re.exec(txt))) b.push3(+m[1],+m[2],+m[3]);
+  if(b.n<9) throw new Error('ไฟล์ STL ไม่มีข้อมูลสามเหลี่ยม');
+  const out=b.done();
+  return out.subarray(0, Math.floor(out.length/9)*9);
+}
+
+function _m3OBJ(txt){
+  const vb=_m3Buf(); const b=_m3Buf();
+  let nv=0;
+  const V=(i)=>{ const k=(i<0 ? nv+i : i-1)*3; return k; };
+  const vs=[];                                   // index → offset, kept flat
+  txt.split(/\r?\n/).forEach(ln=>{
+    const s=ln.trim();
+    if(s.charCodeAt(0)===118 && s[1]===' '){
+      const p=s.split(/\s+/); vb.push3(+p[1],+p[2],+p[3]||0); nv++;
+    } else if(s.charCodeAt(0)===102 && s[1]===' '){
+      const idx=s.split(/\s+/).slice(1).map(x=>V(parseInt(x.split('/')[0],10)));
+      const A=vb;
+      for(let i=1;i+1<idx.length;i++) vs.push(idx[0],idx[i],idx[i+1]);
+    }
+  });
+  const P=vb.done();
+  if(!vs.length) throw new Error('ไฟล์ OBJ ไม่มีหน้า (f) ที่อ่านได้');
+  const t=new Float32Array(vs.length*3);
+  for(let i=0;i<vs.length;i++){ const o=vs[i];
+    t[i*3]=P[o]||0; t[i*3+1]=P[o+1]||0; t[i*3+2]=P[o+2]||0; }
+  return t;
+}
+
+function _m3PLY(buf){
+  const u8=new Uint8Array(buf);
+  const head=new TextDecoder('latin1').decode(u8.subarray(0, Math.min(u8.length,65536)));
+  const endTok=head.indexOf('end_header');
+  if(endTok<0) throw new Error('ไฟล์ PLY ไม่มีส่วนหัวที่ถูกต้อง');
+  const dataAt=head.indexOf('\n', endTok)+1;
+  const SZ={char:1,uchar:1,int8:1,uint8:1,short:2,ushort:2,int16:2,uint16:2,
+            int:4,uint:4,int32:4,uint32:4,float:4,float32:4,double:8,float64:8};
+  const RD={char:'getInt8',uchar:'getUint8',int8:'getInt8',uint8:'getUint8',
+            short:'getInt16',ushort:'getUint16',int16:'getInt16',uint16:'getUint16',
+            int:'getInt32',uint:'getUint32',int32:'getInt32',uint32:'getUint32',
+            float:'getFloat32',float32:'getFloat32',double:'getFloat64',float64:'getFloat64'};
+  let fmt='ascii', els=[], cur=null;
+  head.slice(0,endTok).split(/\r?\n/).forEach(ln=>{
+    const p=ln.trim().split(/\s+/);
+    if(p[0]==='format') fmt=p[1];
+    else if(p[0]==='element'){ cur={name:p[1], n:+p[2], props:[]}; els.push(cur); }
+    else if(p[0]==='property' && cur){
+      if(p[1]==='list') cur.props.push({list:true, cnt:p[2], item:p[3], name:p[4]});
+      else cur.props.push({type:p[1], name:p[2]});
+    }
+  });
+  const nV=(els.find(e=>e.name==='vertex')||{}).n||0;
+  const P=new Float32Array(nV*3);
+  const fb=[];
+  if(fmt==='ascii'){
+    const toks=new TextDecoder().decode(u8.subarray(dataAt)).split(/\s+/);
+    let k=0, vi=0;
+    if(toks[0]==='') k=1;
+    els.forEach(el=>{
+      for(let i=0;i<el.n;i++){
+        const rec={};
+        el.props.forEach(pr=>{
+          if(pr.list){ const c=+toks[k++]; const a=new Array(c);
+            for(let j=0;j<c;j++) a[j]=+toks[k++]; rec[pr.name]=a; }
+          else rec[pr.name]=+toks[k++];
+        });
+        if(el.name==='vertex'){ P[vi*3]=rec.x||0; P[vi*3+1]=rec.y||0; P[vi*3+2]=rec.z||0; vi++; }
+        else if(el.name==='face'){ const f=rec.vertex_indices||rec.vertex_index||[];
+          for(let j=1;j+1<f.length;j++) fb.push(f[0],f[j],f[j+1]); }
+      }
+    });
+  } else {
+    const LE = fmt.indexOf('little')>=0;
+    const dv=new DataView(buf); let o=dataAt, vi=0;
+    els.forEach(el=>{
+      for(let i=0;i<el.n;i++){
+        const rec={};
+        el.props.forEach(pr=>{
+          if(pr.list){
+            const c=dv[RD[pr.cnt]](o,LE); o+=SZ[pr.cnt];
+            const a=new Array(c);
+            for(let j=0;j<c;j++){ a[j]=dv[RD[pr.item]](o,LE); o+=SZ[pr.item]; }
+            rec[pr.name]=a;
+          } else { rec[pr.name]=dv[RD[pr.type]](o,LE); o+=SZ[pr.type]; }
+        });
+        if(el.name==='vertex'){ P[vi*3]=rec.x||0; P[vi*3+1]=rec.y||0; P[vi*3+2]=rec.z||0; vi++; }
+        else if(el.name==='face'){ const f=rec.vertex_indices||rec.vertex_index||[];
+          for(let j=1;j+1<f.length;j++) fb.push(f[0],f[j],f[j+1]); }
+      }
+    });
+  }
+  if(!fb.length) throw new Error('ไฟล์ PLY ไม่มีหน้าที่อ่านได้');
+  const t=new Float32Array(fb.length*3);
+  for(let i=0;i<fb.length;i++){ const o=fb[i]*3;
+    t[i*3]=P[o]; t[i*3+1]=P[o+1]; t[i*3+2]=P[o+2]; }
+  return t;
+}
+
+function _m3_3MF(u8){
+  const files=_unzip(u8);
+  const key=Object.keys(files).find(k=>/\.model$/i.test(k));
+  if(!key) throw new Error('ไฟล์ .3mf ไม่มี 3dmodel.model ข้างใน');
+  const xml=new TextDecoder('utf-8').decode(files[key]);
+  const b=_m3Buf();
+  const meshes=xml.match(/<mesh[\s\S]*?<\/mesh>/g)||[];
+  meshes.forEach(ms=>{
+    const vb=_m3Buf(); let m;
+    const rv=/<vertex\s[^>]*?x="([-\d.eE+]+)"[^>]*?y="([-\d.eE+]+)"[^>]*?z="([-\d.eE+]+)"/g;
+    while((m=rv.exec(ms))) vb.push3(+m[1],+m[2],+m[3]);
+    const P=vb.done();
+    const rt=/<triangle\s[^>]*?v1="(\d+)"[^>]*?v2="(\d+)"[^>]*?v3="(\d+)"/g;
+    while((m=rt.exec(ms))){
+      for(let j=1;j<=3;j++){ const o=(+m[j])*3;
+        if(o+2<P.length) b.push3(P[o],P[o+1],P[o+2]); }
+    }
+  });
+  if(b.n<9) throw new Error('ไฟล์ .3mf ไม่มีสามเหลี่ยมที่อ่านได้');
+  const out=b.done();
+  return out.subarray(0, Math.floor(out.length/9)*9);
+}
+
+/* ─────────── sorting ─────────── */
+/** LSD radix over a 48-bit key held as (hi16, lo32). No comparator, no strings. */
+function _m3Radix(lo, hi, n){
+  let idx=new Uint32Array(n), tmp=new Uint32Array(n);
+  for(let i=0;i<n;i++) idx[i]=i;
+  const cnt=new Uint32Array(65536);
+  const pass=(get)=>{
+    cnt.fill(0);
+    for(let i=0;i<n;i++) cnt[get(idx[i])]++;
+    let s=0; for(let b=0;b<65536;b++){ const c=cnt[b]; cnt[b]=s; s+=c; }
+    for(let i=0;i<n;i++){ const v=idx[i]; tmp[cnt[get(v)]++]=v; }
+    const t=idx; idx=tmp; tmp=t;
+  };
+  pass(v=>lo[v]&0xffff);
+  pass(v=>(lo[v]>>>16)&0xffff);
+  pass(v=>hi[v]&0xffff);
+  return idx;
+}
+
+/* ─────────── mesh → planar faces ─────────── */
+/**
+ * A panel is a run of triangles that touch edge-to-edge AND stay on one plane.
+ * Each candidate is measured against the plane the run STARTED on, never against
+ * its neighbour — comparing neighbours lets a finely tessellated curve creep a
+ * fraction of a degree at a time until a whole sphere counts as one "flat" face.
+ */
+function _m3BuildFaces(tf, onProgress){
+  const N=tf.length/9|0, n3=N*3;
+  if(!N) return [];
+  let mnX=Infinity,mnY=Infinity,mnZ=Infinity,mxX=-Infinity,mxY=-Infinity,mxZ=-Infinity;
+  for(let i=0;i<tf.length;i+=3){
+    const x=tf[i],y=tf[i+1],z=tf[i+2];
+    if(x<mnX)mnX=x; if(x>mxX)mxX=x; if(y<mnY)mnY=y; if(y>mxY)mxY=y;
+    if(z<mnZ)mnZ=z; if(z>mxZ)mxZ=z;
+  }
+  const span=Math.max(mxX-mnX, mxY-mnY, mxZ-mnZ)||1;
+  const PTOL=span*2e-4;                      // "on the same plane" in model units
+
+  // ── weld vertices: quantise, radix sort, number the runs
+  const kLo=new Uint32Array(n3), kHi=new Uint32Array(n3);
+  const sc=65535/span;
+  for(let v=0;v<n3;v++){
+    const o=v*3;
+    const qx=(tf[o]  -mnX)*sc|0, qy=(tf[o+1]-mnY)*sc|0, qz=(tf[o+2]-mnZ)*sc|0;
+    kHi[v]=qx; kLo[v]=((qy<<16)|qz)>>>0;
+  }
+  let ord=_m3Radix(kLo,kHi,n3);
+  const vid=new Int32Array(n3);
+  let nv=0;
+  for(let i=0;i<n3;i++){
+    const v=ord[i];
+    if(i>0){ const p=ord[i-1]; if(kLo[v]!==kLo[p]||kHi[v]!==kHi[p]) nv++; }
+    vid[v]=nv;
+  }
+  nv++;
+  if(nv>16777216) throw new Error('โมเดลมีจุดมากกว่า 16 ล้านจุด — เกินที่โปรแกรมจะจัดการไหว');
+  if(onProgress) onProgress('เชื่อมจุด');
+
+  // ── triangle normals and areas
+  const nx=new Float32Array(N), ny=new Float32Array(N), nz=new Float32Array(N);
+  const tArea=new Float32Array(N);
+  for(let t=0;t<N;t++){
+    const o=t*9;
+    const ax=tf[o],ay=tf[o+1],az=tf[o+2];
+    const e1x=tf[o+3]-ax, e1y=tf[o+4]-ay, e1z=tf[o+5]-az;
+    const e2x=tf[o+6]-ax, e2y=tf[o+7]-ay, e2z=tf[o+8]-az;
+    const cx=e1y*e2z-e1z*e2y, cy=e1z*e2x-e1x*e2z, cz=e1x*e2y-e1y*e2x;
+    const L=Math.sqrt(cx*cx+cy*cy+cz*cz);
+    tArea[t]=L/2;
+    if(L>1e-20){ nx[t]=cx/L; ny[t]=cy/L; nz[t]=cz/L; } else nx[t]=NaN;
+  }
+
+  // ── edges: every triangle side, keyed by its two welded endpoints
+  const eLo=new Uint32Array(n3), eHi=new Uint32Array(n3);
+  for(let t=0;t<N;t++) for(let e=0;e<3;e++){
+    const a=vid[t*3+e], b=vid[t*3+(e+1)%3];
+    const lo=a<b?a:b, hi=a<b?b:a;
+    const k=lo*16777216+hi;                   // 24 bits each — exact in a double
+    eHi[t*3+e]=(k/4294967296)|0;
+    eLo[t*3+e]=(k>>>0);
+  }
+  ord=_m3Radix(eLo,eHi,n3);
+  const pairA=new Int32Array(n3), pairB=new Int32Array(n3);
+  let np=0;
+  for(let i=0;i<n3;){
+    let j=i+1;
+    while(j<n3 && eLo[ord[j]]===eLo[ord[i]] && eHi[ord[j]]===eHi[ord[i]]) j++;
+    if(j-i>1) for(let a=i;a<j;a++) for(let b=a+1;b<j;b++){
+      pairA[np]=ord[a]/3|0; pairB[np]=ord[b]/3|0; np++;
+      if(np>=n3) { a=j; b=j; }
+    }
+    i=j;
+  }
+  if(onProgress) onProgress('จับคู่ขอบ');
+
+  // ── adjacency in CSR form
+  const deg=new Int32Array(N+1);
+  for(let i=0;i<np;i++){ deg[pairA[i]]++; deg[pairB[i]]++; }
+  const off=new Int32Array(N+1);
+  for(let i=0,s=0;i<=N;i++){ off[i]=s; s+=deg[i]; }
+  const fill=off.slice(), nbr=new Int32Array(off[N]);
+  for(let i=0;i<np;i++){ nbr[fill[pairA[i]]++]=pairB[i]; nbr[fill[pairB[i]]++]=pairA[i]; }
+
+  // ── grow one panel at a time
+  const COS=Math.cos(0.75*Math.PI/180);
+  const comp=new Int32Array(N).fill(-1);
+  const stack=new Int32Array(N);
+  const faces=[];
+  for(let s=0;s<N;s++){
+    if(comp[s]>=0 || !(tArea[s]>0) || isNaN(nx[s])) continue;
+    const fi=faces.length;
+    const n0x=nx[s], n0y=ny[s], n0z=nz[s];
+    const d0=n0x*tf[s*9]+n0y*tf[s*9+1]+n0z*tf[s*9+2];
+    let sp=0; stack[sp++]=s; comp[s]=fi;
+    const mine=[s]; let area=tArea[s];
+    while(sp){
+      const t=stack[--sp];
+      for(let k=off[t];k<off[t+1];k++){
+        const j=nbr[k];
+        if(comp[j]>=0 || isNaN(nx[j]) || !(tArea[j]>0)) continue;
+        if(n0x*nx[j]+n0y*ny[j]+n0z*nz[j] < COS) continue;
+        const o=j*9;
+        let far=0;
+        for(let c=0;c<3;c++){
+          const dd=Math.abs(n0x*tf[o+c*3]+n0y*tf[o+c*3+1]+n0z*tf[o+c*3+2]-d0);
+          if(dd>PTOL){ far=1; break; }
+        }
+        if(far) continue;
+        comp[j]=fi; area+=tArea[j]; mine.push(j); stack[sp++]=j;
+      }
+    }
+    faces.push({tris:mine, area, n:[n0x,n0y,n0z]});
+  }
+  if(onProgress) onProgress('รวมหน้า');
+
+  // ── only the faces big enough to be a panel get an outline traced
+  faces.sort((a,b)=>b.area-a.area);
+  const total=faces.length;
+  const top=faces.length?faces[0].area:0;
+  const keep=faces.filter(f=>f.area>=top*2e-4).slice(0, M3_KEEP);
+  keep.forEach(f=>_m3Outline(f, tf, vid));
+  const out=keep.filter(f=>f.poly && f.poly.length>=3 && f.w>1e-9 && f.h>1e-9);
+  const kept=new Int32Array(N).fill(-1);
+  out.forEach((f,j)=>f.tris.forEach(t=>{ kept[t]=j; }));
+  out._total=total; out._vid=vid; out._comp=kept;
+  out._box={cx:(mnX+mxX)/2, cy:(mnY+mxY)/2, cz:(mnZ+mxZ)/2, span};
+  return out;
+}
+
+/** Walk the unshared edges of one panel into closed loops, then flatten them. */
+function _m3Outline(f, tf, vid){
+  // "Unshared" means unshared WITHIN THIS PANEL. On a closed solid every edge is
+  // shared by two triangles, so a global count would find no boundary at all —
+  // the panel's rim is exactly where it hands over to a differently-angled face.
+  const cnt=new Map(), ends=new Map(), pos=new Map();
+  f.tris.forEach(t=>{
+    for(let e=0;e<3;e++){
+      const a=vid[t*3+e], b=vid[t*3+(e+1)%3];
+      const oa=(t*3+e)*3, ob=(t*3+(e+1)%3)*3;
+      pos.set(a,[tf[oa],tf[oa+1],tf[oa+2]]);
+      pos.set(b,[tf[ob],tf[ob+1],tf[ob+2]]);
+      const lo=a<b?a:b, hi=a<b?b:a, k=lo*16777216+hi;
+      cnt.set(k,(cnt.get(k)||0)+1);
+      if(!ends.has(k)) ends.set(k,[a,b]);
+    }
+  });
+  const adj=new Map();
+  cnt.forEach((c,k)=>{
+    if(c!==1) return;
+    const [a,b]=ends.get(k);
+    if(!adj.has(a)) adj.set(a,[]); if(!adj.has(b)) adj.set(b,[]);
+    adj.get(a).push(b); adj.get(b).push(a);
+  });
+  const seen=new Set(), loops=[];
+  adj.forEach((_,start)=>{
+    if(seen.has(start)) return;
+    const loop=[]; let cur=start, prev=null, guard=0;
+    while(cur!==undefined && !seen.has(cur) && guard++<1e6){
+      seen.add(cur); loop.push(pos.get(cur));
+      const nb=adj.get(cur)||[];
+      const nx=nb.find(x=>x!==prev && !seen.has(x));
+      prev=cur; cur=nx;
+    }
+    if(loop.length>=3) loops.push(loop);
+  });
+  if(!loops.length){ f.poly=[]; return; }
+
+  const n=f.n;
+  let u=null;
+  for(const L of loops){ for(let i=1;i<L.length && !u;i++){
+    const d=[L[i][0]-L[0][0], L[i][1]-L[0][1], L[i][2]-L[0][2]];
+    if(Math.hypot(d[0],d[1],d[2])>1e-9) u=d;
+  } if(u) break; }
+  if(!u) u=Math.abs(n[0])<0.9 ? [1,0,0] : [0,1,0];
+  const dot=u[0]*n[0]+u[1]*n[1]+u[2]*n[2];
+  let ux=u[0]-n[0]*dot, uy=u[1]-n[1]*dot, uz=u[2]-n[2]*dot;
+  const uL=Math.hypot(ux,uy,uz)||1; ux/=uL; uy/=uL; uz/=uL;
+  const vx=n[1]*uz-n[2]*uy, vy=n[2]*ux-n[0]*uz, vz=n[0]*uy-n[1]*ux;
+
+  const flat=loops.map(L=>_m3Simplify(L.map(p=>[p[0]*ux+p[1]*uy+p[2]*uz, p[0]*vx+p[1]*vy+p[2]*vz])));
+  const withA=flat.map((p,i)=>({p, a:Math.abs(_m3Area(p)), i})).filter(x=>x.p.length>=3 && x.a>1e-9);
+  withA.sort((a,b)=>b.a-a.a);
+  if(!withA.length){ f.poly=[]; return; }
+  f.loops3=withA.map(x=>loops[x.i]);
+  const outer=withA[0].p;
+  let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
+  outer.forEach(p=>{ if(p[0]<mnX)mnX=p[0]; if(p[0]>mxX)mxX=p[0];
+                     if(p[1]<mnY)mnY=p[1]; if(p[1]>mxY)mxY=p[1]; });
+  f.poly=outer.map(p=>[p[0]-mnX, p[1]-mnY]);
+  if(_m3Area(f.poly)<0) f.poly.reverse();
+  f.holes=withA.slice(1).map(x=>x.p.map(p=>[p[0]-mnX,p[1]-mnY]));
+  f.w=mxX-mnX; f.h=mxY-mnY;
+  f.flatArea=Math.abs(_m3Area(f.poly))-f.holes.reduce((a,p)=>a+Math.abs(_m3Area(p)),0);
+}
+
+function _m3Area(p){
+  let s=0; for(let i=0,n=p.length;i<n;i++){ const a=p[i], b=p[(i+1)%n]; s+=a[0]*b[1]-b[0]*a[1]; }
+  return s/2;
+}
+
+/** Mesh boundaries carry a crowd of collinear points. Cutting does not need them. */
+function _m3Simplify(p){
+  if(p.length<4) return p;
+  const out=[];
+  for(let i=0;i<p.length;i++){
+    const a=p[(i-1+p.length)%p.length], b=p[i], c=p[(i+1)%p.length];
+    const cr=(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+    const L=Math.hypot(c[0]-a[0], c[1]-a[1])||1;
+    if(Math.abs(cr)/L > 1e-4) out.push(b);       // keep only real corners
+  }
+  return out.length>=3 ? out : p;
+}
+
+/** Sutherland–Hodgman against one axis-aligned rectangle. */
+function _m3ClipRect(poly,x0,y0,x1,y1){
+  const clip=(pts,inside,isect)=>{
+    const out=[];
+    for(let i=0;i<pts.length;i++){
+      const a=pts[i], b=pts[(i+1)%pts.length];
+      const ia=inside(a), ib=inside(b);
+      if(ia) out.push(a);
+      if(ia!==ib) out.push(isect(a,b));
+    }
+    return out;
+  };
+  const ix=(a,b,X)=>{ const t=(X-a[0])/((b[0]-a[0])||1e-12); return [X, a[1]+t*(b[1]-a[1])]; };
+  const iy=(a,b,Y)=>{ const t=(Y-a[1])/((b[1]-a[1])||1e-12); return [a[0]+t*(b[0]-a[0]), Y]; };
+  let p=poly;
+  p=clip(p,a=>a[0]>=x0, (a,b)=>ix(a,b,x0)); if(p.length<3) return [];
+  p=clip(p,a=>a[0]<=x1, (a,b)=>ix(a,b,x1)); if(p.length<3) return [];
+  p=clip(p,a=>a[1]>=y0, (a,b)=>iy(a,b,y0)); if(p.length<3) return [];
+  p=clip(p,a=>a[1]<=y1, (a,b)=>iy(a,b,y1)); if(p.length<3) return [];
+  return p;
+}
+
+/** A face wider than the sheet is cut into equal panels that do fit. */
+function _m3SplitToSheet(poly, w, h, maxW, maxH){
+  let nx=Math.max(1,Math.ceil(w/maxW - 1e-9)), ny=Math.max(1,Math.ceil(h/maxH - 1e-9));
+  const alt={nx:Math.max(1,Math.ceil(w/maxH - 1e-9)), ny:Math.max(1,Math.ceil(h/maxW - 1e-9))};
+  let rot=false;
+  if(alt.nx*alt.ny < nx*ny){ nx=alt.nx; ny=alt.ny; rot=true; }   // sheet turned 90°
+  if(nx*ny<=1) return {panels:[{poly, w, h, x0:0, y0:0}], nx:1, ny:1, rot:false};
+  const panels=[];
+  for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){
+    const x0=i*w/nx, x1=(i+1)*w/nx, y0=j*h/ny, y1=(j+1)*h/ny;
+    const c=_m3ClipRect(poly, x0-1e-9, y0-1e-9, x1+1e-9, y1+1e-9);
+    if(c.length<3) continue;
+    let mnX=1e18,mnY=1e18,mxX=-1e18,mxY=-1e18;
+    c.forEach(p=>{ if(p[0]<mnX)mnX=p[0]; if(p[0]>mxX)mxX=p[0];
+                   if(p[1]<mnY)mnY=p[1]; if(p[1]>mxY)mxY=p[1]; });
+    const pw=mxX-mnX, ph=mxY-mnY;
+    if(pw<0.5 || ph<0.5 || Math.abs(_m3Area(c))<1) continue;
+    panels.push({poly:c.map(p=>[p[0]-mnX, p[1]-mnY]), w:pw, h:ph, x0:mnX, y0:mnY, ix:i+1, iy:j+1});
+  }
+  return {panels, nx, ny, rot};
+}
+
+/* ─────────── file intake ─────────── */
+
+function handle3DDrop(ev){
+  ev.preventDefault();
+  const d=ev.currentTarget; if(d&&d.classList) d.classList.remove('dragover');
+  const f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0];
+  if(f) handle3DFile(f);
+}
+
+function _m3Busy(msg){
+  const el=document.getElementById('m3Result');
+  if(!el) return; el.style.display='';
+  el.innerHTML=`<div class="notice">⏳ ${esc(msg)}</div>`;
+}
+function _m3Fail(msg){
+  const el=document.getElementById('m3Result');
+  if(!el) return; el.style.display='';
+  el.innerHTML=`<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ ${esc(msg)}</div>`;
+}
+
+function handle3DFile(file){
+  if(!file) return;
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(['step','stp','iges','igs','skp','3dm','sldprt','ipt','f3d'].includes(ext)){
+    _m3Fail(`ไฟล์ .${ext} เป็นรูปแบบ CAD (ผิวโค้งจริง) ยังอ่านไม่ได้ในเวอร์ชันนี้ — `+
+            `เปิดใน CAD แล้ว Export เป็น .stl หรือ .obj ก่อน (ฟรี ทุกโปรแกรมทำได้)`);
+    return;
+  }
+  if(!['stl','obj','ply','3mf'].includes(ext)){
+    _m3Fail(`นามสกุล .${ext} ไม่รองรับ — ใช้ .stl .obj .ply หรือ .3mf`); return;
+  }
+  m3Name=file.name;
+  m3Tri=null; m3NTri=0; m3Faces=[]; m3Sel=new Set();
+  _m3Busy('กำลังอ่านไฟล์ 3D…');
+  const fr=new FileReader();
+  fr.onerror=()=>_m3Fail('อ่านไฟล์ไม่สำเร็จ');
+  fr.onload=e=>{
+    // let the busy notice paint before the parse takes the thread
+    setTimeout(()=>{
+      let tf;
+      try{
+        const buf=e.target.result;
+        if(ext==='stl') tf=_m3STL(buf);
+        else if(ext==='obj') tf=_m3OBJ(new TextDecoder().decode(new Uint8Array(buf)));
+        else if(ext==='ply') tf=_m3PLY(buf);
+        else tf=_m3_3MF(new Uint8Array(buf));
+      }catch(err){ _m3Fail(err.message||String(err)); return; }
+      const N=tf.length/9|0;
+      if(!N){ _m3Fail('ไม่พบสามเหลี่ยมในไฟล์'); return; }
+      _m3Busy(`กำลังหาหน้าเรียบจาก ${N.toLocaleString()} สามเหลี่ยม…`+
+              (N>400000?' (โมเดลใหญ่ ใช้เวลาสักครู่)':''));
+      setTimeout(()=>{
+        try{
+          m3Tri=tf; m3NTri=N;
+          const t0=Date.now();
+          m3Faces=_m3BuildFaces(tf);
+          m3AllFaces=m3Faces._total||m3Faces.length;
+          m3CompOf=m3Faces._comp; m3Box=m3Faces._box;
+          const S=_m3BuildSides(tf, m3Faces._vid);
+          m3SideOf=S.side; m3Sides=S.sides;
+          m3Ms=Date.now()-t0;
+          m3Hover=-1; m3Zoom=1; m3Yaw=M3_VIEW.iso[0]; m3Pitch=M3_VIEW.iso[1];
+          m3GL=null; m3GLErr='';
+          m3Mode='side'; m3Sel=new Set([0]);   // "top" is what people mean nine times in ten
+          render3D(true);
+        }catch(err){ _m3Fail(err.message||String(err)); }
+      },30);
+    },30);
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+/* ─────────── the six sides ─────────── */
+// The model the user is looking at is a slab, and what they want to know is what
+// the TOP is — not what 33,000 sliver facets are. Every triangle is filed under
+// the axis its normal leans towards, which gives exactly the six sides a person
+// sees: top, bottom, front, back, left, right.
+
+const M3_SIDE=[
+  {k:'top',    lab:'บน',   ax:2, sg: 1, u:[1,0,0],  v:[0,1,0],  col:[0.30,0.80,0.45]},
+  {k:'bottom', lab:'ล่าง', ax:2, sg:-1, u:[1,0,0],  v:[0,-1,0], col:[0.90,0.65,0.25]},
+  {k:'front',  lab:'หน้า', ax:1, sg:-1, u:[1,0,0],  v:[0,0,1],  col:[0.35,0.65,0.95]},
+  {k:'back',   lab:'หลัง', ax:1, sg: 1, u:[-1,0,0], v:[0,0,1],  col:[0.75,0.45,0.90]},
+  {k:'left',   lab:'ซ้าย', ax:0, sg:-1, u:[0,-1,0], v:[0,0,1],  col:[0.95,0.45,0.55]},
+  {k:'right',  lab:'ขวา',  ax:0, sg: 1, u:[0,1,0],  v:[0,0,1],  col:[0.40,0.85,0.85]}
+];
+
+/** Chain a bag of undirected edges into closed loops. */
+function _m3Loops(ea, eb, n, P){
+  const adj=new Map();
+  for(let i=0;i<n;i++){
+    const a=ea[i], b=eb[i];
+    if(a===b) continue;
+    let A=adj.get(a); if(!A) adj.set(a,A=[]); A.push(b);
+    let B=adj.get(b); if(!B) adj.set(b,B=[]); B.push(a);
+  }
+  const seen=new Set(), loops=[];
+  adj.forEach((_,start)=>{
+    if(seen.has(start)) return;
+    const loop=[]; let cur=start, prev=null, guard=0;
+    while(cur!==undefined && !seen.has(cur) && guard++<2e6){
+      seen.add(cur); loop.push([P[cur*3],P[cur*3+1],P[cur*3+2]]);
+      const nb=adj.get(cur)||[];
+      const nx=nb.find(x=>x!==prev && !seen.has(x));
+      prev=cur; cur=nx;
+    }
+    if(loop.length>=3) loops.push(loop);
+  });
+  return loops;
+}
+
+/* ─────────── footprint by coverage ─────────── */
+// CAD meshers split one surface into several patches and mesh each on its own, so
+// shared seams end up with mismatched vertices (T-junctions). Topology then reads
+// a seam as an outer edge and the traced panel comes out as one patch instead of
+// the whole face. Coverage does not care about topology: rasterise the projection
+// and trace the border of the filled region.
+
+function _m3Footprint(tris, tf, u, v){
+  const px=o=>tf[o]*u[0]+tf[o+1]*u[1]+tf[o+2]*u[2];
+  const py=o=>tf[o]*v[0]+tf[o+1]*v[1]+tf[o+2]*v[2];
+  let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
+  for(let i=0;i<tris.length;i++){ const t=tris[i];
+    for(let c=0;c<3;c++){ const o=t*9+c*3, x=px(o), y=py(o);
+      if(x<mnX)mnX=x; if(x>mxX)mxX=x; if(y<mnY)mnY=y; if(y>mxY)mxY=y; } }
+  const bw=mxX-mnX, bh=mxY-mnY;
+  if(!(bw>0)||!(bh>0)) return null;
+  const sc=1400/Math.max(bw,bh);
+  const W=Math.ceil(bw*sc)+4, H=Math.ceil(bh*sc)+4;
+  const M=new Uint8Array(W*H);
+  const X=x=>(x-mnX)*sc+2, Y=y=>(y-mnY)*sc+2;
+  const dot=(x,y)=>{ const i=Math.round(x), j=Math.round(y);
+    if(i>=0&&i<W&&j>=0&&j<H) M[j*W+i]=1; };
+  const line=(x0,y0,x1,y1)=>{ const n=Math.ceil(Math.max(Math.abs(x1-x0),Math.abs(y1-y0)))||1;
+    for(let i=0;i<=n;i++) dot(x0+(x1-x0)*i/n, y0+(y1-y0)*i/n); };
+  for(let i=0;i<tris.length;i++){
+    const o=tris[i]*9;
+    const ax=X(px(o)),   ay=Y(py(o));
+    const bx=X(px(o+3)), by=Y(py(o+3));
+    const cx=X(px(o+6)), cy=Y(py(o+6));
+    let x0=Math.floor(Math.min(ax,bx,cx)), x1=Math.ceil(Math.max(ax,bx,cx));
+    let y0=Math.floor(Math.min(ay,by,cy)), y1=Math.ceil(Math.max(ay,by,cy));
+    if(x0<0)x0=0; if(y0<0)y0=0; if(x1>W-1)x1=W-1; if(y1>H-1)y1=H-1;
+    const d=(bx-ax)*(cy-ay)-(by-ay)*(cx-ax);
+    if(Math.abs(d)>1e-12 && (x1-x0)>1 && (y1-y0)>1){
+      const inv=1/d;
+      for(let y=y0;y<=y1;y++){
+        const fy=y+0.5;
+        for(let x=x0;x<=x1;x++){
+          const fx=x+0.5;
+          const w1=((bx-ax)*(fy-ay)-(by-ay)*(fx-ax))*inv;
+          const w2=((fx-ax)*(cy-ay)-(fy-ay)*(cx-ax))*inv;
+          if(w1>=-1e-9 && w2>=-1e-9 && w1+w2<=1+1e-9) M[y*W+x]=1;
+        }
+      }
+    }
+    // a triangle thinner than a pixel would fall through the centre test
+    line(ax,ay,bx,by); line(bx,by,cx,cy); line(cx,cy,ax,ay);
+  }
+  // fill single-pixel cracks where a seam lands exactly on a pixel border
+  for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+    if(M[y*W+x]) continue;
+    if((M[y*W+x-1]&&M[y*W+x+1]) || (M[(y-1)*W+x]&&M[(y+1)*W+x])) M[y*W+x]=2;
+  }
+  for(let i=0;i<M.length;i++) if(M[i]===2) M[i]=1;
+
+  const cs=_m3Contours(M,W,H);
+  if(!cs.length) return null;
+  const tol=1.3/sc;
+  const shaped=cs.map(c=>{
+    const p=_m3Snap(_m3RDP(c.map(([x,y])=>[mnX+(x-2)/sc, mnY+(y-2)/sc]), tol), tol*1.5);
+    return {p, a:Math.abs(_m3Area(p))};
+  }).filter(x=>x.p.length>=3 && x.a>tol*tol*4);
+  if(!shaped.length) return null;
+  shaped.sort((a,b)=>b.a-a.a);
+  const outer=_m3FitBox(shaped[0].p, mnX, mnY, mxX, mxY);
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  outer.forEach(([x,y])=>{ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; });
+  const poly=outer.map(([x,y])=>[x-x0,y-y0]);
+  if(_m3Area(poly)<0) poly.reverse();
+  const w=x1-x0, h=y1-y0;
+  const holes=shaped.slice(1).map(s=>s.p.map(([x,y])=>[x-x0,y-y0]))
+    .filter(hp=>_m3Chunky(hp) && hp.every(([x,y])=>x>=-tol&&y>=-tol&&x<=w+tol&&y<=h+tol))
+    .filter(hp=>_m3HoleReal(hp, null, tf, u, v, x0, y0));
+  return {poly, holes, w, h, a:Math.abs(_m3Area(poly))};
+}
+
+/** Border-following over a binary mask. Returns each contour as pixel coords. */
+function _m3Contours(M,W,H){
+  const seen=new Uint8Array(W*H), out=[];
+  const at=(x,y)=>(x<0||y<0||x>=W||y>=H)?0:M[y*W+x];
+  const DX=[-1,-1,0,1,1,1,0,-1], DY=[0,-1,-1,-1,0,1,1,1];
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    if(!at(x,y) || seen[y*W+x] || at(x-1,y)) continue;
+    const c=[]; let cx=x, cy=y, dir=0, guard=0;
+    do{
+      seen[cy*W+cx]=1; c.push([cx,cy]);
+      let nx=-1, ny=-1;
+      const k=(dir+6)%8;
+      for(let i=0;i<8;i++){
+        const d=(k+i)%8, tx=cx+DX[d], ty=cy+DY[d];
+        if(at(tx,ty)){ nx=tx; ny=ty; dir=d; break; }
+      }
+      if(nx<0) break;
+      cx=nx; cy=ny;
+    } while((cx!==x||cy!==y) && guard++<8*W*H);
+    if(c.length>=8) out.push(c);
+  }
+  return out;
+}
+
+/** Ramer–Douglas–Peucker over a closed ring, split at its two far ends. */
+function _m3RDP(p, tol){
+  const n=p.length;
+  if(n<5) return p;
+  let far=0, best=-1;
+  for(let i=1;i<n;i++){
+    const d=(p[i][0]-p[0][0])**2+(p[i][1]-p[0][1])**2;
+    if(d>best){ best=d; far=i; }
+  }
+  const keep=new Uint8Array(n); keep[0]=1; keep[far]=1;
+  const rec=(idx,a,b)=>{
+    if(b<=a+1) return;
+    const A=p[idx[a]], B=p[idx[b]];
+    const dx=B[0]-A[0], dy=B[1]-A[1], L=Math.hypot(dx,dy)||1;
+    let mi=-1, md=-1;
+    for(let i=a+1;i<b;i++){
+      const P=p[idx[i]];
+      const d=Math.abs((P[0]-A[0])*dy-(P[1]-A[1])*dx)/L;
+      if(d>md){ md=d; mi=i; }
+    }
+    if(md>tol){ keep[idx[mi]]=1; rec(idx,a,mi); rec(idx,mi,b); }
+  };
+  const arc1=[]; for(let i=0;i<=far;i++) arc1.push(i);
+  const arc2=[]; for(let i=far;i<=n;i++) arc2.push(i%n);
+  rec(arc1,0,arc1.length-1);
+  rec(arc2,0,arc2.length-1);
+  const out=[];
+  for(let i=0;i<n;i++) if(keep[i]) out.push(p[i]);
+  return out.length>=3 ? out : p;
+}
+
+/** A raster edge that is nearly axis-aligned was a straight cut — make it straight. */
+function _m3Snap(p, tol){
+  const q=p.map(v=>[v[0],v[1]]);
+  const n=q.length;
+  for(let i=0;i<n;i++){
+    const a=q[i], b=q[(i+1)%n];
+    const dx=Math.abs(a[0]-b[0]), dy=Math.abs(a[1]-b[1]);
+    if(dx>0 && dx<tol && dy>tol){ const m=(a[0]+b[0])/2; a[0]=b[0]=m; }
+    if(dy>0 && dy<tol && dx>tol){ const m=(a[1]+b[1])/2; a[1]=b[1]=m; }
+  }
+  const out=[];
+  for(let i=0;i<n;i++){
+    const a=q[i], b=out[out.length-1];
+    if(!b || Math.hypot(a[0]-b[0],a[1]-b[1])>tol*0.3) out.push(a);
+  }
+  return out.length>=3 ? out : p;
+}
+
+/** Stretch a traced ring so its extremes land on the real vertex extremes. */
+function _m3FitBox(p, mnX, mnY, mxX, mxY){
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  p.forEach(([x,y])=>{ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; });
+  const sx=(x1-x0)>1e-9?(mxX-mnX)/(x1-x0):1;
+  const sy=(y1-y0)>1e-9?(mxY-mnY)/(y1-y0):1;
+  if(!(sx>0.97&&sx<1.03&&sy>0.97&&sy<1.03)) return p;   // not a rounding gap — leave it alone
+  return p.map(([x,y])=>[mnX+(x-x0)*sx, mnY+(y-y0)*sy]);
+}
+
+/**
+ * A loop inside a face is only a hole if nothing covers it. Mismatched seam
+ * vertices produce loops that look like holes but sit on solid material, and
+ * cutting those would put a slot through a good panel.
+ */
+function _m3HoleReal(hole, tris, tf, u, v, ox, oy){
+  const inside=(x,y,poly)=>{
+    let c=false;
+    for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+      const a=poly[i], b=poly[j];
+      if(((a[1]>y)!==(b[1]>y)) && x < (b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0]) c=!c;
+    }
+    return c;
+  };
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  hole.forEach(([x,y])=>{ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; });
+  // A hole is empty EVERYWHERE. One sample would let a crescent-shaped seam
+  // artefact through, because most of it sits on solid material.
+  const pts=[];
+  for(let i=1;i<=5 && pts.length<14;i++) for(let j=1;j<=5 && pts.length<14;j++){
+    const X=x0+(x1-x0)*i/6, Y=y0+(y1-y0)*j/6;
+    if(inside(X,Y,hole)) pts.push([X,Y]);
+  }
+  if(!pts.length){
+    const cx=hole.reduce((a,p)=>a+p[0],0)/hole.length;
+    const cy=hole.reduce((a,p)=>a+p[1],0)/hole.length;
+    if(!inside(cx,cy,hole)) return false;
+    pts.push([cx,cy]);
+  }
+  const px=o=>tf[o]*u[0]+tf[o+1]*u[1]+tf[o+2]*u[2];
+  const py=o=>tf[o]*v[0]+tf[o+1]*v[1]+tf[o+2]*v[2];
+  // Coverage is judged against the WHOLE model, not just this side's triangles.
+  // A crescent between a wall and the wavy top it meets is empty as far as the
+  // wall is concerned, yet there is solid material sitting in it.
+  const NT = tris ? tris.length : (tf.length/9|0);
+  for(let i=0;i<NT;i++){
+    const o=(tris?tris[i]:i)*9;
+    const ax=px(o),   ay=py(o);
+    const bx=px(o+3), by=py(o+3);
+    const cx2=px(o+6),cy2=py(o+6);
+    const tx0=Math.min(ax,bx,cx2), tx1=Math.max(ax,bx,cx2);
+    const ty0=Math.min(ay,by,cy2), ty1=Math.max(ay,by,cy2);
+    if(tx1<x0+ox||tx0>x1+ox||ty1<y0+oy||ty0>y1+oy) continue;
+    const d=(bx-ax)*(cy2-ay)-(by-ay)*(cx2-ax);
+    if(Math.abs(d)<1e-12) continue;
+    for(let k=0;k<pts.length;k++){
+      const X=pts[k][0]+ox, Y=pts[k][1]+oy;
+      if(X<tx0||X>tx1||Y<ty0||Y>ty1) continue;
+      const w1=((bx-ax)*(Y-ay)-(by-ay)*(X-ax))/d;
+      const w2=((X-ax)*(cy2-ay)-(Y-ay)*(cx2-ax))/d;
+      if(w1>=-1e-9 && w2>=-1e-9 && w1+w2<=1+1e-9) return false;   // solid here
+    }
+  }
+  return true;
+}
+
+/** Seam artefacts trace as long thin slivers. A real hole is not sliver-shaped. */
+function _m3Chunky(p){
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  p.forEach(([x,y])=>{ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; });
+  const bx=(x1-x0)*(y1-y0);
+  return bx>0 && Math.abs(_m3Area(p))/bx > 0.25;
+}
+
+/** Loops → a normalised 2D outline on the given plane basis. */
+function _m3PolyFrom(loops, u, v, chk){
+  const flat=loops.map(L=>_m3Simplify(L.map(p=>[
+    p[0]*u[0]+p[1]*u[1]+p[2]*u[2],
+    p[0]*v[0]+p[1]*v[1]+p[2]*v[2]])));
+  const withA=flat.map(p=>({p, a:Math.abs(_m3Area(p))})).filter(x=>x.p.length>=3 && x.a>1e-9);
+  withA.sort((a,b)=>b.a-a.a);
+  if(!withA.length) return {poly:[], holes:[], w:0, h:0, a:0};
+  const outer=withA[0].p;
+  let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
+  outer.forEach(p=>{ if(p[0]<mnX)mnX=p[0]; if(p[0]>mxX)mxX=p[0];
+                     if(p[1]<mnY)mnY=p[1]; if(p[1]>mxY)mxY=p[1]; });
+  const poly=outer.map(p=>[p[0]-mnX,p[1]-mnY]);
+  if(_m3Area(poly)<0) poly.reverse();
+  const w=mxX-mnX, h=mxY-mnY;
+  const holes=withA.slice(1).map(x=>x.p.map(p=>[p[0]-mnX,p[1]-mnY]))
+    .filter(hp=>_m3Chunky(hp) && hp.every(([x,y])=>x>=-1e-6&&y>=-1e-6&&x<=w+1e-6&&y<=h+1e-6))
+    .filter(hp=>!chk || chk(hp, mnX, mnY));
+  return {poly, holes, w, h, a:withA[0].a};
+}
+
+function _m3BuildSides(tf, vid){
+  const N=tf.length/9|0, n3=N*3;
+  const side=new Uint8Array(N);
+  const cnt=new Int32Array(6);
+  const trueA=new Float64Array(6), projA=new Float64Array(6);
+  const nx=new Float32Array(N), ny=new Float32Array(N), nz=new Float32Array(N);
+  for(let t=0;t<N;t++){
+    const o=t*9;
+    const ax=tf[o],ay=tf[o+1],az=tf[o+2];
+    const e1x=tf[o+3]-ax,e1y=tf[o+4]-ay,e1z=tf[o+5]-az;
+    const e2x=tf[o+6]-ax,e2y=tf[o+7]-ay,e2z=tf[o+8]-az;
+    const cx=e1y*e2z-e1z*e2y, cy=e1z*e2x-e1x*e2z, cz=e1x*e2y-e1y*e2x;
+    const L=Math.sqrt(cx*cx+cy*cy+cz*cz);
+    if(L<1e-20){ side[t]=255; continue; }
+    nx[t]=cx/L; ny[t]=cy/L; nz[t]=cz/L;
+    const X=Math.abs(cx), Y=Math.abs(cy), Z=Math.abs(cz);
+    let s;
+    if(Z>=X && Z>=Y) s = cz>0?0:1;
+    else if(Y>=X)    s = cy<0?2:3;
+    else             s = cx<0?4:5;
+    side[t]=s; cnt[s]++;
+    trueA[s]+=L/2;
+    projA[s]+=(s<2?Z:s<4?Y:X)/2;
+  }
+  const at=new Int32Array(6), lists=[];
+  for(let s=0;s<6;s++) lists.push(new Int32Array(cnt[s]));
+  for(let t=0;t<N;t++){ const s=side[t]; if(s<6) lists[s][at[s]++]=t; }
+
+  let nv=0; for(let i=0;i<n3;i++) if(vid[i]>nv) nv=vid[i];
+  nv++;
+  const P=new Float32Array(nv*3);
+  for(let i=0;i<n3;i++){ const d=vid[i]*3, o=i*3; P[d]=tf[o]; P[d+1]=tf[o+1]; P[d+2]=tf[o+2]; }
+
+  // every edge once, with the (up to two) triangles that own it
+  const eLo=new Uint32Array(n3), eHi=new Uint32Array(n3);
+  for(let t=0;t<N;t++) for(let e=0;e<3;e++){
+    const a=vid[t*3+e], b=vid[t*3+(e+1)%3];
+    const lo=a<b?a:b, hi=a<b?b:a, k=lo*16777216+hi;
+    eHi[t*3+e]=(k/4294967296)|0; eLo[t*3+e]=(k>>>0);
+  }
+  const ord=_m3Radix(eLo,eHi,n3);
+  const rA=new Int32Array(n3), rB=new Int32Array(n3);
+  const rT1=new Int32Array(n3), rT2=new Int32Array(n3);
+  let nr=0;
+  for(let i=0;i<n3;){
+    let j=i+1;
+    while(j<n3 && eLo[ord[j]]===eLo[ord[i]] && eHi[ord[j]]===eHi[ord[i]]) j++;
+    const s0=ord[i], t1=s0/3|0, e0=s0%3;
+    rA[nr]=vid[t1*3+e0]; rB[nr]=vid[t1*3+(e0+1)%3];
+    rT1[nr]=t1; rT2[nr]=(j-i>=2)?(ord[i+1]/3|0):-1;
+    nr++; i=j;
+  }
+
+  const la=new Int32Array(nr), lb=new Int32Array(nr);
+  const EPS=1e-6;
+
+  const sides=M3_SIDE.map((d,s)=>{
+    // the side's exact extent, straight from its vertices — the yardstick every
+    // candidate outline is judged against
+    let bx0=Infinity,by0=Infinity,bx1=-Infinity,by1=-Infinity;
+    lists[s].forEach(t=>{ for(let c=0;c<3;c++){ const o=t*9+c*3;
+      const x=tf[o]*d.u[0]+tf[o+1]*d.u[1]+tf[o+2]*d.u[2];
+      const y=tf[o]*d.v[0]+tf[o+1]*d.v[1]+tf[o+2]*d.v[2];
+      if(x<bx0)bx0=x; if(x>bx1)bx1=x; if(y<by0)by0=y; if(y>by1)by1=y; }});
+    const bw=bx1-bx0, bh=by1-by0;
+    const good=R => !!R && R.poly.length>=3 && R.w>=bw*0.995 && R.h>=bh*0.995
+                    && R.a>=projA[s]*0.95;
+
+    // 1 — the rim of the patch itself. Exact, and it keeps every notch.
+    const mark=new Uint8Array(N);
+    lists[s].forEach(t=>{ mark[t]=1; });
+    let n=0;
+    for(let i=0;i<nr;i++){
+      const m1=rT1[i]>=0 && mark[rT1[i]];
+      const m2=rT2[i]>=0 && mark[rT2[i]];
+      if(m1!==m2 || (m1 && rT2[i]<0)){ la[n]=rA[i]; lb[n]=rB[i]; n++; }
+    }
+    const chk=(hp,ox,oy)=>_m3HoleReal(hp, null, tf, d.u, d.v, ox, oy);
+    let R = n>=3 ? _m3PolyFrom(_m3Loops(la,lb,n,P), d.u, d.v, chk) : null;
+
+    // 2 — the silhouette, for a wavy face whose steep flanks were filed sideways
+    if(!good(R)){
+      const an = d.ax===0?nx : d.ax===1?ny : nz;
+      const front=t=>t>=0 && side[t]!==255 && an[t]*d.sg>EPS;
+      let m=0;
+      for(let i=0;i<nr;i++){
+        const f1=front(rT1[i]), f2=rT2[i]<0?false:front(rT2[i]);
+        if(f1!==f2){ la[m]=rA[i]; lb[m]=rB[i]; m++; }
+      }
+      if(m>=3){
+        const R2=_m3PolyFrom(_m3Loops(la,lb,m,P), d.u, d.v, chk);
+        if(good(R2) || (R2 && (!R || R2.a>R.a))) R=R2;
+      }
+    }
+    // 3 — coverage, which ignores topology altogether
+    if(!good(R) && lists[s].length){
+      const R3=_m3Footprint(lists[s], tf, d.u, d.v);
+      if(R3 && (good(R3) || !R || R3.a>R.a)) R=R3;
+    }
+    R = R || {poly:[],holes:[],w:0,h:0,a:0};
+    return Object.assign({}, d, {i:s, nTri:cnt[s], trueArea:trueA[s], projArea:projA[s],
+      poly:R.poly, holes:R.holes, w:R.w, h:R.h});
+  });
+  return {side, sides};
+}
+
+/* ─────────── preview ─────────── */
+
+const M3_U={mm:1, cm:10, m:1000, in:25.4};
+function m3Scale(){ return M3_U[m3Unit]||1; }
+function m3SetUnit(u){ m3Unit=u; render3D(); }
+function m3SetDisp(u){ m3Disp=u; render3D(); }
+function m3SetQty(v){ m3Qty=Math.max(1, parseInt(v,10)||1); }
+function m3SetSplit(v){ m3AutoSplit=!!v; render3D(); }
+function m3SetMode(m){ if(m===m3Mode) return; m3Mode=m; m3Sel=new Set([0]); render3D(); }
+
+/* WebGL: 600k triangles is nothing for a GPU and impossible for canvas2d. */
+const M3_VS=`attribute vec3 aPos; attribute vec3 aNrm; attribute vec3 aCol; attribute float aId;
+uniform mat4 uMVP; uniform mat3 uNM; varying vec3 vN; varying vec3 vC; varying float vId;
+void main(){ vN=uNM*aNrm; vC=aCol; vId=aId; gl_Position=uMVP*vec4(aPos,1.0); }`;
+const M3_FS=`precision mediump float; varying vec3 vN; varying vec3 vC; varying float vId;
+uniform int uPick;
+void main(){
+  if(uPick==1){ float id=vId+1.0;
+    gl_FragColor=vec4(mod(id,256.0)/255.0, mod(floor(id/256.0),256.0)/255.0, floor(id/65536.0)/255.0, 1.0);
+    return; }
+  vec3 n=normalize(vN);
+  // two-sided: back faces of an open mesh should still read as surface, not a hole
+  float l=0.28+0.62*abs(n.z)+0.22*max(0.0,n.y);
+  gl_FragColor=vec4(vC*l, 1.0);
+}`;
+
+function _m3GLInit(cv){
+  const gl=cv.getContext('webgl',{antialias:true,preserveDrawingBuffer:true})
+        || cv.getContext('experimental-webgl',{antialias:true,preserveDrawingBuffer:true});
+  if(!gl) return null;
+  const mk=(t,src)=>{ const s=gl.createShader(t); gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+  const pr=gl.createProgram();
+  gl.attachShader(pr,mk(gl.VERTEX_SHADER,M3_VS));
+  gl.attachShader(pr,mk(gl.FRAGMENT_SHADER,M3_FS));
+  gl.linkProgram(pr);
+  if(!gl.getProgramParameter(pr,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+  gl.useProgram(pr);
+  const buf=k=>gl.createBuffer();
+  const G={gl,pr,pos:buf(),nrm:buf(),col:buf(),id:buf(),n:0,
+    aPos:gl.getAttribLocation(pr,'aPos'), aNrm:gl.getAttribLocation(pr,'aNrm'),
+    aCol:gl.getAttribLocation(pr,'aCol'), aId:gl.getAttribLocation(pr,'aId'),
+    uMVP:gl.getUniformLocation(pr,'uMVP'), uNM:gl.getUniformLocation(pr,'uNM'),
+    uPick:gl.getUniformLocation(pr,'uPick')};
+  gl.enable(gl.DEPTH_TEST);
+  return G;
+}
+
+function _m3GLUpload(){
+  const G=m3GL, gl=G.gl, tf=m3Tri, N=m3NTri;
+  const nr=new Float32Array(N*9);
+  for(let t=0;t<N;t++){
+    const o=t*9;
+    const ax=tf[o],ay=tf[o+1],az=tf[o+2];
+    const e1x=tf[o+3]-ax,e1y=tf[o+4]-ay,e1z=tf[o+5]-az;
+    const e2x=tf[o+6]-ax,e2y=tf[o+7]-ay,e2z=tf[o+8]-az;
+    let cx=e1y*e2z-e1z*e2y, cy=e1z*e2x-e1x*e2z, cz=e1x*e2y-e1y*e2x;
+    const L=Math.sqrt(cx*cx+cy*cy+cz*cz)||1; cx/=L; cy/=L; cz/=L;
+    for(let k=0;k<3;k++){ nr[o+k*3]=cx; nr[o+k*3+1]=cy; nr[o+k*3+2]=cz; }
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER,G.pos); gl.bufferData(gl.ARRAY_BUFFER,tf,gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,G.nrm); gl.bufferData(gl.ARRAY_BUFFER,nr,gl.STATIC_DRAW);
+  G.n=N*3;
+  G.colArr=new Float32Array(N*9);
+  G.idArr=new Float32Array(N*3);
+  _m3GLTags();
+}
+
+/** Which triangle belongs to what, and which of those the user has ticked. */
+function _m3GLTags(){
+  const G=m3GL; if(!G) return;
+  const gl=G.gl, N=m3NTri;
+  const GREY=[0.74,0.76,0.80];
+  for(let t=0;t<N;t++){
+    let id=-1, col=GREY;
+    if(m3Mode==='side'){
+      const sd=m3SideOf[t];
+      if(sd<6){ id=sd; if(m3Sel.has(sd)) col=M3_SIDE[sd].col; }
+    } else {
+      const f=m3CompOf?m3CompOf[t]:-1;
+      id=f; if(f>=0 && m3Sel.has(f)) col=[0.30,0.80,0.45];
+    }
+    const o=t*3, c=t*9;
+    G.idArr[o]=G.idArr[o+1]=G.idArr[o+2]=id;
+    for(let k=0;k<3;k++){ G.colArr[c+k*3]=col[0]; G.colArr[c+k*3+1]=col[1]; G.colArr[c+k*3+2]=col[2]; }
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER,G.col); gl.bufferData(gl.ARRAY_BUFFER,G.colArr,gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,G.id);  gl.bufferData(gl.ARRAY_BUFFER,G.idArr,gl.DYNAMIC_DRAW);
+}
+
+function _m3Mat(W,H){
+  // orbit camera, Z up: yaw is the compass bearing, pitch the elevation
+  const ct=Math.cos(m3Yaw), st=Math.sin(m3Yaw);
+  const cf=Math.cos(m3Pitch), sf=Math.sin(m3Pitch);
+  const B=m3Box, span=B.span||1;
+  const s=2*0.80/span*m3Zoom, ar=W/H, sz=2*0.40/span;   // depth scale stays put so zoom never clips
+  const rx=-st,      ry= ct,      rz=0;                 // screen right
+  const ux=-sf*ct,   uy=-sf*st,   uz=cf;                // screen up
+  const dx= cf*ct,   dy= cf*st,   dz=sf;                // towards the eye
+  const m=new Float32Array(16);
+  m[0]=rx*s/ar; m[1]=ux*s; m[2]=-dx*sz;
+  m[4]=ry*s/ar; m[5]=uy*s; m[6]=-dy*sz;
+  m[8]=rz*s/ar; m[9]=uz*s; m[10]=-dz*sz;
+  m[12]=-(B.cx*m[0]+B.cy*m[4]+B.cz*m[8]);
+  m[13]=-(B.cx*m[1]+B.cy*m[5]+B.cz*m[9]);
+  m[14]=-(B.cx*m[2]+B.cy*m[6]+B.cz*m[10]);
+  m[15]=1;
+  const nm=new Float32Array([rx,ux,-dx, ry,uy,-dy, rz,uz,-dz]);
+  return {m, nm};
+}
+
+function _m3Paint(pick){
+  const cv=document.getElementById('m3Cv');
+  if(!cv || !m3Tri) return;
+  const DPR=Math.min(2, window.devicePixelRatio||1);
+  const W=cv.clientWidth||600, H=cv.clientHeight||420;
+  if(cv.width!==Math.round(W*DPR)||cv.height!==Math.round(H*DPR)){
+    cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
+  }
+  if(!m3GL) return;
+  const G=m3GL, gl=G.gl;
+  gl.viewport(0,0,cv.width,cv.height);
+  gl.clearColor(0.043,0.063,0.125,1);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const M=_m3Mat(cv.width,cv.height);
+  gl.uniformMatrix4fv(G.uMVP,false,M.m);
+  gl.uniformMatrix3fv(G.uNM,false,M.nm);
+  gl.uniform1i(G.uPick, pick?1:0);
+  const bind=(b,loc,sz)=>{ gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc,sz,gl.FLOAT,false,0,0); };
+  bind(G.pos,G.aPos,3); bind(G.nrm,G.aNrm,3); bind(G.col,G.aCol,3); bind(G.id,G.aId,1);
+  gl.drawArrays(gl.TRIANGLES,0,G.n);
+}
+
+function _m3PickAt(mx,my){
+  const cv=document.getElementById('m3Cv'); if(!cv||!m3GL) return -1;
+  _m3Paint(true);
+  const gl=m3GL.gl;
+  const x=Math.round(mx*cv.width/cv.clientWidth), y=Math.round(cv.height-my*cv.height/cv.clientHeight);
+  const px=new Uint8Array(4);
+  gl.readPixels(x,y,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
+  _m3Paint(false);
+  const id=px[0]|(px[1]<<8)|(px[2]<<16);
+  return id>0 ? id-1 : -1;
+}
+
+function m3Down(ev){ m3Drag={x:ev.clientX, y:ev.clientY}; m3Moved=0; }
+function m3Move(ev){
+  if(!m3Drag) return;
+  const dx=ev.clientX-m3Drag.x, dy=ev.clientY-m3Drag.y;
+  m3Moved+=Math.abs(dx)+Math.abs(dy);
+  // Grab-and-turn: the surface under the cursor follows the cursor. Orbiting the
+  // camera the same way the drag goes would send the model the other way.
+  m3Yaw -= dx*0.01;
+  m3Pitch = Math.max(-1.553, Math.min(1.553, m3Pitch + dy*0.01));
+  m3Drag={x:ev.clientX, y:ev.clientY};
+  _m3Paint();
+}
+function m3Up(ev){
+  const moved=m3Moved; m3Drag=null;
+  if(moved>4) return;
+  const cv=ev.currentTarget, r=cv.getBoundingClientRect();
+  const i=_m3PickAt(ev.clientX-r.left, ev.clientY-r.top);
+  if(i<0) return;
+  if(m3Sel.has(i)) m3Sel.delete(i); else m3Sel.add(i);
+  render3D();
+}
+function m3Wheel(ev){
+  ev.preventDefault();
+  m3Zoom=Math.max(0.2, Math.min(8, m3Zoom * (ev.deltaY<0?1.12:0.89)));
+  _m3Paint();
+}
+const M3_VIEW={ iso:[-0.95,0.52], top:[-Math.PI/2,1.553], bottom:[-Math.PI/2,-1.553],
+  front:[-Math.PI/2,0], back:[Math.PI/2,0], left:[Math.PI,0], right:[0,0] };
+function m3View(k){
+  const V=M3_VIEW[k];
+  if(V){ m3Yaw=V[0]; m3Pitch=V[1]; _m3Paint(); }
+}
+function m3Toggle(i){ if(m3Sel.has(i)) m3Sel.delete(i); else m3Sel.add(i); render3D(); }
+function m3SelAll(){ (m3Mode==='side'?M3_SIDE:m3Faces).forEach((_,i)=>m3Sel.add(i)); render3D(); }
+function m3SelNone(){ m3Sel.clear(); render3D(); }
+function m3Reset(){ m3Yaw=M3_VIEW.iso[0]; m3Pitch=M3_VIEW.iso[1]; m3Zoom=1; _m3Paint(); }
+
+/* ─────────── the card ─────────── */
+
+function render3D(rebuild){
+  const el=document.getElementById('m3Result');
+  if(!el) return;
+  el.style.display='';
+  if(!m3Tri){ el.innerHTML=''; el.style.display='none'; return; }
+
+  const k=m3Scale();
+  const sw=+document.getElementById('sw').value||1200;
+  const sh=+document.getElementById('sh').value||2400;
+  const mg=+document.getElementById('kerf').value||0;
+  const maxW=Math.max(1, sw-2*mg), maxH=Math.max(1, sh-2*mg);
+  // Everything inside the program is millimetres. These two turn a millimetre
+  // number into the unit the user picked — nothing else in the card formats.
+  const DU=M3_U[m3Disp]||1;
+  const UL={mm:'mm',cm:'cm',m:'m',in:'นิ้ว'}[m3Disp]||m3Disp;
+  const AL=UL+'²';
+  const nf=(v,d)=>v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const fmt=v=>{ const x=v/DU, a=Math.abs(x);
+    return nf(x, a>=1000?0 : a>=100?1 : a>=10?2 : 3); };
+  const m2=v=>{ const x=v*k*k/(DU*DU), a=Math.abs(x);
+    return nf(x, a>=10000?0 : a>=100?1 : a>=1?3 : 4); };
+
+  const src = m3Mode==='side' ? m3Sides : m3Faces;
+  const rows=src.map((f,i)=>{
+    const w=(f.w||0)*k, h=(f.h||0)*k;
+    const big=w>maxW||h>maxH;
+    const sp=(big&&f.poly&&f.poly.length>=3)
+      ? _m3SplitToSheet(f.poly.map(p=>[p[0]*k,p[1]*k]), w, h, maxW, maxH) : null;
+    return {i,f,w,h,big,sp,sel:m3Sel.has(i),usable:!!(f.poly&&f.poly.length>=3)};
+  }).filter(r=>m3Mode==='side' ? r.f.nTri>0 : true);
+
+  let nPanels=0, nPieces=0;
+  rows.filter(r=>r.sel&&r.usable).forEach(r=>{
+    const c=(r.big&&m3AutoSplit&&r.sp)?r.sp.panels.length:1;
+    nPanels+=c; nPieces+=c*m3Qty;
+  });
+
+  const list=rows.map(r=>{
+    const {i,f,w,h,big,sp,sel}=r;
+    const pw=sp&&sp.panels[0]?`${fmt(sp.panels[0].w)}×${fmt(sp.panels[0].h)} ${UL}`:'';
+    const warn=big?(m3AutoSplit&&sp
+        ? `<span style="color:#4ade80;" title="ชิ้นนี้ใหญ่กว่าแผ่น ${fmt(maxW)}×${fmt(maxH)} ${UL} ที่ใช้ได้จริง จึงต้องตัดต่อ">✂ ต่อ ${sp.panels.length} ท่อน (${pw})</span>`
+        : `<span style="color:#f87171;">⚠ ใหญ่กว่าแผ่น ${fmt(maxW)}×${fmt(maxH)} ${UL}</span>`):'';
+    const sw3 = m3Mode==='side'
+      ? `<span style="display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;
+           background:rgb(${f.col.map(c=>Math.round(c*255)).join(',')});"></span><b>${f.lab}</b>`
+      : `<span style="color:var(--muted);">#${i+1}</span>`;
+    const extra = m3Mode==='side'
+      ? `<span style="color:var(--muted);"> · ผิวจริง <b style="color:#93c5fd;">${m2(f.trueArea)}</b> ${AL}
+           · เงา ${m2(f.projArea)} ${AL} · ${f.nTri.toLocaleString()} หน้า</span>`
+      : `<span style="color:var(--muted);"> · ${m2(f.flatArea)} ${AL}${f.holes.length?` · ${f.holes.length} รู`:''}</span>`;
+    return `<div onclick="m3Toggle(${i})" style="display:flex;align-items:center;gap:9px;padding:6px 8px;cursor:pointer;
+        border-radius:7px;background:${sel?'#16a34a22':'transparent'};border:1px solid ${sel?'#22c55e66':'transparent'};">
+      <input type="checkbox" ${sel?'checked':''} onclick="event.stopPropagation();m3Toggle(${i})">
+      <span style="flex:1;font-size:.84rem;">${sw3}
+        <b>${fmt(w)} × ${fmt(h)}</b> ${UL}${extra}</span>
+      <span style="font-size:.76rem;">${warn}</span>
+    </div>`;
+  }).join('');
+
+  // what is selected, totalled — read off the preview without hunting the list
+  const chosen=rows.filter(r=>r.sel);
+  let hud;
+  if(!chosen.length){
+    hud=`<span style="color:var(--muted);">ยังไม่ได้เลือก — คลิกที่ผิวในภาพ หรือติ๊กจากรายการด้านล่าง</span>`;
+  } else {
+    const SHOW=6;
+    const line=r=>{
+      const dot=m3Mode==='side'
+        ? `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;
+             background:rgb(${r.f.col.map(c=>Math.round(c*255)).join(',')});"></span>`
+        : `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;
+             background:#4ade80;"></span>`;
+      const nm=m3Mode==='side'?r.f.lab:('#'+(r.i+1));
+      const ar=m3Mode==='side'
+        ? `ผิวจริง <b style="color:#93c5fd;">${m2(r.f.trueArea)}</b> ${AL}
+           <span style="color:var(--muted);">· เงา ${m2(r.f.projArea)} ${AL}</span>`
+        : `<b style="color:#93c5fd;">${m2(r.f.flatArea)}</b> ${AL}`;
+      return `<div>${dot}<b>${nm}</b> <span style="color:var(--muted);">${fmt(r.w)}×${fmt(r.h)} ${UL}</span> · ${ar}</div>`;
+    };
+    const tT=chosen.reduce((a,r)=>a+(m3Mode==='side'?r.f.trueArea:(r.f.flatArea||0)),0);
+    const tP=chosen.reduce((a,r)=>a+(m3Mode==='side'?r.f.projArea:(r.f.flatArea||0)),0);
+    hud=chosen.slice(0,SHOW).map(line).join('')
+      + (chosen.length>SHOW?`<div style="color:var(--muted);">…อีก ${chosen.length-SHOW} รายการ</div>`:'')
+      + (chosen.length>1
+         ? `<div style="border-top:1px solid #ffffff22;margin-top:5px;padding-top:5px;">
+              <b>รวม ${chosen.length} ${m3Mode==='side'?'ด้าน':'หน้า'}</b> · ผิวจริง
+              <b style="color:#4ade80;font-size:.95rem;">${m2(tT)}</b> ${AL}
+              ${m3Mode==='side'?`<span style="color:var(--muted);">· เงา ${m2(tP)} ${AL}</span>`:''}
+            </div>`
+         : '');
+  }
+
+  const tab=(m,t)=>`<button class="btn btn-sm ${m3Mode===m?'btn-primary':'btn-ghost'}"
+     onclick="m3SetMode('${m}')">${t}</button>`;
+
+  const shell=`
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+      <b style="font-size:.92rem;">📐 ${esc(m3Name)}</b>
+      <span style="color:var(--muted);font-size:.78rem;">${m3NTri.toLocaleString()} สามเหลี่ยม
+        · ${m3AllFaces.toLocaleString()} หน้าเรียบ · ${m3Ms} ms</span>
+      <span id="m3GlMsg" style="color:#fbbf24;font-size:.76rem;"></span>
+    </div>
+    <div style="position:relative;">
+      <canvas id="m3Cv" style="width:100%;height:440px;background:#0b1020;border:1px solid var(--border,#2a3050);
+        border-radius:10px;cursor:grab;display:block;touch-action:none;"></canvas>
+      <div id="m3Hud" style="position:absolute;left:10px;bottom:10px;pointer-events:none;
+        background:#0b1020e6;border:1px solid var(--border,#2a3050);border-radius:9px;
+        padding:8px 11px;font-size:.8rem;line-height:1.55;max-width:min(94%,520px);
+        box-shadow:0 6px 18px #0007;"></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center;">
+      <span style="color:var(--muted);font-size:.78rem;">มุมมอง:</span>
+      <button class="btn btn-ghost btn-sm" onclick="m3View('iso')">Iso</button>
+      <button class="btn btn-ghost btn-sm" onclick="m3View('top')">บน</button>
+      <button class="btn btn-ghost btn-sm" onclick="m3View('bottom')">ล่าง</button>
+      <button class="btn btn-ghost btn-sm" onclick="m3View('front')">หน้า</button>
+      <button class="btn btn-ghost btn-sm" onclick="m3View('back')">หลัง</button>
+      <button class="btn btn-ghost btn-sm" onclick="m3View('left')">ซ้าย</button>
+      <button class="btn btn-ghost btn-sm" onclick="m3View('right')">ขวา</button>
+      <span style="flex:1;"></span>
+      <span style="color:var(--muted);font-size:.76rem;">ลากเพื่อหมุน · ลูกกลิ้งซูม · คลิกที่ผิวเพื่อเลือก</span>
+      <button class="btn btn-ghost btn-sm" onclick="m3Reset()">⟲ รีเซ็ตมุม</button>
+    </div>
+    <div id="m3Panel"></div>`;
+
+  const panel=`
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 8px;">
+      ${tab('side','◧ เลือกเป็นด้าน (6 ด้าน)')}
+      ${tab('face',`▦ หน้าเรียบทีละหน้า (${m3AllFaces.toLocaleString()})`)}
+      <span style="flex:1;"></span>
+      <button class="btn btn-ghost btn-sm" onclick="m3SelAll()">☑ ทั้งหมด</button>
+      <button class="btn btn-ghost btn-sm" onclick="m3SelNone()">☐ ล้าง</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:.84rem;">
+      <span>แสดงผลเป็น:</span>
+      ${['mm','cm','m','in'].map(u=>`<button class="btn btn-sm ${m3Disp===u?'btn-primary':'btn-ghost'}"
+         onclick="m3SetDisp('${u}')">${u==='in'?'นิ้ว':u}</button>`).join('')}
+      <span style="margin-left:10px;" title="ไฟล์ 3D ไม่ได้บอกหน่วยมาด้วย — ถ้าขนาดออกมาผิดไปเป็นพันเท่า ให้แก้ช่องนี้">ไฟล์นี้เป็นหน่วย:</span>
+      <select onchange="m3SetUnit(this.value)"
+        style="background:#0006;border:1px solid var(--border,#2a3050);border-radius:6px;color:inherit;padding:3px 6px;">
+        ${['mm','cm','m','in'].map(u=>`<option value="${u}" ${m3Unit===u?'selected':''}>${u==='in'?'นิ้ว':u}</option>`).join('')}
+      </select>
+      <span style="margin-left:6px;">จำนวนต่อหน้า:</span>
+      <input type="number" min="1" value="${m3Qty}" onchange="m3SetQty(this.value);render3D()"
+        style="width:64px;background:#0006;border:1px solid var(--border,#2a3050);border-radius:6px;
+        color:inherit;padding:3px 6px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-left:6px;">
+        <input type="checkbox" ${m3AutoSplit?'checked':''} onchange="m3SetSplit(this.checked)">
+        ✂ แบ่งหน้าที่ใหญ่กว่าแผ่น (${fmt(maxW)}×${fmt(maxH)} ${UL})
+      </label>
+    </div>
+    <div id="m3Note"></div>
+    <div style="max-height:270px;overflow:auto;border:1px solid var(--border,#2a3050);border-radius:9px;padding:4px;">
+      ${list}
+      ${m3Mode==='face'&&m3AllFaces>rows.length?`<div style="padding:6px;color:var(--muted);font-size:.78rem;">
+        …แสดง ${rows.length} หน้าที่ใหญ่ที่สุด จากทั้งหมด ${m3AllFaces.toLocaleString()} หน้า</div>`:''}
+    </div>
+    ${m3Mode==='side'?`<div class="notice" style="margin-top:8px;">
+      💡 <b>ผิวจริง</b> = พื้นที่ผิวตามรูปทรงจริง (ผิวเป็นคลื่นจะมากกว่า) · <b>เงา</b> = พื้นที่ที่มองจากด้านนั้นตรงๆ
+      &nbsp;|&nbsp; ชิ้นงานที่เพิ่มเข้าลิสต์ใช้<b>เส้นขอบเงา</b> เพราะ CNC ตัดเป็นแผ่นแบน
+      &nbsp;|&nbsp; ปุ่ม <b>แสดงผลเป็น</b> เปลี่ยนแค่หน่วยที่อ่าน ไม่ได้เปลี่ยนขนาดชิ้นงาน</div>`:''}
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;">
+      <button class="btn btn-primary" ${nPieces?'':'disabled'} onclick="m3AddSelected()">
+        ➕ เพิ่มเข้าลิสต์ชิ้นงาน (${nPanels} รายการ · ${nPieces} ชิ้น)</button>
+      <span style="color:var(--muted);font-size:.8rem;">เลือกไว้ ${m3Sel.size}</span>
+    </div>`;
+
+  // The canvas — and the GPU buffers tied to it — must survive a list redraw.
+  // Rebuilding it on every click meant re-uploading 100 MB per tick.
+  if(rebuild || !document.getElementById('m3Cv')) el.innerHTML=shell;
+  document.getElementById('m3Panel').innerHTML=panel;
+  const hudEl=document.getElementById('m3Hud');
+  if(hudEl) hudEl.innerHTML=hud;
+
+  const cv=document.getElementById('m3Cv');
+  if(!cv) return;
+  if(!m3GL || m3GL.gl.canvas!==cv){
+    cv.onmousedown=m3Down; cv.onmousemove=m3Move;
+    cv.onmouseup=m3Up; cv.onmouseleave=()=>{ m3Drag=null; };
+    cv.onwheel=m3Wheel;
+    try{
+      m3GL=_m3GLInit(cv);
+      if(m3GL) _m3GLUpload(); else m3GLErr='เครื่องนี้ไม่รองรับ WebGL — แสดงภาพ 3D ไม่ได้';
+    }catch(err){ m3GL=null; m3GLErr='WebGL: '+(err.message||err); }
+    const msg=document.getElementById('m3GlMsg');
+    if(msg) msg.textContent=m3GLErr?('⚠ '+m3GLErr):'';
+  }
+  _m3GLTags();
+  _m3Paint();
+}
+
+function m3AddSelected(){
+  if(!m3Sel.size) return;
+  const src = m3Mode==='side' ? m3Sides : m3Faces;
+  const k=m3Scale();
+  const sw=+document.getElementById('sw').value||1200;
+  const sh=+document.getElementById('sh').value||2400;
+  const mg=+document.getElementById('kerf').value||0;
+  const maxW=Math.max(1, sw-2*mg), maxH=Math.max(1, sh-2*mg);
+  const base=(m3Name||'3D').replace(/\.[^.]+$/,'');
+  let added=0, qtySum=0;
+  [...m3Sel].sort((a,b)=>a-b).forEach(i=>{
+    const f=src[i];
+    if(!f || !f.poly || f.poly.length<3) return;
+    const poly=f.poly.map(p=>[p[0]*k, p[1]*k]);
+    const w=f.w*k, h=f.h*k;
+    const big=w>maxW||h>maxH;
+    const holes=(f.holes||[]).map(hp=>hp.map(([x,y])=>[x*k,y*k]));
+    const parts=(big&&m3AutoSplit)?_m3SplitToSheet(poly,w,h,maxW,maxH).panels:[{poly,w,h,x0:0,y0:0}];
+    const tag = m3Mode==='side' ? f.lab : `F${i+1}`;
+    parts.forEach((pt,pi)=>{
+      const myHoles=[];
+      holes.forEach(hp=>{
+        const a0=Math.abs(_m3Area(hp));
+        const c=_m3ClipRect(hp, pt.x0-1e-6, pt.y0-1e-6, pt.x0+pt.w+1e-6, pt.y0+pt.h+1e-6);
+        if(c.length>=3 && Math.abs(Math.abs(_m3Area(c))-a0) < a0*0.001)
+          myHoles.push(c.map(([x,y])=>[x-pt.x0, y-pt.y0]));
+      });
+      pieces.push({
+        id:uid(), name: parts.length>1 ? `${base}-${tag}-${pt.ix||pi+1}.${pt.iy||1}` : `${base}-${tag}`,
+        qty:m3Qty, source:'dxf',
+        w:Math.max(0.01, Math.round(pt.w*1000)/1000),
+        h:Math.max(0.01, Math.round(pt.h*1000)/1000),
+        area:Math.max(1, Math.abs(_m3Area(pt.poly))-myHoles.reduce((a,hp)=>a+Math.abs(_m3Area(hp)),0)),
+        open:false, stlData:null, dxfData:null,
+        color:COLORS[pieces.length%COLORS.length],
+        vertices:pt.poly.map(([x,y])=>[x, pt.h-y]),
+        holes:myHoles.map(hp=>{
+          let mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+          hp.forEach(([x,y])=>{ if(x<mnx)mnx=x; if(x>mxx)mxx=x; if(y<mny)mny=y; if(y>mxy)mxy=y; });
+          return {type:'poly', closed:true, w:mxx-mnx, h:mxy-mny,
+                  vertices:hp.map(([x,y])=>[x, pt.h-y])};
+        }),
+        fileName:m3Name
+      });
+      added++; qtySum+=m3Qty;
+    });
+  });
+  renderPieces(); savePieces();
+  const nt=document.getElementById('m3Note');
+  if(nt) nt.innerHTML=
+    `<div class="notice" style="border-color:#22c55e;color:#86efac;margin:0 0 8px;">
+      ✓ เพิ่มแล้ว ${added} รายการ (${qtySum} ชิ้น) — เลื่อนลงไปดูในลิสต์ชิ้นงาน</div>`;
+  const pl=document.getElementById('pcList');
+  if(pl) pl.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+
 function collectState(){
   const st={v:PROJ_VER, build:BUILD_TAG, saved:new Date().toISOString(), lang, settings:{}};
   SETTING_IDS.forEach(id=>{ const e=document.getElementById(id); if(e) st.settings[id]=e.value; });
@@ -5564,9 +7221,34 @@ function updateHistUI(){
 
 // ─── Save / open a project file ───────────────────────
 function saveProject(){
+  // A save that quietly writes an empty project is the worst kind: nothing looks
+  // wrong until the file is opened days later. Say it out loud instead.
+  if(!pieces.length){
+    if(!confirm('ยังไม่มีชิ้นงานในลิสต์ — ไฟล์นี้จะบันทึกแค่การตั้งค่าแผ่น\n\n'+
+                'ถ้านำเข้าจาก Excel / CSV / รูป หรือ DXF ไว้ ต้องกดปุ่ม "เพิ่มเข้าลิสต์ชิ้นงาน" ก่อน\n\n'+
+                'กด ตกลง เพื่อบันทึกเฉพาะการตั้งค่า · กด ยกเลิก เพื่อกลับไปเพิ่มชิ้นงาน')) return;
+  }
   const st=collectState();
   const name=(projName()||'SheetCNC').replace(/[\\/:*?"<>|]/g,'_');
   dlText(_projJSON(st), `${name}_${BUILD_TAG}.sheetcnc.json`, 'application/json');
+  const tot=pieces.reduce((a,p)=>a+(+p.qty||1),0);
+  _projToast(`💾 บันทึกแล้ว — ชิ้นงาน ${pieces.length} รายการ (รวม ${tot} ชิ้น)`+
+             (nestResult?` · มีผลจัดวาง ${nestResult.sheets.length} แผ่น`:' · ยังไม่ได้จัดวาง'));
+}
+
+/** Small non-blocking note: a save is too routine for a modal every time. */
+function _projToast(msg){
+  let el=document.getElementById('projToast');
+  if(!el){
+    el=document.createElement('div'); el.id='projToast';
+    el.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:9999;'+
+      'background:#16a34a;color:#fff;font-weight:700;font-size:.9rem;padding:10px 16px;border-radius:10px;'+
+      'box-shadow:0 8px 24px #0008;transition:opacity .25s;pointer-events:none;max-width:90vw;text-align:center;';
+    document.body.appendChild(el);
+  }
+  el.textContent=msg; el.style.opacity='1';
+  clearTimeout(_projToast._t);
+  _projToast._t=setTimeout(()=>{ el.style.opacity='0'; }, 3200);
 }
 function openProjectPick(){ const fi=document.getElementById('projFi'); if(fi){ fi.value=''; fi.click(); } }
 function openProjectFile(file){
@@ -5582,8 +7264,12 @@ function openProjectFile(file){
       applyState(st);
       histPush('open');
       const warn = st.build && st.build!==BUILD_TAG ? `\n(บันทึกจาก build ${st.build} — ปัจจุบัน ${BUILD_TAG})` : '';
+      const empty = !pieces.length
+        ? '\n\n⚠ ไฟล์นี้ไม่มีชิ้นงานเก็บไว้ (บันทึกตอนลิสต์ยังว่าง) — การตั้งค่าแผ่นกลับมาครบแล้ว\n'+
+          'คราวหน้า: นำเข้าไฟล์ → กด "เพิ่มเข้าลิสต์ชิ้นงาน" → แล้วค่อยกดบันทึก'
+        : '';
       alert(`เปิดโปรเจกต์แล้ว: ${st.settings.projName||'-'}\nชิ้นงาน ${pieces.length} รายการ`+
-            (nestResult?` · มีผลจัดวาง ${nestResult.sheets.length} แผ่น`:'')+warn);
+            (nestResult?` · มีผลจัดวาง ${nestResult.sheets.length} แผ่น`:'')+warn+empty);
     }catch(err){ alert('เปิดไฟล์ไม่สำเร็จ: '+(err.message||err)); }
   };
   fr.readAsText(file);
@@ -5900,7 +7586,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-g58';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-h9';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
