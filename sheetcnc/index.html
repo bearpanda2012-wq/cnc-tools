@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-h9</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-i2</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -408,6 +408,8 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       &nbsp;|&nbsp; <b>หมุนดูได้ คลิกที่หน้าในภาพเพื่อเลือก</b>
       <br>✂ หน้าที่ใหญ่กว่าแผ่นวัสดุ โปรแกรมจะ<b>แบ่งเป็นหลายแผ่นให้อัตโนมัติ</b> พร้อมบอกว่าต้องต่อกี่ท่อน
       &nbsp;|&nbsp; รูปทรงที่ได้เป็นเส้นขอบจริง ไม่ใช่กรอบสี่เหลี่ยม
+      <br>📦 อ่านได้ <b>STL · OBJ · PLY · 3MF · glTF/GLB · COLLADA(.dae) · FBX · 3DS · VRML/X3D · OFF · AMF</b>
+      — ไฟล์จาก SketchUp / Blender / Rhino / 3ds Max โยนเข้ามาได้ตรงๆ
     </div>
     <div class="dxf-import-drop" id="m3Drop"
       onclick="document.getElementById('m3Fi').click()"
@@ -416,9 +418,10 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       ondrop="handle3DDrop(event)">
       <div class="ico">📐</div>
       <p>คลิกหรือลากไฟล์ <b>3D</b> มาวาง</p>
-      <p style="font-size:.74rem;margin-top:4px;">รองรับ <b>.stl &nbsp;.obj &nbsp;.ply &nbsp;.3mf</b>
-        &nbsp;(STEP / IGES / SKP / 3DM: export เป็น .stl จาก CAD ก่อน)</p>
-      <input type="file" id="m3Fi" accept=".stl,.obj,.ply,.3mf" style="display:none" onchange="handle3DFile(this.files[0])">
+      <p style="font-size:.74rem;margin-top:4px;">
+        <b>.stl &nbsp;.obj &nbsp;.ply &nbsp;.3mf &nbsp;.glb &nbsp;.gltf &nbsp;.dae &nbsp;.fbx &nbsp;.3ds &nbsp;.wrl &nbsp;.x3d &nbsp;.off &nbsp;.amf</b>
+        <br><span style="opacity:.75;">STEP / IGES / SKP / 3DM: export เป็น .stl หรือ .dae จาก CAD ก่อน</span></p>
+      <input type="file" id="m3Fi" accept=".stl,.obj,.ply,.3mf,.glb,.gltf,.dae,.off,.amf,.wrl,.vrml,.x3d,.fbx,.3ds" style="display:none" onchange="handle3DFile(this.files[0])">
     </div>
     <div id="m3Result" style="display:none;margin-top:12px;"></div>
   </div>
@@ -5811,6 +5814,7 @@ let m3NTri=0;
 let m3Faces=[];           // the planar faces worth showing, biggest first
 let m3AllFaces=0;         // how many were found before the small ones were dropped
 let m3Name='', m3Unit='mm', m3Disp='mm', m3Qty=1, m3AutoSplit=true;
+let m3UpAx='z'; // which axis the file calls up, after any conversion
 let m3Sel=new Set(), m3Hover=-1;
 let m3Mode='side';        // 'side' = the six faces a person sees · 'face' = every flat patch
 let m3Sides=[], m3SideOf=null, m3CompOf=null;
@@ -5966,6 +5970,414 @@ function _m3_3MF(u8){
   const out=b.done();
   return out.subarray(0, Math.floor(out.length/9)*9);
 }
+
+
+/* ─────────── more formats ─────────── */
+// Nothing here needs a library or the network. Every reader ends the same way:
+// a flat Float32Array of triangle corners, in the file's own units.
+
+function _m3B64(s){
+  const bin=atob(s.replace(/\s+/g,''));
+  const u=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+  return u;
+}
+
+/** Multiply a column-major 4×4 into a flat point list, in place. */
+function _m3Xform(out, m){
+  for(let i=0;i<out.length;i+=3){
+    const x=out[i], y=out[i+1], z=out[i+2];
+    out[i]  =m[0]*x+m[4]*y+m[8]*z+m[12];
+    out[i+1]=m[1]*x+m[5]*y+m[9]*z+m[13];
+    out[i+2]=m[2]*x+m[6]*y+m[10]*z+m[14];
+  }
+}
+function _m3MulM(a,b){                        // a∘b, both column-major
+  const o=new Float64Array(16);
+  for(let c=0;c<4;c++) for(let r=0;r<4;r++){
+    let v=0; for(let k=0;k<4;k++) v+=a[k*4+r]*b[c*4+k];
+    o[c*4+r]=v;
+  }
+  return o;
+}
+const M3_ID=new Float64Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+
+/* ── glTF 2.0 · .gltf and .glb ── */
+function _m3GLTF(buf, isGLB){
+  let json=null, bin=null;
+  if(isGLB){
+    const dv=new DataView(buf);
+    if(dv.getUint32(0,true)!==0x46546C67) throw new Error('ไม่ใช่ไฟล์ .glb ที่ถูกต้อง');
+    const total=dv.getUint32(8,true);
+    let o=12;
+    while(o+8<=Math.min(total,buf.byteLength)){
+      const cl=dv.getUint32(o,true), ct=dv.getUint32(o+4,true);
+      if(ct===0x4E4F534A) json=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,o+8,cl)));
+      else if(ct===0x004E4942) bin=new Uint8Array(buf,o+8,cl);
+      o+=8+cl;
+    }
+  } else {
+    json=JSON.parse(new TextDecoder().decode(new Uint8Array(buf)));
+  }
+  if(!json) throw new Error('ไฟล์ glTF ไม่มีส่วน JSON');
+  const bufs=(json.buffers||[]).map(b=>{
+    if(b.uri==null) return bin;
+    if(/^data:/i.test(b.uri)) return _m3B64(b.uri.slice(b.uri.indexOf(',')+1));
+    throw new Error('ไฟล์ .gltf นี้อ้างไฟล์ข้อมูลแยก ('+b.uri+') — ให้ export เป็น .glb แทน');
+  });
+  const CSZ={5120:1,5121:1,5122:2,5123:2,5125:4,5126:4};
+  const NC={SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT4:16};
+  const acc=i=>{
+    const a=json.accessors[i], n=NC[a.type]||1, sz=CSZ[a.componentType];
+    const out=new Float64Array(a.count*n);
+    const bv=(json.bufferViews||[])[a.bufferView];
+    if(!bv) return out;                                // sparse-only accessor
+    const src=bufs[bv.buffer];
+    if(!src) throw new Error('ไฟล์ glTF ไม่มีข้อมูล binary');
+    const base=(bv.byteOffset||0)+(a.byteOffset||0);
+    const stride=bv.byteStride || n*sz;
+    const dv=new DataView(src.buffer, src.byteOffset, src.byteLength);
+    const rd={5120:'getInt8',5121:'getUint8',5122:'getInt16',5123:'getUint16',
+              5125:'getUint32',5126:'getFloat32'}[a.componentType];
+    for(let e=0;e<a.count;e++) for(let c=0;c<n;c++)
+      out[e*n+c]=dv[rd](base+e*stride+c*sz, true);
+    return out;
+  };
+  const b=_m3Buf();
+  const emit=(m, prim)=>{
+    if(prim.mode!=null && prim.mode!==4) return;         // triangles only
+    const P=acc(prim.attributes.POSITION);
+    const pts=new Float64Array(P);
+    _m3Xform(pts, m);
+    const push=i=>b.push3(pts[i*3],pts[i*3+1],pts[i*3+2]);
+    if(prim.indices!=null){
+      const I=acc(prim.indices);
+      for(let i=0;i+2<I.length;i+=3){ push(I[i]); push(I[i+1]); push(I[i+2]); }
+    } else {
+      for(let i=0;i+2<pts.length/3;i+=3){ push(i); push(i+1); push(i+2); }
+    }
+  };
+  const nodeM=nd=>{
+    if(nd.matrix) return new Float64Array(nd.matrix);
+    const t=nd.translation||[0,0,0], r=nd.rotation||[0,0,0,1], s=nd.scale||[1,1,1];
+    const [x,y,z,w]=r;
+    const R=[1-2*(y*y+z*z), 2*(x*y+z*w),   2*(x*z-y*w),   0,
+             2*(x*y-z*w),   1-2*(x*x+z*z), 2*(y*z+x*w),   0,
+             2*(x*z+y*w),   2*(y*z-x*w),   1-2*(x*x+y*y), 0,
+             0,0,0,1];
+    for(let c=0;c<3;c++) for(let r2=0;r2<3;r2++) R[c*4+r2]*=s[c];
+    R[12]=t[0]; R[13]=t[1]; R[14]=t[2];
+    return new Float64Array(R);
+  };
+  const walk=(ni, parent)=>{
+    const nd=(json.nodes||[])[ni]; if(!nd) return;
+    const m=_m3MulM(parent, nodeM(nd));
+    if(nd.mesh!=null){
+      const me=(json.meshes||[])[nd.mesh];
+      if(me) (me.primitives||[]).forEach(p=>emit(m,p));
+    }
+    (nd.children||[]).forEach(c=>walk(c,m));
+  };
+  const scene=(json.scenes||[])[json.scene||0];
+  if(scene && scene.nodes) scene.nodes.forEach(n=>walk(n, M3_ID));
+  else if(json.nodes) json.nodes.forEach((_,i)=>walk(i, M3_ID));
+  else (json.meshes||[]).forEach(me=>(me.primitives||[]).forEach(p=>emit(M3_ID,p)));
+  if(b.n<9) throw new Error('ไฟล์ glTF ไม่มีสามเหลี่ยมที่อ่านได้');
+  const out=b.done();
+  return {tri:out.subarray(0, Math.floor(out.length/9)*9), up:'y'};
+}
+
+/* ── COLLADA · .dae (SketchUp, most CAD) ── */
+function _m3DAE(txt){
+  const up=(txt.match(/<up_axis>\s*(\w+)/i)||[])[1]||'Y_UP';
+  const src={};                                // id → number array
+  let m;
+  const reSrc=/<source[^>]*\bid="([^"]+)"[\s\S]*?<float_array[^>]*>([\s\S]*?)<\/float_array>/g;
+  while((m=reSrc.exec(txt))) src[m[1]]=m[2].trim().split(/\s+/).map(Number);
+  const vmap={};                               // <vertices id> → POSITION source id
+  const reV=/<vertices[^>]*\bid="([^"]+)"[\s\S]*?<input[^>]*semantic="POSITION"[^>]*source="#([^"]+)"/g;
+  while((m=reV.exec(txt))) vmap[m[1]]=m[2];
+  const b=_m3Buf();
+  // <matrix> on the node that instantiates a geometry
+  const inst={};
+  const reN=/<node\b[\s\S]*?<\/node>/g;
+  let nm;
+  while((nm=reN.exec(txt))){
+    const blk=nm[0];
+    const mm=blk.match(/<matrix[^>]*>([\s\S]*?)<\/matrix>/);
+    const gi=blk.match(/<instance_geometry[^>]*url="#([^"]+)"/);
+    if(gi){
+      const v=mm ? mm[1].trim().split(/\s+/).map(Number) : null;
+      // COLLADA writes row-major; the transform helper wants column-major
+      inst[gi[1]] = v && v.length===16
+        ? new Float64Array([v[0],v[4],v[8],v[12], v[1],v[5],v[9],v[13],
+                            v[2],v[6],v[10],v[14], v[3],v[7],v[11],v[15]])
+        : M3_ID;
+    }
+  }
+  const reG=/<geometry[^>]*\bid="([^"]+)"[\s\S]*?<\/geometry>/g;
+  let g;
+  while((g=reG.exec(txt))){
+    const gid=g[1], blk=g[0];
+    const M=inst[gid]||M3_ID;
+    const reP=/<(triangles|polylist|polygons)\b[^>]*>([\s\S]*?)<\/\1>/g;
+    let t;
+    while((t=reP.exec(blk))){
+      const kind=t[1], body=t[2];
+      const ins=[...body.matchAll(/<input[^>]*semantic="([^"]+)"[^>]*source="#([^"]+)"[^>]*offset="(\d+)"/g)]
+        .map(x=>({sem:x[1], src:x[2], off:+x[3]}));
+      const stride=ins.reduce((a,x)=>Math.max(a,x.off),0)+1;
+      const vin=ins.find(x=>x.sem==='VERTEX');
+      if(!vin) continue;
+      const pid=vmap[vin.src]||vin.src;
+      const P=src[pid];
+      if(!P) continue;
+      const pts=new Float64Array(P); _m3Xform(pts, M);
+      const push=i=>b.push3(pts[i*3],pts[i*3+1],pts[i*3+2]);
+      const counts=(body.match(/<vcount>([\s\S]*?)<\/vcount>/)||[])[1];
+      const vc=counts?counts.trim().split(/\s+/).map(Number):null;
+      const plist=[...body.matchAll(/<p>([\s\S]*?)<\/p>/g)].map(x=>x[1].trim().split(/\s+/).map(Number));
+      if(kind==='triangles'){
+        const idx=plist.length?plist[0]:[];
+        for(let i=0;i+3*stride<=idx.length;i+=3*stride){
+          push(idx[i+vin.off]); push(idx[i+stride+vin.off]); push(idx[i+2*stride+vin.off]);
+        }
+      } else if(kind==='polylist'){
+        const idx=plist.length?plist[0]:[];
+        let o=0;
+        (vc||[]).forEach(n=>{
+          const f=[]; for(let k=0;k<n;k++) f.push(idx[o+k*stride+vin.off]);
+          o+=n*stride;
+          for(let k=1;k+1<f.length;k++){ push(f[0]); push(f[k]); push(f[k+1]); }
+        });
+      } else {                                 // <polygons>: one <p> per face
+        plist.forEach(idx=>{
+          const f=[]; for(let k=0;k*stride<idx.length;k++) f.push(idx[k*stride+vin.off]);
+          for(let k=1;k+1<f.length;k++){ push(f[0]); push(f[k]); push(f[k+1]); }
+        });
+      }
+    }
+  }
+  if(b.n<9) throw new Error('ไฟล์ .dae ไม่มีสามเหลี่ยมที่อ่านได้');
+  const out=b.done();
+  return {tri:out.subarray(0, Math.floor(out.length/9)*9), up: /Z_UP/i.test(up)?'z':'y'};
+}
+
+/* ── OFF · plain and simple ── */
+function _m3OFF(txt){
+  const tk=txt.replace(/#[^\n]*/g,' ').trim().split(/\s+/);
+  let i=0;
+  if(/^(ST|C|N|4|n)*OFF$/i.test(tk[0])) i=1;
+  const nv=+tk[i++], nf=+tk[i++]; i++;          // vertex / face / edge counts
+  if(!(nv>0&&nf>0)) throw new Error('ไฟล์ .off อ่านส่วนหัวไม่ได้');
+  const P=new Float64Array(nv*3);
+  for(let v=0;v<nv;v++){ P[v*3]=+tk[i++]; P[v*3+1]=+tk[i++]; P[v*3+2]=+tk[i++]; }
+  const b=_m3Buf();
+  const push=k=>b.push3(P[k*3],P[k*3+1],P[k*3+2]);
+  for(let f=0;f<nf && i<tk.length;f++){
+    const n=+tk[i++]; const idx=[];
+    for(let k=0;k<n;k++) idx.push(+tk[i++]);
+    for(let k=1;k+1<idx.length;k++){ push(idx[0]); push(idx[k]); push(idx[k+1]); }
+  }
+  if(b.n<9) throw new Error('ไฟล์ .off ไม่มีหน้าที่อ่านได้');
+  const out=b.done();
+  return {tri:out.subarray(0, Math.floor(out.length/9)*9), up:'z'};
+}
+
+/* ── AMF · zipped or plain XML, same shape as 3MF ── */
+function _m3AMF(u8){
+  let xml;
+  if(u8[0]===0x50 && u8[1]===0x4B){
+    const files=_unzip(u8);
+    const key=Object.keys(files).find(k=>/\.amf$|\.xml$/i.test(k)) || Object.keys(files)[0];
+    xml=new TextDecoder('utf-8').decode(files[key]);
+  } else {
+    xml=new TextDecoder('utf-8').decode(u8);
+  }
+  const b=_m3Buf();
+  (xml.match(/<mesh[\s\S]*?<\/mesh>/g)||[]).forEach(ms=>{
+    const vb=_m3Buf(); let m;
+    const rv=/<coordinates>[\s\S]*?<x>([-\d.eE+]+)<\/x>[\s\S]*?<y>([-\d.eE+]+)<\/y>[\s\S]*?<z>([-\d.eE+]+)<\/z>[\s\S]*?<\/coordinates>/g;
+    while((m=rv.exec(ms))) vb.push3(+m[1],+m[2],+m[3]);
+    const P=vb.done();
+    const rt=/<triangle>[\s\S]*?<v1>(\d+)<\/v1>[\s\S]*?<v2>(\d+)<\/v2>[\s\S]*?<v3>(\d+)<\/v3>[\s\S]*?<\/triangle>/g;
+    while((m=rt.exec(ms))){
+      for(let j=1;j<=3;j++){ const o=(+m[j])*3;
+        if(o+2<P.length) b.push3(P[o],P[o+1],P[o+2]); }
+    }
+  });
+  if(b.n<9) throw new Error('ไฟล์ .amf ไม่มีสามเหลี่ยมที่อ่านได้');
+  const out=b.done();
+  return {tri:out.subarray(0, Math.floor(out.length/9)*9), up:'z'};
+}
+
+/* ── VRML 2.0 / X3D · .wrl .x3d (Rhino, older CAD) ── */
+function _m3WRL(txt){
+  const b=_m3Buf();
+  const nums=s=>s.replace(/[,\[\]]/g,' ').trim().split(/\s+/).filter(x=>x.length).map(Number);
+  // X3D writes attributes, VRML writes blocks — collect both
+  let m, found=0;
+  const reX=/<IndexedFaceSet[^>]*coordIndex="([^"]*)"[^>]*>[\s\S]*?<Coordinate[^>]*point="([^"]*)"/g;
+  while((m=reX.exec(txt))){ _m3IFS(b, nums(m[2]), nums(m[1])); found++; }
+  const reX2=/<IndexedFaceSet[^>]*coordIndex="([^"]*)"[^>]*>[\s\S]*?<Coordinate[^>]*\bpoint\s*=\s*'([^']*)'/g;
+  while((m=reX2.exec(txt))){ _m3IFS(b, nums(m[2]), nums(m[1])); found++; }
+  if(!found){
+    const re=/coordIndex\s*\[([\s\S]*?)\]/g;
+    const pts=[...txt.matchAll(/point\s*\[([\s\S]*?)\]/g)].map(x=>nums(x[1]));
+    const idxs=[...txt.matchAll(re)].map(x=>nums(x[1]));
+    for(let i=0;i<idxs.length;i++) _m3IFS(b, pts[Math.min(i,pts.length-1)]||[], idxs[i]);
+  }
+  if(b.n<9) throw new Error('ไฟล์นี้ไม่มี IndexedFaceSet ที่อ่านได้');
+  const out=b.done();
+  return {tri:out.subarray(0, Math.floor(out.length/9)*9), up:'y'};
+}
+/** coordIndex uses -1 to end each face. */
+function _m3IFS(b, pts, idx){
+  const push=k=>{ const o=k*3; if(o+2<pts.length) b.push3(pts[o],pts[o+1],pts[o+2]); };
+  let face=[];
+  for(let i=0;i<idx.length;i++){
+    const v=idx[i];
+    if(v<0){
+      for(let k=1;k+1<face.length;k++){ push(face[0]); push(face[k]); push(face[k+1]); }
+      face=[];
+    } else face.push(v);
+  }
+  for(let k=1;k+1<face.length;k++){ push(face[0]); push(face[k]); push(face[k+1]); }
+}
+
+/* ── FBX · binary 7.x and ASCII ── */
+function _m3FBX(buf){
+  const u8=new Uint8Array(buf);
+  const head=new TextDecoder('latin1').decode(u8.subarray(0,Math.min(64,u8.length)));
+  if(head.indexOf('Kaydara FBX Binary')<0) return _m3FBXText(new TextDecoder('latin1').decode(u8));
+  const dv=new DataView(buf);
+  const ver=dv.getUint32(23,true);
+  const wide=ver>=7500;
+  const verts=[], polys=[];
+  let up='y';
+  const readArr=(o,type)=>{
+    const len=dv.getUint32(o,true), enc=dv.getUint32(o+4,true), cl=dv.getUint32(o+8,true);
+    let data=new Uint8Array(buf, o+12, cl);
+    if(enc===1) data=_inflateRawJS(data,2);              // zlib → skip its 2-byte header
+    const d=new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const rd={f:['getFloat32',4],d:['getFloat64',8],l:['getBigInt64',8],
+              i:['getInt32',4],b:['getUint8',1]}[type];
+    const out=new Float64Array(len);
+    for(let k=0;k<len;k++) out[k]=type==='l' ? Number(d[rd[0]](k*rd[1],true)) : d[rd[0]](k*rd[1],true);
+    return {arr:out, end:o+12+cl};
+  };
+  const node=(o, depth)=>{
+    const endOff = wide ? Number(dv.getBigUint64(o,true)) : dv.getUint32(o,true);
+    const nProp  = wide ? Number(dv.getBigUint64(o+8,true)) : dv.getUint32(o+4,true);
+    const pLen   = wide ? Number(dv.getBigUint64(o+16,true)) : dv.getUint32(o+8,true);
+    let p = o + (wide?24:12);
+    const nl=dv.getUint8(p); p++;
+    const name=new TextDecoder('latin1').decode(new Uint8Array(buf,p,nl)); p+=nl;
+    const props=[];
+    for(let k=0;k<nProp;k++){
+      const t=String.fromCharCode(dv.getUint8(p)); p++;
+      if(t==='Y'){ props.push(dv.getInt16(p,true)); p+=2; }
+      else if(t==='C'){ props.push(dv.getUint8(p)); p+=1; }
+      else if(t==='I'){ props.push(dv.getInt32(p,true)); p+=4; }
+      else if(t==='F'){ props.push(dv.getFloat32(p,true)); p+=4; }
+      else if(t==='D'){ props.push(dv.getFloat64(p,true)); p+=8; }
+      else if(t==='L'){ props.push(Number(dv.getBigInt64(p,true))); p+=8; }
+      else if(t==='S'||t==='R'){ const l=dv.getUint32(p,true); p+=4;
+        props.push(t==='S'?new TextDecoder('latin1').decode(new Uint8Array(buf,p,l)):null); p+=l; }
+      else if('fdlib'.indexOf(t)>=0){ const r=readArr(p,t); props.push(r.arr); p=r.end; }
+      else break;
+    }
+    if(name==='Vertices' && props[0] && props[0].length) verts.push(props[0]);
+    if(name==='PolygonVertexIndex' && props[0] && props[0].length) polys.push(props[0]);
+    if(name==='P' && props[0]==='UpAxis') up = props[4]===2 ? 'z' : 'y';
+    // children run from here to endOff, closed by a null record
+    while(p + (wide?25:13) <= endOff){
+      const peek = wide ? Number(dv.getBigUint64(p,true)) : dv.getUint32(p,true);
+      if(peek===0) break;
+      p=node(p, depth+1);
+    }
+    return endOff;
+  };
+  let o=27;
+  while(o + (wide?25:13) <= u8.length){
+    const peek = wide ? Number(dv.getBigUint64(o,true)) : dv.getUint32(o,true);
+    if(peek===0 || peek<=o) break;
+    o=node(o,0);
+  }
+  return _m3FBXBuild(verts, polys, up);
+}
+
+function _m3FBXText(txt){
+  const grab=key=>{
+    const out=[];
+    const re=new RegExp(key+'\\s*:\\s*\\*\\d+\\s*\\{\\s*a\\s*:\\s*([^}]*)\\}','g');
+    let m; while((m=re.exec(txt))) out.push(m[1].trim().split(/[\s,]+/).filter(x=>x.length).map(Number));
+    return out;
+  };
+  const up=/UpAxis"\s*,\s*""\s*,\s*""\s*,\s*""\s*,\s*2/.test(txt)?'z':'y';
+  return _m3FBXBuild(grab('Vertices'), grab('PolygonVertexIndex'), up);
+}
+
+function _m3FBXBuild(verts, polys, up){
+  const b=_m3Buf();
+  for(let g=0;g<verts.length;g++){
+    const P=verts[g], I=polys[g]||polys[0];
+    if(!P||!I) continue;
+    const push=k=>{ const o=k*3; if(o+2<P.length) b.push3(P[o],P[o+1],P[o+2]); };
+    let face=[];
+    for(let i=0;i<I.length;i++){
+      let v=I[i], last=false;
+      if(v<0){ v=-v-1; last=true; }                     // the last index of a face is ~encoded
+      face.push(v);
+      if(last){
+        for(let k=1;k+1<face.length;k++){ push(face[0]); push(face[k]); push(face[k+1]); }
+        face=[];
+      }
+    }
+  }
+  if(b.n<9) throw new Error('ไฟล์ .fbx ไม่มีสามเหลี่ยมที่อ่านได้');
+  const out=b.done();
+  return {tri:out.subarray(0, Math.floor(out.length/9)*9), up};
+}
+
+/* ── 3DS · old but still around ── */
+function _m3_3DS(buf){
+  const dv=new DataView(buf);
+  const b=_m3Buf();
+  const walk=(start,end)=>{
+    let o=start;
+    while(o+6<=end){
+      const id=dv.getUint16(o,true), len=dv.getUint32(o+2,true);
+      if(len<6 || o+len>end) break;
+      const body=o+6;
+      if(id===0x4D4D||id===0x3D3D||id===0x4100) walk(body,o+len);
+      else if(id===0x4000){                              // object: name then sub-chunks
+        let p=body; while(p<o+len && dv.getUint8(p)!==0) p++;
+        walk(p+1,o+len);
+      } else if(id===0x4110){
+        const n=dv.getUint16(body,true);
+        const P=new Float64Array(n*3);
+        for(let i=0;i<n;i++) for(let c=0;c<3;c++) P[i*3+c]=dv.getFloat32(body+2+i*12+c*4,true);
+        _m3_3DSPend=P;
+      } else if(id===0x4120){
+        const n=dv.getUint16(body,true), P=_m3_3DSPend;
+        if(P) for(let i=0;i<n;i++){
+          const q=body+2+i*8;
+          for(let c=0;c<3;c++){ const k=dv.getUint16(q+c*2,true)*3;
+            if(k+2<P.length) b.push3(P[k],P[k+1],P[k+2]); }
+        }
+      }
+      o+=len;
+    }
+  };
+  if(dv.getUint16(0,true)!==0x4D4D) throw new Error('ไม่ใช่ไฟล์ .3ds ที่ถูกต้อง');
+  _m3_3DSPend=null;
+  walk(0, buf.byteLength);
+  if(b.n<9) throw new Error('ไฟล์ .3ds ไม่มีสามเหลี่ยมที่อ่านได้');
+  const out=b.done();
+  return {tri:out.subarray(0, Math.floor(out.length/9)*9), up:'z'};
+}
+let _m3_3DSPend=null;
 
 /* ─────────── sorting ─────────── */
 /** LSD radix over a 48-bit key held as (hi16, lo32). No comparator, no strings. */
@@ -6264,49 +6676,101 @@ function _m3Fail(msg){
   el.innerHTML=`<div class="notice" style="border-color:#ef4444;color:#fca5a5;">✕ ${esc(msg)}</div>`;
 }
 
+const M3_READ={
+  stl:  b=>({tri:_m3STL(b), up:'z'}),
+  obj:  b=>({tri:_m3OBJ(new TextDecoder().decode(new Uint8Array(b))), up:'z'}),
+  ply:  b=>({tri:_m3PLY(b), up:'z'}),
+  '3mf':b=>({tri:_m3_3MF(new Uint8Array(b)), up:'z'}),
+  glb:  b=>_m3GLTF(b, true),
+  gltf: b=>_m3GLTF(b, false),
+  dae:  b=>_m3DAE(new TextDecoder().decode(new Uint8Array(b))),
+  off:  b=>_m3OFF(new TextDecoder().decode(new Uint8Array(b))),
+  amf:  b=>_m3AMF(new Uint8Array(b)),
+  wrl:  b=>_m3WRL(new TextDecoder().decode(new Uint8Array(b))),
+  vrml: b=>_m3WRL(new TextDecoder().decode(new Uint8Array(b))),
+  x3d:  b=>_m3WRL(new TextDecoder().decode(new Uint8Array(b))),
+  fbx:  b=>_m3FBX(b),
+  '3ds':b=>_m3_3DS(b)
+};
+// files that belong to another card — say where to take them, don't just refuse
+const M3_ELSE={
+  dxf:'Vector', svg:'Vector', eps:'Vector', ai:'Vector', pdf:'Vector',
+  xlsx:'Excel', xls:'Excel', csv:'Excel', tsv:'Excel',
+  png:'Excel', jpg:'Excel', jpeg:'Excel', webp:'Excel', bmp:'Excel', tif:'Excel', tiff:'Excel'
+};
+const M3_CAD=['step','stp','iges','igs','skp','3dm','sldprt','sldasm','ipt','iam','f3d','catpart','prt','x_t','x_b','sat'];
+
+/** Y-up (glTF, COLLADA, VRML, most FBX) → Z-up, which is what CAD and this app use. */
+function _m3AxisSwap(tf, toZ){
+  for(let i=0;i<tf.length;i+=3){
+    const y=tf[i+1], z=tf[i+2];
+    if(toZ){ tf[i+1]=-z; tf[i+2]=y; } else { tf[i+1]=z; tf[i+2]=-y; }
+  }
+}
+
+function m3SetUpAxis(u){
+  if(u===m3UpAx || !m3Tri) return;
+  _m3AxisSwap(m3Tri, u==='z');
+  m3UpAx=u;
+  _m3Busy('กำลังคำนวณใหม่ตามแกนใหม่…');
+  setTimeout(()=>{ _m3Analyse(); m3GL=null; render3D(true); }, 20);
+}
+
+/** Faces, sides and the bounding box — everything derived from the triangles. */
+function _m3Analyse(){
+  const t0=Date.now();
+  m3Faces=_m3BuildFaces(m3Tri);
+  m3AllFaces=m3Faces._total||m3Faces.length;
+  m3CompOf=m3Faces._comp; m3Box=m3Faces._box;
+  const S=_m3BuildSides(m3Tri, m3Faces._vid);
+  m3SideOf=S.side; m3Sides=S.sides;
+  m3Ms=Date.now()-t0;
+}
+
 function handle3DFile(file){
   if(!file) return;
   const ext=(file.name.split('.').pop()||'').toLowerCase();
-  if(['step','stp','iges','igs','skp','3dm','sldprt','ipt','f3d'].includes(ext)){
-    _m3Fail(`ไฟล์ .${ext} เป็นรูปแบบ CAD (ผิวโค้งจริง) ยังอ่านไม่ได้ในเวอร์ชันนี้ — `+
-            `เปิดใน CAD แล้ว Export เป็น .stl หรือ .obj ก่อน (ฟรี ทุกโปรแกรมทำได้)`);
+  if(M3_CAD.includes(ext)){
+    _m3Fail(`ไฟล์ .${ext} เก็บผิวโค้งจริงแบบ B-rep ไม่ใช่ mesh ยังอ่านไม่ได้ในเวอร์ชันนี้ — `+
+            `เปิดใน CAD แล้ว Export เป็น .stl / .obj / .glb / .dae ก่อน (ฟรี ทุกโปรแกรมทำได้)`);
     return;
   }
-  if(!['stl','obj','ply','3mf'].includes(ext)){
-    _m3Fail(`นามสกุล .${ext} ไม่รองรับ — ใช้ .stl .obj .ply หรือ .3mf`); return;
+  if(M3_ELSE[ext]){
+    _m3Fail(M3_ELSE[ext]==='Vector'
+      ? `.${ext} เป็นไฟล์แบบ 2D — ใช้การ์ด "นำเข้าไฟล์ Vector (DXF / SVG / EPS / AI)" ด้านบนแทน`
+      : `.${ext} เป็นตาราง/รูป — ใช้การ์ด "นำเข้ารายการชิ้นงานจาก Excel / CSV / ไฟล์รูป" ด้านบนแทน`);
+    return;
+  }
+  if(!M3_READ[ext]){
+    _m3Fail(`นามสกุล .${ext} ไม่รองรับ — การ์ดนี้รับไฟล์โมเดล 3D: `+
+            Object.keys(M3_READ).map(x=>'.'+x).join(' '));
+    return;
   }
   m3Name=file.name;
-  m3Tri=null; m3NTri=0; m3Faces=[]; m3Sel=new Set();
+  m3Tri=null; m3NTri=0; m3Faces=[]; m3Sides=[]; m3Sel=new Set();
   _m3Busy('กำลังอ่านไฟล์ 3D…');
   const fr=new FileReader();
   fr.onerror=()=>_m3Fail('อ่านไฟล์ไม่สำเร็จ');
   fr.onload=e=>{
     // let the busy notice paint before the parse takes the thread
     setTimeout(()=>{
-      let tf;
-      try{
-        const buf=e.target.result;
-        if(ext==='stl') tf=_m3STL(buf);
-        else if(ext==='obj') tf=_m3OBJ(new TextDecoder().decode(new Uint8Array(buf)));
-        else if(ext==='ply') tf=_m3PLY(buf);
-        else tf=_m3_3MF(new Uint8Array(buf));
-      }catch(err){ _m3Fail(err.message||String(err)); return; }
+      let res;
+      try{ res=M3_READ[ext](e.target.result); }
+      catch(err){ _m3Fail(err.message||String(err)); return; }
+      let tf = res && res.tri ? res.tri : res;
       const N=tf.length/9|0;
       if(!N){ _m3Fail('ไม่พบสามเหลี่ยมในไฟล์'); return; }
+      m3UpAx = (res && res.up) || 'z';
+      if(m3UpAx==='y'){ _m3AxisSwap(tf, true); m3UpAx='z'; }
       _m3Busy(`กำลังหาหน้าเรียบจาก ${N.toLocaleString()} สามเหลี่ยม…`+
               (N>400000?' (โมเดลใหญ่ ใช้เวลาสักครู่)':''));
       setTimeout(()=>{
         try{
           m3Tri=tf; m3NTri=N;
-          const t0=Date.now();
-          m3Faces=_m3BuildFaces(tf);
-          m3AllFaces=m3Faces._total||m3Faces.length;
-          m3CompOf=m3Faces._comp; m3Box=m3Faces._box;
-          const S=_m3BuildSides(tf, m3Faces._vid);
-          m3SideOf=S.side; m3Sides=S.sides;
-          m3Ms=Date.now()-t0;
+          _m3Analyse();
           m3Hover=-1; m3Zoom=1; m3Yaw=M3_VIEW.iso[0]; m3Pitch=M3_VIEW.iso[1];
           m3GL=null; m3GLErr='';
+          if(!m3Faces.length) throw new Error('ไม่พบหน้าเรียบในโมเดลนี้ — น่าจะเป็นผิวโค้งล้วน (เช่นงานสแกน) ซึ่งตัดเป็นแผ่นแบนไม่ได้');
           m3Mode='side'; m3Sel=new Set([0]);   // "top" is what people mean nine times in ten
           render3D(true);
         }catch(err){ _m3Fail(err.message||String(err)); }
@@ -7033,6 +7497,9 @@ function render3D(rebuild){
         style="background:#0006;border:1px solid var(--border,#2a3050);border-radius:6px;color:inherit;padding:3px 6px;">
         ${['mm','cm','m','in'].map(u=>`<option value="${u}" ${m3Unit===u?'selected':''}>${u==='in'?'นิ้ว':u}</option>`).join('')}
       </select>
+      <span style="margin-left:10px;" title="ถ้าด้าน บน/หน้า สลับกัน แปลว่าไฟล์ใช้แกนขึ้นอีกแบบ">แกนขึ้น:</span>
+      ${['z','y'].map(u=>`<button class="btn btn-sm ${m3UpAx===u?'btn-primary':'btn-ghost'}"
+         onclick="m3SetUpAxis('${u}')">${u.toUpperCase()}</button>`).join('')}
       <span style="margin-left:6px;">จำนวนต่อหน้า:</span>
       <input type="number" min="1" value="${m3Qty}" onchange="m3SetQty(this.value);render3D()"
         style="width:64px;background:#0006;border:1px solid var(--border,#2a3050);border-radius:6px;
@@ -7586,7 +8053,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-h9';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-i2';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
