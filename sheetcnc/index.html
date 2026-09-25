@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-i4</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-j5</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -5820,9 +5820,12 @@ let m3Grid=true;
 let m3UpAx='z'; // which axis the file calls up, after any conversion
 let m3Sel=new Set(), m3Hover=-1;
 let m3Mode='side';        // 'side' = the six faces a person sees · 'face' = every flat patch
-let m3Sides=[], m3SideOf=null, m3CompOf=null;
+let m3Sides=[], m3SideOf=null, m3CompOf=null, m3GrpOf=null;
+let m3Objs=[], m3ObjOf=null, m3TriAll=null;   // the file as it arrived, for undo
 let m3Box={cx:0,cy:0,cz:0,span:1};
 let m3GL=null, m3GLErr='';
+let m3PanX=0, m3PanY=0;   // view offset in clip units, set by dragging
+let m3Nav='orbit';        // what the LEFT button does: 'orbit' or 'pan'
 let m3Yaw=-0.95, m3Pitch=0.52, m3Zoom=1, m3Drag=null, m3Moved=0;
 let m3Ms=0;
 const M3_KEEP=500;        // faces shown; the rest are slivers, never panels
@@ -6825,7 +6828,8 @@ function _m3Analyse(){
   m3AllFaces=m3Faces._total||m3Faces.length;
   m3CompOf=m3Faces._comp; m3Box=m3Faces._box;
   const S=_m3BuildSides(m3Tri, m3Faces._vid);
-  m3SideOf=S.side; m3Sides=S.sides;
+  m3SideOf=S.side; m3GrpOf=S.grp; m3Sides=S.sides;
+  m3ObjOf=S.obj; m3Objs=S.objs;
   m3Ms=Date.now()-t0;
 }
 
@@ -6878,12 +6882,14 @@ function handle3DFile(file){
               (N>400000?' (โมเดลใหญ่ ใช้เวลาสักครู่)':''));
       setTimeout(()=>{
         try{
-          m3Tri=tf; m3NTri=N;
+          m3Tri=tf; m3NTri=N; m3TriAll=tf;
           _m3Analyse();
-          m3Hover=-1; m3Zoom=1; m3Yaw=M3_VIEW.iso[0]; m3Pitch=M3_VIEW.iso[1];
+          m3Hover=-1; m3Zoom=1; m3PanX=0; m3PanY=0; m3Yaw=M3_VIEW.iso[0]; m3Pitch=M3_VIEW.iso[1];
           m3GL=null; m3GLErr='';
           if(!m3Faces.length) throw new Error('ไม่พบหน้าเรียบในโมเดลนี้ — น่าจะเป็นผิวโค้งล้วน (เช่นงานสแกน) ซึ่งตัดเป็นแผ่นแบนไม่ได้');
-          m3Mode='side'; m3Sel=new Set([0]);   // "top" is what people mean nine times in ten
+          // Open on the object list: clearing out the props that came along in the
+          // file is the first thing to do, and every area figure depends on it.
+          m3Mode='obj'; m3Sel=new Set();
           render3D(true);
         }catch(err){ _m3Fail(err.message||String(err)); }
       },30);
@@ -6907,27 +6913,56 @@ const M3_SIDE=[
   {k:'right',  lab:'ขวา',  ax:0, sg: 1, u:[0,1,0],  v:[0,0,1],  col:[0.40,0.85,0.85]}
 ];
 
-/** Chain a bag of undirected edges into closed loops. */
+/**
+ * Chain a bag of undirected edges into closed loops.
+ *
+ * Walk EDGES, not vertices, and at a junction carry straight on. A rim and the
+ * rim of a hole can meet at one shared vertex; a walker that just takes any
+ * unused neighbour will hop between them and hand back one keyhole instead of
+ * an outline plus a hole.
+ */
 function _m3Loops(ea, eb, n, P){
   const adj=new Map();
   for(let i=0;i<n;i++){
     const a=ea[i], b=eb[i];
     if(a===b) continue;
-    let A=adj.get(a); if(!A) adj.set(a,A=[]); A.push(b);
-    let B=adj.get(b); if(!B) adj.set(b,B=[]); B.push(a);
+    let A=adj.get(a); if(!A) adj.set(a,A=[]); A.push(i);
+    let B=adj.get(b); if(!B) adj.set(b,B=[]); B.push(i);
   }
-  const seen=new Set(), loops=[];
-  adj.forEach((_,start)=>{
-    if(seen.has(start)) return;
-    const loop=[]; let cur=start, prev=null, guard=0;
-    while(cur!==undefined && !seen.has(cur) && guard++<2e6){
-      seen.add(cur); loop.push([P[cur*3],P[cur*3+1],P[cur*3+2]]);
-      const nb=adj.get(cur)||[];
-      const nx=nb.find(x=>x!==prev && !seen.has(x));
-      prev=cur; cur=nx;
+  const used=new Uint8Array(n);
+  const other=(i,v)=> ea[i]===v ? eb[i] : ea[i];
+  const dir=(from,to)=>{
+    const dx=P[to*3]-P[from*3], dy=P[to*3+1]-P[from*3+1], dz=P[to*3+2]-P[from*3+2];
+    const L=Math.hypot(dx,dy,dz)||1;
+    return [dx/L, dy/L, dz/L];
+  };
+  const loops=[];
+  for(let e0=0;e0<n;e0++){
+    if(used[e0]) continue;
+    const start=ea[e0];
+    let cur=start, e=e0;
+    const loop=[];
+    let guard=0;
+    while(e>=0 && !used[e] && guard++<2e6){
+      used[e]=1;
+      loop.push([P[cur*3],P[cur*3+1],P[cur*3+2]]);
+      const nxt=other(e,cur);
+      const d=dir(cur,nxt);
+      cur=nxt;
+      if(cur===start) break;
+      // straightest unused edge out of this vertex
+      const cand=adj.get(cur)||[];
+      let best=-1, bestDot=-2;
+      for(const k of cand){
+        if(used[k]) continue;
+        const dd=dir(cur, other(k,cur));
+        const dot=d[0]*dd[0]+d[1]*dd[1]+d[2]*dd[2];
+        if(dot>bestDot){ bestDot=dot; best=k; }
+      }
+      e=best;
     }
     if(loop.length>=3) loops.push(loop);
-  });
+  }
   return loops;
 }
 
@@ -6938,7 +6973,7 @@ function _m3Loops(ea, eb, n, P){
 // the whole face. Coverage does not care about topology: rasterise the projection
 // and trace the border of the filled region.
 
-function _m3Footprint(tris, tf, u, v){
+function _m3Footprint(tris, tf, u, v, band){
   const px=o=>tf[o]*u[0]+tf[o+1]*u[1]+tf[o+2]*u[2];
   const py=o=>tf[o]*v[0]+tf[o+1]*v[1]+tf[o+2]*v[2];
   let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
@@ -7003,7 +7038,7 @@ function _m3Footprint(tris, tf, u, v){
   const w=x1-x0, h=y1-y0;
   const holes=shaped.slice(1).map(s=>s.p.map(([x,y])=>[x-x0,y-y0]))
     .filter(hp=>_m3Chunky(hp) && hp.every(([x,y])=>x>=-tol&&y>=-tol&&x<=w+tol&&y<=h+tol))
-    .filter(hp=>_m3HoleReal(hp, null, tf, u, v, x0, y0));
+    .filter(hp=>_m3HoleReal(hp, null, tf, u, v, x0, y0, band));
   return {poly, holes, w, h, a:Math.abs(_m3Area(poly))};
 }
 
@@ -7014,11 +7049,14 @@ function _m3Contours(M,W,H){
   const DX=[-1,-1,0,1,1,1,0,-1], DY=[0,-1,-1,-1,0,1,1,1];
   for(let y=0;y<H;y++) for(let x=0;x<W;x++){
     if(!at(x,y) || seen[y*W+x] || at(x-1,y)) continue;
-    const c=[]; let cx=x, cy=y, dir=0, guard=0;
+    const c=[]; let cx=x, cy=y, dir=0, guard=0, first=true;
     do{
       seen[cy*W+cx]=1; c.push([cx,cy]);
       let nx=-1, ny=-1;
-      const k=(dir+6)%8;
+      // Moore tracing: resume the sweep one step clockwise of where we came FROM.
+      // Starting anywhere else lets the walk cut across the inside of the shape.
+      const k = first ? 0 : (dir+5)%8;
+      first=false;
       for(let i=0;i<8;i++){
         const d=(k+i)%8, tx=cx+DX[d], ty=cy+DY[d];
         if(at(tx,ty)){ nx=tx; ny=ty; dir=d; break; }
@@ -7095,7 +7133,7 @@ function _m3FitBox(p, mnX, mnY, mxX, mxY){
  * vertices produce loops that look like holes but sit on solid material, and
  * cutting those would put a slot through a good panel.
  */
-function _m3HoleReal(hole, tris, tf, u, v, ox, oy){
+function _m3HoleReal(hole, tris, tf, u, v, ox, oy, band){
   const inside=(x,y,poly)=>{
     let c=false;
     for(let i=0,j=poly.length-1;i<poly.length;j=i++){
@@ -7140,7 +7178,15 @@ function _m3HoleReal(hole, tris, tf, u, v, ox, oy){
       if(X<tx0||X>tx1||Y<ty0||Y>ty1) continue;
       const w1=((bx-ax)*(Y-ay)-(by-ay)*(X-ax))/d;
       const w2=((X-ax)*(cy2-ay)-(Y-ay)*(cx2-ax))/d;
-      if(w1>=-1e-9 && w2>=-1e-9 && w1+w2<=1+1e-9) return false;   // solid here
+      if(w1<-1e-9 || w2<-1e-9 || w1+w2>1+1e-9) continue;
+      if(band){
+        // Material at a different depth is not this panel's material. A pocket
+        // floor sits well below the lid, so the opening above it IS a hole.
+        const za=tf[o+band.ax], zb=tf[o+3+band.ax], zc=tf[o+6+band.ax];
+        const z=za + (zb-za)*w2 + (zc-za)*w1;
+        if(z < band.lo-band.tol || z > band.hi+band.tol) continue;
+      }
+      return false;                                              // solid here
     }
   }
   return true;
@@ -7175,8 +7221,93 @@ function _m3PolyFrom(loops, u, v, chk){
   return {poly, holes, w, h, a:withA[0].a};
 }
 
+/**
+ * Which triangles are on the OUTSIDE of the model.
+ *
+ * A pocket's floor faces up exactly like the lid does, so grouping by normal
+ * alone throws the inside of a recess in with the outside of the part — and a
+ * cut list built from that is wrong. The test is what you would see: look down
+ * each axis and keep the triangle that is nearest the viewer at that spot.
+ * Anything hidden behind material is an inside surface.
+ */
+function _m3OuterMask(tf, side){
+  const N=tf.length/9|0;
+  const out=new Uint8Array(N);          // 1 = the outside of the part
+  if(!N) return out;
+  let mn=[Infinity,Infinity,Infinity], mx=[-Infinity,-Infinity,-Infinity];
+  for(let i=0;i<tf.length;i+=3) for(let k=0;k<3;k++){
+    const v=tf[i+k]; if(v<mn[k])mn[k]=v; if(v>mx[k])mx[k]=v; }
+  const span=Math.max(mx[0]-mn[0], mx[1]-mn[1], mx[2]-mn[2])||1;
+  const RES=900;
+  const win=new Int32Array(N);          // pixels this triangle owns at an extreme
+  const tot=new Int32Array(N);          // pixels it covers at all
+  const EPS=span*2e-4;
+
+  for(let ax=0;ax<3;ax++){
+    const u=(ax+1)%3, v=(ax+2)%3;
+    const bw=mx[u]-mn[u], bh=mx[v]-mn[v];
+    if(!(bw>0)||!(bh>0)) continue;
+    const sc=RES/Math.max(bw,bh);
+    const W=Math.ceil(bw*sc)+3, H=Math.ceil(bh*sc)+3;
+    const hi=new Float32Array(W*H).fill(-Infinity);
+    const lo=new Float32Array(W*H).fill(Infinity);
+    const hid=new Int32Array(W*H).fill(-1), lod=new Int32Array(W*H).fill(-1);
+    // pass 1 — who is in front, looking from each end of this axis
+    const scan=(cb)=>{
+      for(let t=0;t<N;t++){
+        const o=t*9;
+        const ax0=(tf[o+u]-mn[u])*sc+1,   ay0=(tf[o+v]-mn[v])*sc+1;
+        const bx0=(tf[o+3+u]-mn[u])*sc+1, by0=(tf[o+3+v]-mn[v])*sc+1;
+        const cx0=(tf[o+6+u]-mn[u])*sc+1, cy0=(tf[o+6+v]-mn[v])*sc+1;
+        const za=tf[o+ax], zb=tf[o+3+ax], zc=tf[o+6+ax];
+        let x0=Math.floor(Math.min(ax0,bx0,cx0)), x1=Math.ceil(Math.max(ax0,bx0,cx0));
+        let y0=Math.floor(Math.min(ay0,by0,cy0)), y1=Math.ceil(Math.max(ay0,by0,cy0));
+        if(x0<0)x0=0; if(y0<0)y0=0; if(x1>W-1)x1=W-1; if(y1>H-1)y1=H-1;
+        const d=(bx0-ax0)*(cy0-ay0)-(by0-ay0)*(cx0-ax0);
+        if(Math.abs(d)<1e-12){                        // edge-on: one pixel at the middle
+          const mxp=Math.round((ax0+bx0+cx0)/3), myp=Math.round((ay0+by0+cy0)/3);
+          if(mxp>=0&&mxp<W&&myp>=0&&myp<H) cb(t, myp*W+mxp, (za+zb+zc)/3);
+          continue;
+        }
+        const inv=1/d;
+        for(let y=y0;y<=y1;y++){
+          const fy=y+0.5;
+          for(let x=x0;x<=x1;x++){
+            const fx=x+0.5;
+            const w1=((bx0-ax0)*(fy-ay0)-(by0-ay0)*(fx-ax0))*inv;
+            const w2=((fx-ax0)*(cy0-ay0)-(fy-ay0)*(cx0-ax0))*inv;
+            if(w1<-1e-9||w2<-1e-9||w1+w2>1+1e-9) continue;
+            cb(t, y*W+x, za + (zb-za)*w2 + (zc-za)*w1);
+          }
+        }
+      }
+    };
+    scan((t,i,z)=>{
+      if(z>hi[i]){ hi[i]=z; hid[i]=t; }
+      if(z<lo[i]){ lo[i]=z; lod[i]=t; }
+    });
+    // pass 2 — count how much of each triangle actually shows
+    win.fill(0); tot.fill(0);
+    scan((t,i,z)=>{
+      tot[t]++;
+      if(hid[i]===t || lod[i]===t || z>=hi[i]-EPS || z<=lo[i]+EPS) win[t]++;
+    });
+    for(let t=0;t<N;t++){
+      const s=side[t];
+      if(s>5) continue;
+      if(M3_SIDE[s].ax!==ax) continue;               // judge a triangle on its own axis
+      out[t] = (tot[t]>0 && win[t]*3>=tot[t]) ? 1 : 0;   // a third of it visible is enough
+    }
+  }
+  return out;
+}
+
 function _m3BuildSides(tf, vid){
   const N=tf.length/9|0, n3=N*3;
+  let _mn=[Infinity,Infinity,Infinity], _mx=[-Infinity,-Infinity,-Infinity];
+  for(let i=0;i<tf.length;i+=3) for(let k=0;k<3;k++){
+    const v=tf[i+k]; if(v<_mn[k])_mn[k]=v; if(v>_mx[k])_mx[k]=v; }
+  const mSpan=Math.max(_mx[0]-_mn[0], _mx[1]-_mn[1], _mx[2]-_mn[2])||1;
   const side=new Uint8Array(N);
   const cnt=new Int32Array(6);
   const trueA=new Float64Array(6), projA=new Float64Array(6);
@@ -7199,10 +7330,6 @@ function _m3BuildSides(tf, vid){
     trueA[s]+=L/2;
     projA[s]+=(s<2?Z:s<4?Y:X)/2;
   }
-  const at=new Int32Array(6), lists=[];
-  for(let s=0;s<6;s++) lists.push(new Int32Array(cnt[s]));
-  for(let t=0;t<N;t++){ const s=side[t]; if(s<6) lists[s][at[s]++]=t; }
-
   let nv=0; for(let i=0;i<n3;i++) if(vid[i]>nv) nv=vid[i];
   nv++;
   const P=new Float32Array(nv*3);
@@ -7228,35 +7355,159 @@ function _m3BuildSides(tf, vid){
     nr++; i=j;
   }
 
+  // ── inside or outside ────────────────────────────────────────────────
+  // A pocket floor points the same way as the lid above it. Two things give it
+  // away: you cannot see it from outside along that axis, or — when you can,
+  // through the opening — every edge of it runs UP into a wall. A step's top
+  // surface fails both tests and stays outside, which is what it is.
+  const vis = N<=2500000 ? _m3OuterMask(tf, side) : new Uint8Array(N).fill(1);
+  const comp=new Int32Array(N).fill(-1);
+  const inner=new Uint8Array(N);
+  const obj=new Int32Array(N).fill(-1);
+  const objs=[];
+  {
+    const deg=new Int32Array(N+1);
+    for(let i=0;i<nr;i++) if(rT2[i]>=0){ deg[rT1[i]]++; deg[rT2[i]]++; }
+    const off=new Int32Array(N+1);
+    for(let i=0,a=0;i<=N;i++){ off[i]=a; a+=deg[i]; }
+    const fill=off.slice(), nbr=new Int32Array(off[N]), nbrE=new Int32Array(off[N]);
+    for(let i=0;i<nr;i++) if(rT2[i]>=0){
+      nbrE[fill[rT1[i]]]=i; nbr[fill[rT1[i]]++]=rT2[i];
+      nbrE[fill[rT2[i]]]=i; nbr[fill[rT2[i]]++]=rT1[i];
+    }
+    // Separate lumps of mesh: a file often carries a part plus props the user
+    // never wanted — a stand, a mannequin, a bolt someone left in the scene.
+    {
+      const stack2=new Int32Array(N);
+      for(let s0=0;s0<N;s0++){
+        if(obj[s0]>=0) continue;
+        const id=objs.length;
+        let sp=0, n=0; stack2[sp++]=s0; obj[s0]=id;
+        let bx0=Infinity,by0=Infinity,bz0=Infinity,bx1=-Infinity,by1=-Infinity,bz1=-Infinity;
+        let area=0;
+        while(sp){
+          const t=stack2[--sp]; n++;
+          const o=t*9;
+          for(let c=0;c<3;c++){
+            const x=tf[o+c*3], y=tf[o+c*3+1], z=tf[o+c*3+2];
+            if(x<bx0)bx0=x; if(x>bx1)bx1=x;
+            if(y<by0)by0=y; if(y>by1)by1=y;
+            if(z<bz0)bz0=z; if(z>bz1)bz1=z;
+          }
+          const e1x=tf[o+3]-tf[o], e1y=tf[o+4]-tf[o+1], e1z=tf[o+5]-tf[o+2];
+          const e2x=tf[o+6]-tf[o], e2y=tf[o+7]-tf[o+1], e2z=tf[o+8]-tf[o+2];
+          const cx=e1y*e2z-e1z*e2y, cy=e1z*e2x-e1x*e2z, cz=e1x*e2y-e1y*e2x;
+          area+=Math.sqrt(cx*cx+cy*cy+cz*cz)/2;
+          for(let k=off[t];k<off[t+1];k++){
+            const j=nbr[k];
+            if(obj[j]>=0) continue;
+            obj[j]=id; stack2[sp++]=j;
+          }
+        }
+        objs.push({i:id, n, area, w:bx1-bx0, h:by1-by0, d:bz1-bz0,
+                   cx:(bx0+bx1)/2, cy:(by0+by1)/2, cz:(bz0+bz1)/2});
+      }
+      objs.sort((a,b)=>b.area-a.area);      // biggest lump first — usually the part
+      const remap=new Int32Array(objs.length);
+      objs.forEach((o,k)=>{ remap[o.i]=k; o.i=k; });
+      for(let t=0;t<N;t++) if(obj[t]>=0) obj[t]=remap[obj[t]];
+    }
+    const depth=(t,ax,sg)=>{ const o=t*9;
+      return Math.max(tf[o+ax], tf[o+3+ax], tf[o+6+ax])*sg; };
+    const stack=new Int32Array(N);
+    let nc=0;
+    for(let s0=0;s0<N;s0++){
+      if(comp[s0]>=0 || side[s0]>5) continue;
+      const sd=side[s0], ax=M3_SIDE[sd].ax, sg=M3_SIDE[sd].sg;
+      const me=[]; let sp=0; stack[sp++]=s0; comp[s0]=nc;
+      while(sp){
+        const t=stack[--sp]; me.push(t);
+        for(let k=off[t];k<off[t+1];k++){
+          const j=nbr[k];
+          if(comp[j]>=0 || side[j]!==sd) continue;
+          comp[j]=nc; stack[sp++]=j;
+        }
+      }
+      let seen=0;
+      me.forEach(t=>{ if(vis[t]) seen++; });
+      let rise=0, edges=0;
+      me.forEach(t=>{
+        const dt=depth(t,ax,sg);
+        for(let k=off[t];k<off[t+1];k++){
+          const j=nbr[k];
+          if(comp[j]===nc) continue;                 // inside the same patch
+          edges++;
+          if(depth(j,ax,sg) > dt + 1e-6) rise++;      // the neighbour climbs above us
+        }
+      });
+      const pit = edges>0 && rise/edges>=0.85;
+      const hidden = me.length>0 && seen*3 < me.length;
+      if(pit || hidden) me.forEach(t=>{ inner[t]=1; });
+      nc++;
+    }
+  }
+  const grp=new Uint8Array(N).fill(255);
+  const gcnt=new Int32Array(12), gTrue=new Float64Array(12), gProj=new Float64Array(12);
+  for(let t=0;t<N;t++){
+    const sd=side[t];
+    if(sd>5) continue;
+    const g=sd*2+(inner[t]?1:0);
+    grp[t]=g; gcnt[g]++;
+    const o=t*9;
+    const ax=tf[o],ay=tf[o+1],az=tf[o+2];
+    const e1x=tf[o+3]-ax,e1y=tf[o+4]-ay,e1z=tf[o+5]-az;
+    const e2x=tf[o+6]-ax,e2y=tf[o+7]-ay,e2z=tf[o+8]-az;
+    const cx=e1y*e2z-e1z*e2y, cy=e1z*e2x-e1x*e2z, cz=e1x*e2y-e1y*e2x;
+    gTrue[g]+=Math.sqrt(cx*cx+cy*cy+cz*cz)/2;
+    gProj[g]+=(sd<2?Math.abs(cz):sd<4?Math.abs(cy):Math.abs(cx))/2;
+  }
+  const lists=[];
+  for(let g=0;g<12;g++) lists.push(new Int32Array(gcnt[g]));
+  {
+    const at2=new Int32Array(12);
+    for(let t=0;t<N;t++){ const g=grp[t]; if(g<12) lists[g][at2[g]++]=t; }
+  }
+
   const la=new Int32Array(nr), lb=new Int32Array(nr);
   const EPS=1e-6;
 
-  const sides=M3_SIDE.map((d,s)=>{
-    // the side's exact extent, straight from its vertices — the yardstick every
-    // candidate outline is judged against
+  const sides=[];
+  for(let g=0;g<12;g++){
+    const sd=g>>1, isIn=(g&1)===1, d=M3_SIDE[sd];
+    if(!gcnt[g]){ sides.push(Object.assign({},d,{i:g, part:isIn?'in':'out', inner:isIn,
+      lab: isIn ? d.lab+' (ใน)' : d.lab,
+      col: isIn ? d.col.map(c=>c*0.55+0.08) : d.col,
+      nTri:0, trueArea:0, projArea:0, poly:[], holes:[], w:0, h:0})); continue; }
+    const mine=lists[g];
     let bx0=Infinity,by0=Infinity,bx1=-Infinity,by1=-Infinity;
-    lists[s].forEach(t=>{ for(let c=0;c<3;c++){ const o=t*9+c*3;
+    mine.forEach(t=>{ for(let c=0;c<3;c++){ const o=t*9+c*3;
       const x=tf[o]*d.u[0]+tf[o+1]*d.u[1]+tf[o+2]*d.u[2];
       const y=tf[o]*d.v[0]+tf[o+1]*d.v[1]+tf[o+2]*d.v[2];
       if(x<bx0)bx0=x; if(x>bx1)bx1=x; if(y<by0)by0=y; if(y>by1)by1=y; }});
     const bw=bx1-bx0, bh=by1-by0;
     const good=R => !!R && R.poly.length>=3 && R.w>=bw*0.995 && R.h>=bh*0.995
-                    && R.a>=projA[s]*0.95;
+                    && R.a>=gProj[g]*0.95;
+    let dlo=Infinity, dhi=-Infinity;
+    mine.forEach(t=>{ for(let c=0;c<3;c++){ const z=tf[t*9+c*3+d.ax];
+      if(z<dlo)dlo=z; if(z>dhi)dhi=z; }});
+    const band={ax:d.ax, lo:dlo, hi:dhi, tol:mSpan*0.01};
+    const chk=(hp,ox,oy)=>_m3HoleReal(hp, null, tf, d.u, d.v, ox, oy, band);
 
     // 1 — the rim of the patch itself. Exact, and it keeps every notch.
     const mark=new Uint8Array(N);
-    lists[s].forEach(t=>{ mark[t]=1; });
+    mine.forEach(t=>{ mark[t]=1; });
     let n=0;
     for(let i=0;i<nr;i++){
-      const m1=rT1[i]>=0 && mark[rT1[i]];
-      const m2=rT2[i]>=0 && mark[rT2[i]];
-      if(m1!==m2 || (m1 && rT2[i]<0)){ la[n]=rA[i]; lb[n]=rB[i]; n++; }
+      // !! matters: without it an unshared edge compares 0 !== false and every
+      // naked edge in the model leaks into every patch's rim
+      const m1=rT1[i]>=0 && !!mark[rT1[i]];
+      const m2=rT2[i]>=0 && !!mark[rT2[i]];
+      if(m1!==m2){ la[n]=rA[i]; lb[n]=rB[i]; n++; }
     }
-    const chk=(hp,ox,oy)=>_m3HoleReal(hp, null, tf, d.u, d.v, ox, oy);
     let R = n>=3 ? _m3PolyFrom(_m3Loops(la,lb,n,P), d.u, d.v, chk) : null;
 
     // 2 — the silhouette, for a wavy face whose steep flanks were filed sideways
-    if(!good(R)){
+    if(!good(R) && !isIn){
       const an = d.ax===0?nx : d.ax===1?ny : nz;
       const front=t=>t>=0 && side[t]!==255 && an[t]*d.sg>EPS;
       let m=0;
@@ -7270,15 +7521,24 @@ function _m3BuildSides(tf, vid){
       }
     }
     // 3 — coverage, which ignores topology altogether
-    if(!good(R) && lists[s].length){
-      const R3=_m3Footprint(lists[s], tf, d.u, d.v);
+    let R3=null;
+    if(mine.length && (!good(R) || !R.holes.length)) R3=_m3Footprint(mine, tf, d.u, d.v, band);
+    if(!good(R)){
       if(R3 && (good(R3) || !R || R3.a>R.a)) R=R3;
+    } else if(R3 && R3.holes.length && !R.holes.length){
+      // A rim walk can slip through a shared vertex and come back as one keyhole
+      // loop instead of an outline plus a hole. Same area, wrong cut.
+      const net=x=>Math.abs(x.a)-x.holes.reduce((a,h)=>a+Math.abs(_m3Area(h)),0);
+      if(Math.abs(net(R3)-net(R)) <= Math.abs(net(R))*0.02) R=R3;
     }
     R = R || {poly:[],holes:[],w:0,h:0,a:0};
-    return Object.assign({}, d, {i:s, nTri:cnt[s], trueArea:trueA[s], projArea:projA[s],
-      poly:R.poly, holes:R.holes, w:R.w, h:R.h});
-  });
-  return {side, sides};
+    sides.push(Object.assign({}, d, {i:g, part:isIn?'in':'out', inner:isIn,
+      lab: isIn ? d.lab+' (ใน)' : d.lab,
+      col: isIn ? d.col.map(c=>c*0.55+0.08) : d.col,
+      nTri:gcnt[g], trueArea:gTrue[g], projArea:gProj[g],
+      poly:R.poly, holes:R.holes, w:R.w, h:R.h}));
+  }
+  return {side, grp, inner, sides, obj, objs};
 }
 
 /* ─────────── preview ─────────── */
@@ -7289,7 +7549,13 @@ function m3SetUnit(u){ m3Unit=u; render3D(); }
 function m3SetDisp(u){ m3Disp=u; render3D(); }
 function m3SetQty(v){ m3Qty=Math.max(1, parseInt(v,10)||1); }
 function m3SetSplit(v){ m3AutoSplit=!!v; render3D(); }
-function m3SetMode(m){ if(m===m3Mode) return; m3Mode=m; m3Sel=new Set([0]); render3D(); }
+function m3SetMode(m){
+  _m3PopHide();
+  if(m===m3Mode) return;
+  m3Mode=m;
+  m3Sel = new Set();
+  render3D();
+}
 
 /* WebGL: 600k triangles is nothing for a GPU and impossible for canvas2d. */
 const M3_VS=`attribute vec3 aPos; attribute vec3 aNrm; attribute vec3 aCol; attribute float aId;
@@ -7400,9 +7666,13 @@ function _m3GLTags(){
   const GREY=[0.74,0.76,0.80];
   for(let t=0;t<N;t++){
     let id=-1, col=GREY;
-    if(m3Mode==='side'){
-      const sd=m3SideOf[t];
-      if(sd<6){ id=sd; if(m3Sel.has(sd)) col=M3_SIDE[sd].col; }
+    if(m3Mode==='obj'){
+      const oi=m3ObjOf?m3ObjOf[t]:-1;
+      id=oi;
+      if(oi>=0) col = m3Sel.has(oi) ? [0.30,0.80,0.45] : M3_OBJC[oi%M3_OBJC.length];
+    } else if(m3Mode==='side'){
+      const g=m3GrpOf?m3GrpOf[t]:255;
+      if(g<12){ id=g; if(m3Sel.has(g)) col=(m3Sides[g]&&m3Sides[g].col)||M3_SIDE[g>>1].col; }
     } else {
       const f=m3CompOf?m3CompOf[t]:-1;
       id=f; if(f>=0 && m3Sel.has(f)) col=[0.30,0.80,0.45];
@@ -7428,8 +7698,8 @@ function _m3Mat(W,H){
   m[0]=rx*s/ar; m[1]=ux*s; m[2]=-dx*sz;
   m[4]=ry*s/ar; m[5]=uy*s; m[6]=-dy*sz;
   m[8]=rz*s/ar; m[9]=uz*s; m[10]=-dz*sz;
-  m[12]=-(B.cx*m[0]+B.cy*m[4]+B.cz*m[8]);
-  m[13]=-(B.cx*m[1]+B.cy*m[5]+B.cz*m[9]);
+  m[12]=-(B.cx*m[0]+B.cy*m[4]+B.cz*m[8]) + m3PanX;
+  m[13]=-(B.cx*m[1]+B.cy*m[5]+B.cz*m[9]) + m3PanY;
   m[14]=-(B.cx*m[2]+B.cy*m[6]+B.cz*m[10]);
   m[15]=1;
   const nm=new Float32Array([rx,ux,-dx, ry,uy,-dy, rz,uz,-dz]);
@@ -7522,43 +7792,217 @@ function _m3PickAt(mx,my){
   return id>0 ? id-1 : -1;
 }
 
-function m3Down(ev){ m3Drag={x:ev.clientX, y:ev.clientY}; m3Moved=0; }
+// Left drag turns, right or middle drag slides the view — the CAD convention.
+// Shift+left does the same for anyone on a trackpad with no second button.
+/** Which triangle is under the cursor. Everything else — the piece it belongs
+ *  to, the side it faces — follows from that one number. */
+function _m3PickTriAt(mx,my){
+  const G=m3GL, cv=document.getElementById('m3Cv');
+  if(!G||!cv||!m3NTri) return -1;
+  const gl=G.gl, N=m3NTri;
+  for(let t=0;t<N;t++){ const o=t*3; G.idArr[o]=G.idArr[o+1]=G.idArr[o+2]=t; }
+  gl.bindBuffer(gl.ARRAY_BUFFER,G.id); gl.bufferData(gl.ARRAY_BUFFER,G.idArr,gl.DYNAMIC_DRAW);
+  _m3Paint(true);
+  const x=Math.round(mx*cv.width/cv.clientWidth), y=Math.round(cv.height-my*cv.height/cv.clientHeight);
+  const px=new Uint8Array(4);
+  gl.readPixels(x,y,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
+  const id=px[0]|(px[1]<<8)|(px[2]<<16);
+  _m3GLTags(); _m3Paint(false);                 // put the normal ids back
+  return id>0 ? id-1 : -1;
+}
+
+function m3Down(ev){
+  // The middle and right buttons always do the opposite of the left one, so
+  // either mode can reach both without going back to the toolbar.
+  const alt = ev.button===1 || ev.button===2 || ev.shiftKey;
+  _m3PopHide();
+  if(m3Nav==='paint' && !alt){
+    m3Drag={x:ev.clientX, y:ev.clientY, paint:true, erase:ev.altKey, t:0};
+    m3Moved=0;
+    _m3PaintAt(ev);
+    return;
+  }
+  m3Drag={x:ev.clientX, y:ev.clientY,
+          pan: m3Nav==='pan' ? !alt : (m3Nav==='paint' ? false : alt)};
+  m3Moved=0;
+  const cv=ev.currentTarget;
+  if(cv && cv.style) cv.style.cursor = m3Drag.pan ? 'move' : 'grabbing';
+}
+
+/** Add (or with Alt, remove) whatever surface is under the cursor. */
+function _m3PaintAt(ev){
+  const cv=ev.currentTarget; if(!cv) return;
+  const now=Date.now();
+  if(m3Drag && now-m3Drag.t < 40) return;         // a pick is a full redraw; 25/s is plenty
+  if(m3Drag) m3Drag.t=now;
+  const r=cv.getBoundingClientRect();
+  const i=_m3PickAt(ev.clientX-r.left, ev.clientY-r.top);
+  if(i<0) return;
+  const has=m3Sel.has(i);
+  if(m3Drag&&m3Drag.erase){ if(!has) return; m3Sel.delete(i); }
+  else { if(has) return; m3Sel.add(i); }
+  _m3GLTags(); _m3Paint();
+}
+const M3_CUR={orbit:'grab', pan:'move', paint:'crosshair'};
+function m3SetNav(m){
+  m3Nav=m;
+  const cv=document.getElementById('m3Cv');
+  if(cv) cv.style.cursor = M3_CUR[m]||'grab';
+  [['m3NavOrbit','orbit'],['m3NavPan','pan'],['m3NavPaint','paint']].forEach(([id,k])=>{
+    const b=document.getElementById(id);
+    if(b) b.className='btn btn-sm '+(m===k?'btn-primary':'btn-ghost');
+  });
+}
 function m3Move(ev){
   if(!m3Drag) return;
+  if(m3Drag.paint){ m3Moved+=5; _m3PaintAt(ev); return; }
   const dx=ev.clientX-m3Drag.x, dy=ev.clientY-m3Drag.y;
   m3Moved+=Math.abs(dx)+Math.abs(dy);
-  // Grab-and-turn: the surface under the cursor follows the cursor. Orbiting the
-  // camera the same way the drag goes would send the model the other way.
-  m3Yaw -= dx*0.01;
-  m3Pitch = Math.max(-1.553, Math.min(1.553, m3Pitch + dy*0.01));
-  m3Drag={x:ev.clientX, y:ev.clientY};
+  if(m3Drag.pan){
+    const cv=ev.currentTarget;
+    const W=(cv&&cv.clientWidth)||600, H=(cv&&cv.clientHeight)||440;
+    m3PanX += 2*dx/W;
+    m3PanY -= 2*dy/H;
+  } else {
+    // Grab-and-turn: the surface under the cursor follows the cursor. Orbiting the
+    // camera the same way the drag goes would send the model the other way.
+    m3Yaw -= dx*0.01;
+    m3Pitch = Math.max(-1.553, Math.min(1.553, m3Pitch + dy*0.01));
+  }
+  m3Drag={x:ev.clientX, y:ev.clientY, pan:m3Drag.pan};
   _m3Paint();
 }
 function m3Up(ev){
-  const moved=m3Moved; m3Drag=null;
-  if(moved>4) return;
-  const cv=ev.currentTarget, r=cv.getBoundingClientRect();
-  const i=_m3PickAt(ev.clientX-r.left, ev.clientY-r.top);
-  if(i<0) return;
-  if(m3Sel.has(i)) m3Sel.delete(i); else m3Sel.add(i);
+  const moved=m3Moved, wasPan=m3Drag&&m3Drag.pan, wasPaint=m3Drag&&m3Drag.paint;
+  m3Drag=null;
+  if(wasPaint){ render3D(); return; }
+  const cv=ev.currentTarget;
+  if(cv&&cv.style) cv.style.cursor = M3_CUR[m3Nav]||'grab';
+  if(moved>4 || wasPan || !cv) return;
+  const r=cv.getBoundingClientRect();
+  const mx=ev.clientX-r.left, my=ev.clientY-r.top;
+  const i=_m3PickAt(mx, my);
+  if(i<0){ _m3PopHide(); return; }                 // clicked past the model
+  const on=!m3Sel.has(i);
+  if(on) m3Sel.add(i); else m3Sel.delete(i);
   render3D();
+  if(on && m3Mode==='obj'){
+    const t=_m3PickTriAt(mx, my);               // the same spot, asked a second way
+    _m3Pop(i, mx, my, (t>=0 && m3GrpOf) ? m3GrpOf[t] : -1);
+  } else _m3PopHide();
 }
 function m3Wheel(ev){
   ev.preventDefault();
-  m3Zoom=Math.max(0.2, Math.min(8, m3Zoom * (ev.deltaY<0?1.12:0.89)));
+  _m3PopHide();
+  const cv=ev.currentTarget, r=cv&&cv.getBoundingClientRect?cv.getBoundingClientRect():{left:0,top:0};
+  const W=(cv&&cv.clientWidth)||600, H=(cv&&cv.clientHeight)||440;
+  // clip-space position of the pointer, so the point under it stays put
+  const px=2*((ev.clientX-r.left)/W)-1, py=1-2*((ev.clientY-r.top)/H);
+  const before=m3Zoom;
+  m3Zoom=Math.max(0.2, Math.min(40, m3Zoom * (ev.deltaY<0?1.12:0.89)));
+  const k=m3Zoom/before;
+  m3PanX = px + (m3PanX-px)*k;
+  m3PanY = py + (m3PanY-py)*k;
   _m3Paint();
 }
+const M3_OBJC=[[0.74,0.76,0.80],[0.62,0.70,0.86],[0.84,0.72,0.58],[0.68,0.82,0.74],
+  [0.86,0.68,0.74],[0.72,0.66,0.84],[0.80,0.80,0.62],[0.62,0.80,0.84]];
 const M3_VIEW={ iso:[-0.95,0.52], top:[-Math.PI/2,1.553], bottom:[-Math.PI/2,-1.553],
   front:[-Math.PI/2,0], back:[Math.PI/2,0], left:[Math.PI,0], right:[0,0] };
 function m3View(k){
+  _m3PopHide();
   const V=M3_VIEW[k];
-  if(V){ m3Yaw=V[0]; m3Pitch=V[1]; _m3Paint(); }
+  if(V){ m3Yaw=V[0]; m3Pitch=V[1]; m3PanX=0; m3PanY=0; _m3Paint(); }
 }
+/** Click a piece in the preview and its two commands come to the cursor.
+ *  Only in the object tab — on a surface a click just selects. */
+function _m3Pop(i, px, py, sideG){
+  const el=document.getElementById('m3Pop'), cv=document.getElementById('m3Cv');
+  if(!el||!cv) return;
+  const f=m3Objs[i];
+  if(!f){ _m3PopHide(); return; }
+  const k=m3Scale(), DU=M3_U[m3Disp]||1;
+  const UL={mm:'mm',cm:'cm',m:'m',in:'นิ้ว'}[m3Disp]||m3Disp;
+  const nf=v=>{ const x=v*k/DU, a=Math.abs(x), d=a>=1000?0:a>=100?1:2;
+    return x.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); };
+  const sd = (sideG>=0 && m3Sides[sideG] && m3Sides[sideG].nTri) ? m3Sides[sideG] : null;
+  const hdr='color:var(--muted);font-size:.72rem;letter-spacing:.04em;margin:8px 0 4px;';
+  el.innerHTML=`
+    <div style="${hdr}margin-top:0;">📦 ชิ้นวัตถุ</div>
+    <div style="margin-bottom:2px;"><b>ชิ้นที่ ${i+1}</b>
+      <span style="color:var(--muted);">${nf(f.w)}×${nf(f.h)}×${nf(f.d)} ${UL}
+      · ${f.n.toLocaleString()} หน้า</span></div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button class="btn btn-sm btn-ghost" style="color:#fca5a5;" onclick="m3PopDel(${i})">🗑 ลบชิ้นนี้</button>
+      <button class="btn btn-sm btn-ghost" onclick="m3PopKeep(${i})">🎯 เก็บเฉพาะนี้</button>
+    </div>
+    ${sd ? `<div style="border-top:1px solid #ffffff1f;margin-top:9px;"></div>
+      <div style="${hdr}">◧ เลือกเป็นด้าน</div>
+      <div style="margin-bottom:2px;"><b>${esc(sd.lab)}</b>
+        <span style="color:var(--muted);">${nf(sd.w)}×${nf(sd.h)} ${UL}</span></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button class="btn btn-sm btn-primary" onclick="m3PopSide(${sideG})">◧ เลือกด้านนี้</button>
+      </div>` : ''}
+    <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-sm btn-ghost" onclick="m3PopClose(${i})" title="ปิด / ยกเลิกการเลือก">✕ ปิด</button>
+    </div>`;
+  el.style.display='block';
+  const W=cv.clientWidth, H=cv.clientHeight;
+  const w=el.offsetWidth||250, h=el.offsetHeight||150;
+  el.style.left=Math.max(6, Math.min(W-w-6, px+14))+'px';
+  el.style.top =Math.max(6, Math.min(H-h-6, py-h-10))+'px';
+}
+function _m3PopHide(){ const el=document.getElementById('m3Pop'); if(el) el.style.display='none'; }
+function m3PopClose(i){ m3Sel.delete(i); _m3PopHide(); render3D(); }
+function m3PopDel(i){ _m3PopHide(); m3DelOne(i); }
+function m3PopKeep(i){ _m3PopHide(); m3KeepOne(i); }
+function m3PopSide(g){ _m3PopHide(); m3Mode='side'; m3Sel=new Set([g]); render3D(); }
+
 function m3Toggle(i){ if(m3Sel.has(i)) m3Sel.delete(i); else m3Sel.add(i); render3D(); }
-function m3SelAll(){ (m3Mode==='side'?M3_SIDE:m3Faces).forEach((_,i)=>m3Sel.add(i)); render3D(); }
+function m3SelAll(){
+  const src = m3Mode==='obj' ? m3Objs : m3Mode==='side' ? m3Sides : m3Faces;
+  src.forEach((f,i)=>{ if(m3Mode!=='side' || f.nTri) m3Sel.add(i); });
+  render3D();
+}
 function m3SelNone(){ m3Sel.clear(); render3D(); }
 function m3SetGrid(v){ m3Grid=!!v; _m3Paint(); }
-function m3Reset(){ m3Yaw=M3_VIEW.iso[0]; m3Pitch=M3_VIEW.iso[1]; m3Zoom=1; _m3Paint(); }
+/** Rebuild the triangle list, dropping or keeping whole objects. */
+function _m3Filter(keep){
+  if(!m3Tri||!m3ObjOf) return;
+  let n=0;
+  for(let t=0;t<m3NTri;t++) if(keep(m3ObjOf[t])) n++;
+  if(!n){ alert('ต้องเหลือไว้อย่างน้อย 1 ชิ้น'); return; }
+  if(n===m3NTri) return;
+  const out=new Float32Array(n*9);
+  let w=0;
+  for(let t=0;t<m3NTri;t++) if(keep(m3ObjOf[t])) out.set(m3Tri.subarray(t*9,t*9+9), w++*9);
+  m3Tri=out; m3NTri=n;
+  _m3Busy('กำลังคำนวณใหม่…');
+  setTimeout(()=>{
+    _m3Analyse();
+    m3Sel=new Set(); m3GL=null;
+    render3D(true);
+  },20);
+}
+function m3DelSel(){
+  if(!m3Sel.size){ alert('เลือกชิ้นที่จะลบก่อน — คลิกที่ชิ้นในภาพ หรือติ๊กในรายการ'); return; }
+  const gone=new Set(m3Sel);
+  _m3Filter(o=>!gone.has(o));
+}
+function m3KeepSel(){
+  if(!m3Sel.size){ alert('เลือกชิ้นที่จะเก็บไว้ก่อน'); return; }
+  const stay=new Set(m3Sel);
+  _m3Filter(o=>stay.has(o));
+}
+function m3DelOne(i){ _m3Filter(o=>o!==i); }
+function m3KeepOne(i){ _m3Filter(o=>o===i); }
+function m3RestoreAll(){
+  if(!m3TriAll || m3TriAll===m3Tri) return;
+  m3Tri=m3TriAll; m3NTri=m3TriAll.length/9|0;
+  _m3Busy('กำลังคืนค่าทุกชิ้น…');
+  setTimeout(()=>{ _m3Analyse(); m3Sel=new Set(); m3GL=null; render3D(true); },20);
+}
+function m3Reset(){ _m3PopHide(); m3Yaw=M3_VIEW.iso[0]; m3Pitch=M3_VIEW.iso[1]; m3Zoom=1; m3PanX=0; m3PanY=0; _m3Paint(); }
 
 /* ─────────── the card ─────────── */
 
@@ -7584,22 +8028,39 @@ function render3D(rebuild){
   const m2=v=>{ const x=v*k*k/(DU*DU), a=Math.abs(x);
     return nf(x, a>=10000?0 : a>=100?1 : a>=1?3 : 4); };
 
-  const src = m3Mode==='side' ? m3Sides : m3Faces;
-  const rows=src.map((f,i)=>{
+  const src = m3Mode==='obj' ? m3Objs : m3Mode==='side' ? m3Sides : m3Faces;
+  const rows = m3Mode==='obj' ? m3Objs.map((o,i)=>({i, f:o, sel:m3Sel.has(i)})) : src.map((f,i)=>{
     const w=(f.w||0)*k, h=(f.h||0)*k;
     const big=w>maxW||h>maxH;
     const sp=(big&&f.poly&&f.poly.length>=3)
       ? _m3SplitToSheet(f.poly.map(p=>[p[0]*k,p[1]*k]), w, h, maxW, maxH) : null;
     return {i,f,w,h,big,sp,sel:m3Sel.has(i),usable:!!(f.poly&&f.poly.length>=3)};
-  }).filter(r=>m3Mode==='side' ? r.f.nTri>0 : true);
+  });
+  if(m3Mode!=='obj' && m3Mode==='side') { /* empty in/out groups are hidden below */ }
 
+  const shown = m3Mode==='side' ? rows.filter(r=>r.f.nTri>0) : rows;
   let nPanels=0, nPieces=0;
   rows.filter(r=>r.sel&&r.usable).forEach(r=>{
     const c=(r.big&&m3AutoSplit&&r.sp)?r.sp.panels.length:1;
     nPanels+=c; nPieces+=c*m3Qty;
   });
 
-  const list=rows.map(r=>{
+  const list=(m3Mode==='obj' ? shown.map(r=>{
+    const {i,f,sel}=r;
+    const col=M3_OBJC[i%M3_OBJC.length].map(c=>Math.round(c*255)).join(',');
+    return `<div onclick="m3Toggle(${i})" style="display:flex;align-items:center;gap:9px;padding:6px 8px;cursor:pointer;
+        border-radius:7px;background:${sel?'#16a34a22':'transparent'};border:1px solid ${sel?'#22c55e66':'transparent'};">
+      <input type="checkbox" ${sel?'checked':''} onclick="event.stopPropagation();m3Toggle(${i})">
+      <span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:rgb(${col});"></span>
+      <span style="flex:1;font-size:.84rem;"><b>ชิ้นที่ ${i+1}</b>
+        <span style="color:var(--muted);"> ${fmt(f.w*k)} × ${fmt(f.h*k)} × ${fmt(f.d*k)} ${UL}
+        · ${f.n.toLocaleString()} หน้า · ผิว ${m2(f.area)} ${AL}</span></span>
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();m3KeepOne(${i})"
+        title="เก็บเฉพาะชิ้นนี้ ลบที่เหลือ">🎯 เก็บเฉพาะนี้</button>
+      <button class="btn btn-ghost btn-sm" style="color:#fca5a5;"
+        onclick="event.stopPropagation();m3DelOne(${i})" title="ลบชิ้นนี้">🗑 ลบ</button>
+    </div>`;
+  }) : shown.map(r=>{
     const {i,f,w,h,big,sp,sel}=r;
     const pw=sp&&sp.panels[0]?`${fmt(sp.panels[0].w)}×${fmt(sp.panels[0].h)} ${UL}`:'';
     const warn=big?(m3AutoSplit&&sp
@@ -7620,16 +8081,23 @@ function render3D(rebuild){
         <b>${fmt(w)} × ${fmt(h)}</b> ${UL}${extra}</span>
       <span style="font-size:.76rem;">${warn}</span>
     </div>`;
-  }).join('');
+  })).join('');
 
   // what is selected, totalled — read off the preview without hunting the list
-  const chosen=rows.filter(r=>r.sel);
+  const chosen=shown.filter(r=>r.sel);
   let hud;
   if(!chosen.length){
     hud=`<span style="color:var(--muted);">ยังไม่ได้เลือก — คลิกที่ผิวในภาพ หรือติ๊กจากรายการด้านล่าง</span>`;
   } else {
     const SHOW=6;
     const line=r=>{
+      if(m3Mode==='obj'){
+        const c=M3_OBJC[r.i%M3_OBJC.length].map(x=>Math.round(x*255)).join(',');
+        return `<div><span style="display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;
+          background:rgb(${c});"></span><b>ชิ้นที่ ${r.i+1}</b>
+          <span style="color:var(--muted);">${fmt(r.f.w*k)}×${fmt(r.f.h*k)}×${fmt(r.f.d*k)} ${UL}
+          · ${r.f.n.toLocaleString()} หน้า</span></div>`;
+      }
       const dot=m3Mode==='side'
         ? `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;
              background:rgb(${r.f.col.map(c=>Math.round(c*255)).join(',')});"></span>`
@@ -7642,13 +8110,13 @@ function render3D(rebuild){
         : `<b style="color:#93c5fd;">${m2(r.f.flatArea)}</b> ${AL}`;
       return `<div>${dot}<b>${nm}</b> <span style="color:var(--muted);">${fmt(r.w)}×${fmt(r.h)} ${UL}</span> · ${ar}</div>`;
     };
-    const tT=chosen.reduce((a,r)=>a+(m3Mode==='side'?r.f.trueArea:(r.f.flatArea||0)),0);
-    const tP=chosen.reduce((a,r)=>a+(m3Mode==='side'?r.f.projArea:(r.f.flatArea||0)),0);
+    const tT=chosen.reduce((a,r)=>a+(m3Mode==='obj'?r.f.area:m3Mode==='side'?r.f.trueArea:(r.f.flatArea||0)),0);
+    const tP=chosen.reduce((a,r)=>a+(m3Mode==='obj'?r.f.area:m3Mode==='side'?r.f.projArea:(r.f.flatArea||0)),0);
     hud=chosen.slice(0,SHOW).map(line).join('')
       + (chosen.length>SHOW?`<div style="color:var(--muted);">…อีก ${chosen.length-SHOW} รายการ</div>`:'')
       + (chosen.length>1
          ? `<div style="border-top:1px solid #ffffff22;margin-top:5px;padding-top:5px;">
-              <b>รวม ${chosen.length} ${m3Mode==='side'?'ด้าน':'หน้า'}</b> · ผิวจริง
+              <b>รวม ${chosen.length} ${m3Mode==='obj'?'ชิ้น':m3Mode==='side'?'ด้าน':'หน้า'}</b> · ผิวจริง
               <b style="color:#4ade80;font-size:.95rem;">${m2(tT)}</b> ${AL}
               ${m3Mode==='side'?`<span style="color:var(--muted);">· เงา ${m2(tP)} ${AL}</span>`:''}
             </div>`
@@ -7670,12 +8138,22 @@ function render3D(rebuild){
         border-radius:10px;cursor:grab;display:block;touch-action:none;"></canvas>
       <canvas id="m3Ax" width="92" height="92" style="position:absolute;right:10px;bottom:10px;
         width:92px;height:92px;pointer-events:none;"></canvas>
+      <div id="m3Pop" style="position:absolute;display:none;z-index:5;
+        background:#111a2ef2;border:1px solid #3b4668;border-radius:10px;padding:8px 10px;
+        box-shadow:0 10px 26px #000a;font-size:.82rem;white-space:nowrap;"></div>
       <div id="m3Hud" style="position:absolute;left:10px;bottom:10px;pointer-events:none;
         background:#0b1020e6;border:1px solid var(--border,#2a3050);border-radius:9px;
         padding:8px 11px;font-size:.8rem;line-height:1.55;max-width:min(94%,520px);
         box-shadow:0 6px 18px #0007;"></div>
     </div>
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center;">
+      <button id="m3NavOrbit" class="btn btn-sm ${m3Nav==='orbit'?'btn-primary':'btn-ghost'}"
+        onclick="m3SetNav('orbit')" title="ลากซ้ายเพื่อหมุน">🔄 หมุน</button>
+      <button id="m3NavPan" class="btn btn-sm ${m3Nav==='pan'?'btn-primary':'btn-ghost'}"
+        onclick="m3SetNav('pan')" title="ลากซ้ายเพื่อเลื่อนฉาก">✋ เลื่อนฉาก</button>
+      <button id="m3NavPaint" class="btn btn-sm ${m3Nav==='paint'?'btn-primary':'btn-ghost'}"
+        onclick="m3SetNav('paint')" title="ลากซ้ายเพื่อป้ายเลือกผิว · กด Alt ค้างเพื่อลบออก">🖌 ป้ายเลือก</button>
+      <span style="width:8px;"></span>
       <span style="color:var(--muted);font-size:.78rem;">มุมมอง:</span>
       <button class="btn btn-ghost btn-sm" onclick="m3View('iso')">Iso</button>
       <button class="btn btn-ghost btn-sm" onclick="m3View('top')">บน</button>
@@ -7685,7 +8163,7 @@ function render3D(rebuild){
       <button class="btn btn-ghost btn-sm" onclick="m3View('left')">ซ้าย</button>
       <button class="btn btn-ghost btn-sm" onclick="m3View('right')">ขวา</button>
       <span style="flex:1;"></span>
-      <span style="color:var(--muted);font-size:.76rem;">ลากเพื่อหมุน · ลูกกลิ้งซูม · คลิกที่ผิวเพื่อเลือก</span>
+      <span style="color:var(--muted);font-size:.76rem;">ลากซ้าย = ตามปุ่มที่เลือกไว้ · ลากขวา/กลาง (หรือ Shift+ลาก) = หมุน/เลื่อน · 🖌 ลากป้ายเลือกได้ทีละหลายผิว (Alt = ลบออก) · ลูกกลิ้ง = ซูม · คลิก = เลือก/ยกเลิกทีละผิว</span>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.78rem;">
         <input type="checkbox" ${m3Grid?'checked':''} onchange="m3SetGrid(this.checked)"> ตาราง
       </label>
@@ -7695,7 +8173,8 @@ function render3D(rebuild){
 
   const panel=`
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 8px;">
-      ${tab('side','◧ เลือกเป็นด้าน (6 ด้าน)')}
+      ${tab('obj',`📦 ชิ้นวัตถุ (${m3Objs.length})`)}
+      ${tab('side',`◧ เลือกเป็นด้าน (${m3Mode==='side'?shown.length:12} ด้าน)`)}
       ${tab('face',`▦ หน้าเรียบทีละหน้า (${m3AllFaces.toLocaleString()})`)}
       <span style="flex:1;"></span>
       <button class="btn btn-ghost btn-sm" onclick="m3SelAll()">☑ ทั้งหมด</button>
@@ -7725,16 +8204,25 @@ function render3D(rebuild){
     <div id="m3Note"></div>
     <div style="max-height:270px;overflow:auto;border:1px solid var(--border,#2a3050);border-radius:9px;padding:4px;">
       ${list}
-      ${m3Mode==='face'&&m3AllFaces>rows.length?`<div style="padding:6px;color:var(--muted);font-size:.78rem;">
-        …แสดง ${rows.length} หน้าที่ใหญ่ที่สุด จากทั้งหมด ${m3AllFaces.toLocaleString()} หน้า</div>`:''}
+      ${m3Mode==='face'&&m3AllFaces>shown.length?`<div style="padding:6px;color:var(--muted);font-size:.78rem;">
+        …แสดง ${shown.length} หน้าที่ใหญ่ที่สุด จากทั้งหมด ${m3AllFaces.toLocaleString()} หน้า</div>`:''}
     </div>
+    ${m3Mode==='obj'?`<div class="notice" style="margin-top:8px;">
+      💡 ไฟล์เดียวมักมีหลายชิ้นปนมา (ฐาน ขาตั้ง หุ่นคน) — ลบทิ้งก่อนได้ แล้วโปรแกรมจะคำนวณใหม่เฉพาะที่เหลือ
+      &nbsp;|&nbsp; <b>คลิกที่ชิ้นในภาพ 3D จะมีปุ่มลบ/เก็บขึ้นตรงนั้น</b> · กด <b>↩ คืนทุกชิ้น</b> ถ้าลบผิด</div>`:''}
     ${m3Mode==='side'?`<div class="notice" style="margin-top:8px;">
-      💡 <b>ผิวจริง</b> = พื้นที่ผิวตามรูปทรงจริง (ผิวเป็นคลื่นจะมากกว่า) · <b>เงา</b> = พื้นที่ที่มองจากด้านนั้นตรงๆ
+      💡 <b>(ใน)</b> = ผิวที่อยู่ในช่อง/ร่อง มองจากด้านนอกไม่เห็น — แยกออกจากผิวด้านนอกให้แล้ว
+      <br>💡 <b>ผิวจริง</b> = พื้นที่ผิวตามรูปทรงจริง (ผิวเป็นคลื่นจะมากกว่า) · <b>เงา</b> = พื้นที่ที่มองจากด้านนั้นตรงๆ
       &nbsp;|&nbsp; ชิ้นงานที่เพิ่มเข้าลิสต์ใช้<b>เส้นขอบเงา</b> เพราะ CNC ตัดเป็นแผ่นแบน
       &nbsp;|&nbsp; ปุ่ม <b>แสดงผลเป็น</b> เปลี่ยนแค่หน่วยที่อ่าน ไม่ได้เปลี่ยนขนาดชิ้นงาน</div>`:''}
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;">
-      <button class="btn btn-primary" ${nPieces?'':'disabled'} onclick="m3AddSelected()">
-        ➕ เพิ่มเข้าลิสต์ชิ้นงาน (${nPanels} รายการ · ${nPieces} ชิ้น)</button>
+      ${m3Mode==='obj'
+        ? `<button class="btn btn-primary" ${m3Sel.size?'':'disabled'} onclick="m3KeepSel()">🎯 เก็บเฉพาะที่เลือก</button>
+           <button class="btn btn-ghost" ${m3Sel.size?'':'disabled'} style="color:#fca5a5;"
+             onclick="m3DelSel()">🗑 ลบที่เลือก (${m3Sel.size})</button>
+           ${m3TriAll&&m3TriAll!==m3Tri?`<button class="btn btn-ghost" onclick="m3RestoreAll()">↩ คืนทุกชิ้น</button>`:''}`
+        : `<button class="btn btn-primary" ${nPieces?'':'disabled'} onclick="m3AddSelected()">
+             ➕ เพิ่มเข้าลิสต์ชิ้นงาน (${nPanels} รายการ · ${nPieces} ชิ้น)</button>`}
       <span style="color:var(--muted);font-size:.8rem;">เลือกไว้ ${m3Sel.size}</span>
     </div>`;
 
@@ -7749,11 +8237,18 @@ function render3D(rebuild){
   if(!cv) return;
   if(!m3GL || m3GL.gl.canvas!==cv){
     cv.onmousedown=m3Down; cv.onmousemove=m3Move;
-    cv.onmouseup=m3Up; cv.onmouseleave=()=>{ m3Drag=null; };
+    cv.onmouseup=m3Up;
+    cv.onmouseleave=()=>{ m3Drag=null; cv.style.cursor = M3_CUR[m3Nav]||'grab'; };
     cv.onwheel=m3Wheel;
+    cv.oncontextmenu=e=>{ e.preventDefault(); return false; };
+    if(!window._m3Esc){
+      window._m3Esc=true;
+      document.addEventListener('keydown',e=>{ if(e.key==='Escape') _m3PopHide(); });
+    }
     try{
       m3GL=_m3GLInit(cv);
       if(m3GL) _m3GLUpload(); else m3GLErr='เครื่องนี้ไม่รองรับ WebGL — แสดงภาพ 3D ไม่ได้';
+    cv.style.cursor = M3_CUR[m3Nav]||'grab';
     }catch(err){ m3GL=null; m3GLErr='WebGL: '+(err.message||err); }
     const msg=document.getElementById('m3GlMsg');
     if(msg) msg.textContent=m3GLErr?('⚠ '+m3GLErr):'';
@@ -8266,7 +8761,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-i4';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-j5';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
