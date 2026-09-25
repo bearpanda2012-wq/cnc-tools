@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-i2</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-i4</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -409,7 +409,8 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       <br>✂ หน้าที่ใหญ่กว่าแผ่นวัสดุ โปรแกรมจะ<b>แบ่งเป็นหลายแผ่นให้อัตโนมัติ</b> พร้อมบอกว่าต้องต่อกี่ท่อน
       &nbsp;|&nbsp; รูปทรงที่ได้เป็นเส้นขอบจริง ไม่ใช่กรอบสี่เหลี่ยม
       <br>📦 อ่านได้ <b>STL · OBJ · PLY · 3MF · glTF/GLB · COLLADA(.dae) · FBX · 3DS · VRML/X3D · OFF · AMF</b>
-      — ไฟล์จาก SketchUp / Blender / Rhino / 3ds Max โยนเข้ามาได้ตรงๆ
+      และ <b>Rhino .3dm</b> โดยตรง — ไฟล์จาก Blender / Rhino / 3ds Max โยนเข้ามาได้เลย
+      &nbsp;|&nbsp; <b>SketchUp</b> ให้ export เป็น <b>.dae</b> ก่อน (File ▸ Export ▸ 3D Model)
     </div>
     <div class="dxf-import-drop" id="m3Drop"
       onclick="document.getElementById('m3Fi').click()"
@@ -420,8 +421,9 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       <p>คลิกหรือลากไฟล์ <b>3D</b> มาวาง</p>
       <p style="font-size:.74rem;margin-top:4px;">
         <b>.stl &nbsp;.obj &nbsp;.ply &nbsp;.3mf &nbsp;.glb &nbsp;.gltf &nbsp;.dae &nbsp;.fbx &nbsp;.3ds &nbsp;.wrl &nbsp;.x3d &nbsp;.off &nbsp;.amf</b>
-        <br><span style="opacity:.75;">STEP / IGES / SKP / 3DM: export เป็น .stl หรือ .dae จาก CAD ก่อน</span></p>
-      <input type="file" id="m3Fi" accept=".stl,.obj,.ply,.3mf,.glb,.gltf,.dae,.off,.amf,.wrl,.vrml,.x3d,.fbx,.3ds" style="display:none" onchange="handle3DFile(this.files[0])">
+        &nbsp;· <b>.3dm</b> (Rhino — ครั้งแรกต้องต่อเน็ต)
+        <br><span style="opacity:.75;">SketchUp .skp / STEP / IGES: export เป็น .dae หรือ .stl ก่อน</span></p>
+      <input type="file" id="m3Fi" accept=".stl,.obj,.ply,.3mf,.glb,.gltf,.dae,.off,.amf,.wrl,.vrml,.x3d,.fbx,.3ds,.3dm" style="display:none" onchange="handle3DFile(this.files[0])">
     </div>
     <div id="m3Result" style="display:none;margin-top:12px;"></div>
   </div>
@@ -5814,6 +5816,7 @@ let m3NTri=0;
 let m3Faces=[];           // the planar faces worth showing, biggest first
 let m3AllFaces=0;         // how many were found before the small ones were dropped
 let m3Name='', m3Unit='mm', m3Disp='mm', m3Qty=1, m3AutoSplit=true;
+let m3Grid=true;
 let m3UpAx='z'; // which axis the file calls up, after any conversion
 let m3Sel=new Set(), m3Hover=-1;
 let m3Mode='side';        // 'side' = the six faces a person sees · 'face' = every flat patch
@@ -6379,6 +6382,99 @@ function _m3_3DS(buf){
 }
 let _m3_3DSPend=null;
 
+
+/* ── Rhino · .3dm ── */
+// openNURBS is a large, versioned binary format; hand-rolling a reader for it
+// would be guesswork. McNeel publish the real one as free WebAssembly, so the
+// file gets parsed by Rhino's own code. It downloads once and the browser caches it.
+const R3DM_URLS=[
+  'https://cdn.jsdelivr.net/npm/rhino3dm@8.4.0/rhino3dm.min.js',
+  'https://unpkg.com/rhino3dm@8.4.0/rhino3dm.min.js',
+  'https://cdn.jsdelivr.net/npm/rhino3dm/rhino3dm.min.js'
+];
+let _r3P=null;
+function loadRhino3dm(){
+  if(_r3P) return _r3P;
+  _r3P=(async()=>{
+    for(const u of R3DM_URLS){
+      try{
+        if(typeof rhino3dm==='undefined') await _loadScript(u);
+        if(typeof rhino3dm!=='undefined') return await rhino3dm();
+      }catch(e){}
+    }
+    _r3P=null;
+    throw new Error('โหลดตัวอ่านไฟล์ Rhino (.3dm) ไม่ได้ — ครั้งแรกต้องต่ออินเทอร์เน็ต '+
+                    'หรือ export เป็น .stl / .obj จาก Rhino แทน');
+  })();
+  return _r3P;
+}
+
+/** Rhino stores NURBS, not triangles. What this reads is the render mesh Rhino
+ *  saved next to each object — the same surface you see shaded in the viewport. */
+async function _m3_3DM(buf){
+  const R=await loadRhino3dm();
+  let doc=null;
+  try{ doc=R.File3dm.fromByteArray(new Uint8Array(buf)); }catch(e){}
+  if(!doc) throw new Error('เปิดไฟล์ .3dm ไม่ได้ — ไฟล์อาจเสียหรือเป็นเวอร์ชันที่เก่ามาก');
+  const b=_m3Buf();
+  const TYPES=[R.MeshType.Render, R.MeshType.Any, R.MeshType.Preview, R.MeshType.Default];
+  let nMesh=0, nNoMesh=0;
+  const eat=m=>{
+    if(!m) return false;
+    let V,F;
+    try{ V=m.vertices(); F=m.faces(); }catch(e){ return false; }
+    const nv=V.count, nf=F.count;
+    if(!nv||!nf) return false;
+    const P=new Float64Array(nv*3);
+    for(let i=0;i<nv;i++){ const p=V.get(i); P[i*3]=p[0]; P[i*3+1]=p[1]; P[i*3+2]=p[2]; }
+    const push=k=>{ const o=k*3; if(o>=0 && o+2<P.length) b.push3(P[o],P[o+1],P[o+2]); };
+    for(let i=0;i<nf;i++){
+      const f=F.get(i);
+      if(!f) continue;
+      push(f[0]); push(f[1]); push(f[2]);
+      if(f.length>3 && f[3]!==f[2]){ push(f[0]); push(f[2]); push(f[3]); }   // quad → 2 triangles
+    }
+    nMesh++;
+    return true;
+  };
+  const tryGet=obj=>{
+    for(const t of TYPES){
+      let m=null;
+      try{ m=obj.getMesh(t); }catch(e){}
+      if(m && eat(m)) return true;
+    }
+    return false;
+  };
+  const objs=doc.objects();
+  for(let i=0;i<objs.count;i++){
+    let g=null;
+    try{ g=objs.get(i).geometry(); }catch(e){ continue; }
+    if(!g) continue;
+    let ot=null;
+    try{ ot=g.objectType; }catch(e){}
+    if(ot===R.ObjectType.Mesh){ eat(g); continue; }
+    if(ot===R.ObjectType.Extrusion){ if(!tryGet(g)) nNoMesh++; continue; }
+    if(ot===R.ObjectType.Brep){
+      let got=false;
+      try{
+        const fl=g.faces();
+        for(let k=0;k<fl.count;k++) if(tryGet(fl.get(k))) got=true;
+      }catch(e){}
+      if(!got) nNoMesh++;
+      continue;
+    }
+  }
+  if(b.n<9){
+    throw new Error(nNoMesh
+      ? `ไฟล์ .3dm นี้มี ${nNoMesh} ชิ้นที่ไม่ได้บันทึก render mesh มาด้วย — `+
+        `ใน Rhino สั่ง Mesh ก่อน แล้ว Save ใหม่โดยไม่ติ๊ก "Save Small" หรือใช้ Export Selected เป็น .stl`
+      : 'ไฟล์ .3dm นี้ไม่มีรูปทรงที่อ่านได้ (อาจมีแต่เส้นหรือจุด)');
+  }
+  // Rhino is Z-up, same as this program — no axis flip needed
+  const out=b.done();
+  return {tri:out.subarray(0, Math.floor(out.length/9)*9), up:'z'};
+}
+
 /* ─────────── sorting ─────────── */
 /** LSD radix over a 48-bit key held as (hi16, lo32). No comparator, no strings. */
 function _m3Radix(lo, hi, n){
@@ -6690,7 +6786,8 @@ const M3_READ={
   vrml: b=>_m3WRL(new TextDecoder().decode(new Uint8Array(b))),
   x3d:  b=>_m3WRL(new TextDecoder().decode(new Uint8Array(b))),
   fbx:  b=>_m3FBX(b),
-  '3ds':b=>_m3_3DS(b)
+  '3ds':b=>_m3_3DS(b),
+  '3dm':b=>_m3_3DM(b)                      // async — the loader awaits this one
 };
 // files that belong to another card — say where to take them, don't just refuse
 const M3_ELSE={
@@ -6698,7 +6795,12 @@ const M3_ELSE={
   xlsx:'Excel', xls:'Excel', csv:'Excel', tsv:'Excel',
   png:'Excel', jpg:'Excel', jpeg:'Excel', webp:'Excel', bmp:'Excel', tif:'Excel', tiff:'Excel'
 };
-const M3_CAD=['step','stp','iges','igs','skp','3dm','sldprt','sldasm','ipt','iam','f3d','catpart','prt','x_t','x_b','sat'];
+const M3_CAD=['step','stp','iges','igs','sldprt','sldasm','ipt','iam','f3d','catpart','prt','x_t','x_b','sat'];
+// SketchUp keeps its format closed — there is no reader for it outside their own
+// SDK, so the only honest answer is to point at their export menu.
+const M3_SKP='SketchUp (.skp) เป็นรูปแบบปิด ไม่มีตัวอ่านที่ใช้ได้นอกโปรแกรมของเขาเอง — '+
+  'ใน SketchUp สั่ง File ▸ Export ▸ 3D Model แล้วเลือก .dae หรือ .stl (มีมาให้ในตัว ไม่ต้องซื้อเพิ่ม) '+
+  'แล้วลากไฟล์นั้นเข้ามาแทน — อ่านได้เหมือนกันทุกอย่าง';
 
 /** Y-up (glTF, COLLADA, VRML, most FBX) → Z-up, which is what CAD and this app use. */
 function _m3AxisSwap(tf, toZ){
@@ -6730,6 +6832,7 @@ function _m3Analyse(){
 function handle3DFile(file){
   if(!file) return;
   const ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(ext==='skp'){ _m3Fail(M3_SKP); return; }
   if(M3_CAD.includes(ext)){
     _m3Fail(`ไฟล์ .${ext} เก็บผิวโค้งจริงแบบ B-rep ไม่ใช่ mesh ยังอ่านไม่ได้ในเวอร์ชันนี้ — `+
             `เปิดใน CAD แล้ว Export เป็น .stl / .obj / .glb / .dae ก่อน (ฟรี ทุกโปรแกรมทำได้)`);
@@ -6755,8 +6858,17 @@ function handle3DFile(file){
     // let the busy notice paint before the parse takes the thread
     setTimeout(()=>{
       let res;
-      try{ res=M3_READ[ext](e.target.result); }
-      catch(err){ _m3Fail(err.message||String(err)); return; }
+      try{
+        if(ext==='3dm') _m3Busy('กำลังโหลดตัวอ่านไฟล์ Rhino… (ครั้งแรกโหลด ~3MB)');
+        res=M3_READ[ext](e.target.result);
+        if(res && typeof res.then==='function'){
+          res.then(go).catch(err=>_m3Fail(err.message||String(err)));
+          return;
+        }
+      }catch(err){ _m3Fail(err.message||String(err)); return; }
+      go(res);
+    },30);
+    function go(res){
       let tf = res && res.tri ? res.tri : res;
       const N=tf.length/9|0;
       if(!N){ _m3Fail('ไม่พบสามเหลี่ยมในไฟล์'); return; }
@@ -6775,7 +6887,7 @@ function handle3DFile(file){
           render3D(true);
         }catch(err){ _m3Fail(err.message||String(err)); }
       },30);
-    },30);
+    }
   };
   fr.readAsArrayBuffer(file);
 }
@@ -7195,6 +7307,42 @@ void main(){
   gl_FragColor=vec4(vC*l, 1.0);
 }`;
 
+const M3_LVS=`attribute vec3 aPos; attribute vec3 aCol; uniform mat4 uMVP; varying vec3 vC;
+void main(){ vC=aCol; gl_Position=uMVP*vec4(aPos,1.0); }`;
+const M3_LFS=`precision mediump float; varying vec3 vC;
+void main(){ gl_FragColor=vec4(vC,1.0); }`;
+
+/** Rhino's construction plane: a grid on Z=0 with the X and Y axes picked out. */
+function _m3BuildGrid(){
+  const G=m3GL; if(!G) return;
+  const B=m3Box, span=B.span||1;
+  // a round step that lands near 20 divisions across twice the model
+  const raw=span*2/20;
+  const e=Math.pow(10, Math.floor(Math.log10(raw)));
+  const step=[1,2,5,10].map(k=>k*e).find(v=>v>=raw)||10*e;
+  const half=Math.ceil(span*1.1/step)*step;
+  const cx=Math.round(B.cx/step)*step, cy=Math.round(B.cy/step)*step;
+  const P=[], C=[];
+  const seg=(a,b,c)=>{ P.push(a[0],a[1],a[2], b[0],b[1],b[2]); C.push(c[0],c[1],c[2], c[0],c[1],c[2]); };
+  const THIN=[0.22,0.25,0.34], THICK=[0.34,0.38,0.50];
+  for(let i=-half;i<=half+1e-9;i+=step){
+    const major=Math.abs(Math.round(i/step))%5===0;
+    const c=major?THICK:THIN;
+    seg([cx+i,cy-half,0],[cx+i,cy+half,0],c);
+    seg([cx-half,cy+i,0],[cx+half,cy+i,0],c);
+  }
+  // world axes through the origin, Rhino colours
+  const ax=half+step;
+  seg([-ax,0,0],[ax,0,0],[0.85,0.25,0.30]);       // X red
+  seg([0,-ax,0],[0,ax,0],[0.30,0.72,0.35]);       // Y green
+  seg([0,0,-ax*0.25],[0,0,ax*0.6],[0.35,0.55,0.95]); // Z blue
+  const gl=G.gl;
+  G.gridN=P.length/3;
+  gl.bindBuffer(gl.ARRAY_BUFFER,G.gpos); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(P),gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,G.gcol); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(C),gl.STATIC_DRAW);
+  G.gridStep=step;
+}
+
 function _m3GLInit(cv){
   const gl=cv.getContext('webgl',{antialias:true,preserveDrawingBuffer:true})
         || cv.getContext('experimental-webgl',{antialias:true,preserveDrawingBuffer:true});
@@ -7208,7 +7356,14 @@ function _m3GLInit(cv){
   if(!gl.getProgramParameter(pr,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
   gl.useProgram(pr);
   const buf=k=>gl.createBuffer();
-  const G={gl,pr,pos:buf(),nrm:buf(),col:buf(),id:buf(),n:0,
+  const lp=gl.createProgram();
+  gl.attachShader(lp,mk(gl.VERTEX_SHADER,M3_LVS));
+  gl.attachShader(lp,mk(gl.FRAGMENT_SHADER,M3_LFS));
+  gl.linkProgram(lp);
+  if(!gl.getProgramParameter(lp,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(lp));
+  const G={gl,pr,lp,pos:buf(),nrm:buf(),col:buf(),id:buf(),gpos:buf(),gcol:buf(),n:0,gridN:0,
+    lPos:gl.getAttribLocation(lp,'aPos'), lCol:gl.getAttribLocation(lp,'aCol'),
+    lMVP:gl.getUniformLocation(lp,'uMVP'),
     aPos:gl.getAttribLocation(pr,'aPos'), aNrm:gl.getAttribLocation(pr,'aNrm'),
     aCol:gl.getAttribLocation(pr,'aCol'), aId:gl.getAttribLocation(pr,'aId'),
     uMVP:gl.getUniformLocation(pr,'uMVP'), uNM:gl.getUniformLocation(pr,'uNM'),
@@ -7235,6 +7390,7 @@ function _m3GLUpload(){
   G.colArr=new Float32Array(N*9);
   G.idArr=new Float32Array(N*3);
   _m3GLTags();
+  _m3BuildGrid();
 }
 
 /** Which triangle belongs to what, and which of those the user has ticked. */
@@ -7294,6 +7450,17 @@ function _m3Paint(pick){
   gl.clearColor(0.043,0.063,0.125,1);
   gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   const M=_m3Mat(cv.width,cv.height);
+  if(m3Grid && !pick && G.gridN){
+    gl.useProgram(G.lp);
+    gl.uniformMatrix4fv(G.lMVP,false,M.m);
+    gl.bindBuffer(gl.ARRAY_BUFFER,G.gpos); gl.enableVertexAttribArray(G.lPos);
+    gl.vertexAttribPointer(G.lPos,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER,G.gcol); gl.enableVertexAttribArray(G.lCol);
+    gl.vertexAttribPointer(G.lCol,3,gl.FLOAT,false,0,0);
+    gl.drawArrays(gl.LINES,0,G.gridN);
+    gl.disableVertexAttribArray(G.lPos); gl.disableVertexAttribArray(G.lCol);
+  }
+  gl.useProgram(G.pr);
   gl.uniformMatrix4fv(G.uMVP,false,M.m);
   gl.uniformMatrix3fv(G.uNM,false,M.nm);
   gl.uniform1i(G.uPick, pick?1:0);
@@ -7301,6 +7468,46 @@ function _m3Paint(pick){
     gl.vertexAttribPointer(loc,sz,gl.FLOAT,false,0,0); };
   bind(G.pos,G.aPos,3); bind(G.nrm,G.aNrm,3); bind(G.col,G.aCol,3); bind(G.id,G.aId,1);
   gl.drawArrays(gl.TRIANGLES,0,G.n);
+  if(!pick) _m3AxisGizmo();
+}
+
+/** The little X/Y/Z marker in the corner, turning with the view — as in CAD. */
+function _m3AxisGizmo(){
+  const cv=document.getElementById('m3Ax');
+  if(!cv) return;
+  const DPR=Math.min(2, window.devicePixelRatio||1);
+  const S=92;
+  if(cv.width!==S*DPR){ cv.width=S*DPR; cv.height=S*DPR; }
+  const g=cv.getContext('2d');
+  g.setTransform(DPR,0,0,DPR,0,0);
+  g.clearRect(0,0,S,S);
+  const ct=Math.cos(m3Yaw), st=Math.sin(m3Yaw);
+  const cf=Math.cos(m3Pitch), sf=Math.sin(m3Pitch);
+  const R=[-st, ct, 0], U=[-sf*ct, -sf*st, cf], D=[cf*ct, cf*st, sf];
+  const L=30, ox=S/2, oy=S/2;
+  const AX=[{v:[1,0,0],c:'#e0433f',t:'x'},{v:[0,1,0],c:'#4bb85a',t:'y'},{v:[0,0,1],c:'#5a8df0',t:'z'}];
+  const proj=v=>({x:ox+(v[0]*R[0]+v[1]*R[1]+v[2]*R[2])*L,
+                  y:oy-(v[0]*U[0]+v[1]*U[1]+v[2]*U[2])*L,
+                  d: v[0]*D[0]+v[1]*D[1]+v[2]*D[2]});
+  AX.map(a=>({a, p:proj(a.v)})).sort((p,q)=>p.p.d-q.p.d).forEach(({a,p})=>{
+    const dim = p.d<-0.02 ? 0.45 : 1;                 // axis pointing away reads faint
+    g.globalAlpha=dim;
+    g.strokeStyle=a.c; g.lineWidth=2; g.lineCap='round';
+    g.beginPath(); g.moveTo(ox,oy); g.lineTo(p.x,p.y); g.stroke();
+    const dx=p.x-ox, dy=p.y-oy, len=Math.hypot(dx,dy)||1;
+    if(len>6){                                        // arrow head
+      const ux=dx/len, uy=dy/len, hx=p.x-ux*7, hy=p.y-uy*7;
+      g.fillStyle=a.c;
+      g.beginPath();
+      g.moveTo(p.x,p.y); g.lineTo(hx-uy*3.4, hy+ux*3.4); g.lineTo(hx+uy*3.4, hy-ux*3.4);
+      g.closePath(); g.fill();
+    }
+    g.fillStyle=a.c; g.font='bold 11px system-ui'; g.textAlign='center'; g.textBaseline='middle';
+    g.fillText(a.t, ox+dx*1.22, oy+dy*1.22);
+    g.globalAlpha=1;
+  });
+  g.fillStyle='rgba(226,232,240,.55)';
+  g.beginPath(); g.arc(ox,oy,2.2,0,7); g.fill();
 }
 
 function _m3PickAt(mx,my){
@@ -7350,6 +7557,7 @@ function m3View(k){
 function m3Toggle(i){ if(m3Sel.has(i)) m3Sel.delete(i); else m3Sel.add(i); render3D(); }
 function m3SelAll(){ (m3Mode==='side'?M3_SIDE:m3Faces).forEach((_,i)=>m3Sel.add(i)); render3D(); }
 function m3SelNone(){ m3Sel.clear(); render3D(); }
+function m3SetGrid(v){ m3Grid=!!v; _m3Paint(); }
 function m3Reset(){ m3Yaw=M3_VIEW.iso[0]; m3Pitch=M3_VIEW.iso[1]; m3Zoom=1; _m3Paint(); }
 
 /* ─────────── the card ─────────── */
@@ -7460,6 +7668,8 @@ function render3D(rebuild){
     <div style="position:relative;">
       <canvas id="m3Cv" style="width:100%;height:440px;background:#0b1020;border:1px solid var(--border,#2a3050);
         border-radius:10px;cursor:grab;display:block;touch-action:none;"></canvas>
+      <canvas id="m3Ax" width="92" height="92" style="position:absolute;right:10px;bottom:10px;
+        width:92px;height:92px;pointer-events:none;"></canvas>
       <div id="m3Hud" style="position:absolute;left:10px;bottom:10px;pointer-events:none;
         background:#0b1020e6;border:1px solid var(--border,#2a3050);border-radius:9px;
         padding:8px 11px;font-size:.8rem;line-height:1.55;max-width:min(94%,520px);
@@ -7476,6 +7686,9 @@ function render3D(rebuild){
       <button class="btn btn-ghost btn-sm" onclick="m3View('right')">ขวา</button>
       <span style="flex:1;"></span>
       <span style="color:var(--muted);font-size:.76rem;">ลากเพื่อหมุน · ลูกกลิ้งซูม · คลิกที่ผิวเพื่อเลือก</span>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.78rem;">
+        <input type="checkbox" ${m3Grid?'checked':''} onchange="m3SetGrid(this.checked)"> ตาราง
+      </label>
       <button class="btn btn-ghost btn-sm" onclick="m3Reset()">⟲ รีเซ็ตมุม</button>
     </div>
     <div id="m3Panel"></div>`;
@@ -8053,7 +8266,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-i2';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-i4';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
