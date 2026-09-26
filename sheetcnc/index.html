@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-j5</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-j9</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -768,7 +768,7 @@ let nestResult = null;
 let activeSheet = 0;
 let _pid = 0;
 const uid = () => 'p' + (++_pid);
-function savePieces(){ histPush('pieces'); }   // every mutation already calls this
+function savePieces(){ histPush({kind:'pieces', text:'ชิ้นงาน '+pieces.length+' รายการ'}); }   // every mutation already calls this
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function unitFactor(){ const u=document.getElementById('stlUnit')?.value||'mm'; return u==='cm'?10:u==='m'?1000:(u==='in'||u==='inch')?25.4:1; }
 
@@ -4989,7 +4989,7 @@ function _runNestingSync() {
   renderResults();
   document.getElementById('resSection').style.display='';
   document.getElementById('resSection').scrollIntoView({behavior:'smooth',block:'start'});
-  histPush('nest');
+  histPush({kind:'nest', text:'จัดวาง '+(nestResult?nestResult.sheets.length:0)+' แผ่น'});
 }
 
 // ── BITMAP-GRID POLYGON NESTING ENGINE ──────────────────────────────────────
@@ -6818,7 +6818,8 @@ function m3SetUpAxis(u){
   _m3AxisSwap(m3Tri, u==='z');
   m3UpAx=u;
   _m3Busy('กำลังคำนวณใหม่ตามแกนใหม่…');
-  setTimeout(()=>{ _m3Analyse(); m3GL=null; render3D(true); }, 20);
+  setTimeout(()=>{ _m3Analyse(); m3GL=null; render3D(true);
+    histPush({kind:'axis', text:'แกนขึ้น = '+u.toUpperCase()}); }, 20);
 }
 
 /** Faces, sides and the bounding box — everything derived from the triangles. */
@@ -6891,6 +6892,7 @@ function handle3DFile(file){
           // file is the first thing to do, and every area figure depends on it.
           m3Mode='obj'; m3Sel=new Set();
           render3D(true);
+          histPush({kind:'open', text:'เปิด '+m3Name});
         }catch(err){ _m3Fail(err.message||String(err)); }
       },30);
     }
@@ -7545,15 +7547,16 @@ function _m3BuildSides(tf, vid){
 
 const M3_U={mm:1, cm:10, m:1000, in:25.4};
 function m3Scale(){ return M3_U[m3Unit]||1; }
-function m3SetUnit(u){ m3Unit=u; render3D(); }
-function m3SetDisp(u){ m3Disp=u; render3D(); }
-function m3SetQty(v){ m3Qty=Math.max(1, parseInt(v,10)||1); }
-function m3SetSplit(v){ m3AutoSplit=!!v; render3D(); }
+function m3SetUnit(u){ m3Unit=u; _m3TouchUI(); render3D(); }
+function m3SetDisp(u){ m3Disp=u; _m3TouchUI(); render3D(); }
+function m3SetQty(v){ m3Qty=Math.max(1, parseInt(v,10)||1); _m3TouchUI(); }
+function m3SetSplit(v){ m3AutoSplit=!!v; _m3TouchUI(); render3D(); }
 function m3SetMode(m){
   _m3PopHide();
   if(m===m3Mode) return;
   m3Mode=m;
   m3Sel = new Set();
+  _m3TouchUI();
   render3D();
 }
 
@@ -7875,7 +7878,7 @@ function m3Move(ev){
 function m3Up(ev){
   const moved=m3Moved, wasPan=m3Drag&&m3Drag.pan, wasPaint=m3Drag&&m3Drag.paint;
   m3Drag=null;
-  if(wasPaint){ render3D(); return; }
+  if(wasPaint){ _m3TouchUI(); render3D(); return; }
   const cv=ev.currentTarget;
   if(cv&&cv.style) cv.style.cursor = M3_CUR[m3Nav]||'grab';
   if(moved>4 || wasPan || !cv) return;
@@ -7885,6 +7888,7 @@ function m3Up(ev){
   if(i<0){ _m3PopHide(); return; }                 // clicked past the model
   const on=!m3Sel.has(i);
   if(on) m3Sel.add(i); else m3Sel.delete(i);
+  _m3TouchUI();
   render3D();
   if(on && m3Mode==='obj'){
     const t=_m3PickTriAt(mx, my);               // the same spot, asked a second way
@@ -7953,21 +7957,24 @@ function _m3Pop(i, px, py, sideG){
   el.style.top =Math.max(6, Math.min(H-h-6, py-h-10))+'px';
 }
 function _m3PopHide(){ const el=document.getElementById('m3Pop'); if(el) el.style.display='none'; }
-function m3PopClose(i){ m3Sel.delete(i); _m3PopHide(); render3D(); }
+function m3PopClose(i){ m3Sel.delete(i); _m3PopHide(); _m3TouchUI(); render3D(); }
 function m3PopDel(i){ _m3PopHide(); m3DelOne(i); }
 function m3PopKeep(i){ _m3PopHide(); m3KeepOne(i); }
-function m3PopSide(g){ _m3PopHide(); m3Mode='side'; m3Sel=new Set([g]); render3D(); }
+function m3PopSide(g){ _m3PopHide(); m3Mode='side'; m3Sel=new Set([g]); _m3TouchUI(); render3D(); }
 
-function m3Toggle(i){ if(m3Sel.has(i)) m3Sel.delete(i); else m3Sel.add(i); render3D(); }
+function m3Toggle(i){ if(m3Sel.has(i)) m3Sel.delete(i); else m3Sel.add(i); _m3TouchUI(); render3D(); }
 function m3SelAll(){
   const src = m3Mode==='obj' ? m3Objs : m3Mode==='side' ? m3Sides : m3Faces;
   src.forEach((f,i)=>{ if(m3Mode!=='side' || f.nTri) m3Sel.add(i); });
+  _m3TouchUI();
   render3D();
 }
-function m3SelNone(){ m3Sel.clear(); render3D(); }
+function m3SelNone(){ m3Sel.clear(); _m3TouchUI(); render3D(); }
 function m3SetGrid(v){ m3Grid=!!v; _m3Paint(); }
 /** Rebuild the triangle list, dropping or keeping whole objects. */
-function _m3Filter(keep){
+let _m3FiltLbl='del';
+function _m3Filter(keep, how){
+  _m3FiltLbl=how||'del';
   if(!m3Tri||!m3ObjOf) return;
   let n=0;
   for(let t=0;t<m3NTri;t++) if(keep(m3ObjOf[t])) n++;
@@ -7982,6 +7989,8 @@ function _m3Filter(keep){
     _m3Analyse();
     m3Sel=new Set(); m3GL=null;
     render3D(true);
+    histPush({kind:_m3FiltLbl==='keep'?'keep':'del',
+              text:(_m3FiltLbl==='keep'?'เก็บเฉพาะที่เลือก · ':'ลบชิ้นวัตถุ · ')+m3Objs.length+' ชิ้น'});
   },20);
 }
 function m3DelSel(){
@@ -7992,15 +8001,16 @@ function m3DelSel(){
 function m3KeepSel(){
   if(!m3Sel.size){ alert('เลือกชิ้นที่จะเก็บไว้ก่อน'); return; }
   const stay=new Set(m3Sel);
-  _m3Filter(o=>stay.has(o));
+  _m3Filter(o=>stay.has(o), 'keep');
 }
 function m3DelOne(i){ _m3Filter(o=>o!==i); }
-function m3KeepOne(i){ _m3Filter(o=>o===i); }
+function m3KeepOne(i){ _m3Filter(o=>o===i, 'keep'); }
 function m3RestoreAll(){
   if(!m3TriAll || m3TriAll===m3Tri) return;
   m3Tri=m3TriAll; m3NTri=m3TriAll.length/9|0;
   _m3Busy('กำลังคืนค่าทุกชิ้น…');
-  setTimeout(()=>{ _m3Analyse(); m3Sel=new Set(); m3GL=null; render3D(true); },20);
+  setTimeout(()=>{ _m3Analyse(); m3Sel=new Set(); m3GL=null; render3D(true);
+    histPush({kind:'restore', text:'คืนทุกชิ้น · '+m3Objs.length+' ชิ้น'}); },20);
 }
 function m3Reset(){ _m3PopHide(); m3Yaw=M3_VIEW.iso[0]; m3Pitch=M3_VIEW.iso[1]; m3Zoom=1; m3PanX=0; m3PanY=0; _m3Paint(); }
 
@@ -8138,13 +8148,33 @@ function render3D(rebuild){
         border-radius:10px;cursor:grab;display:block;touch-action:none;"></canvas>
       <canvas id="m3Ax" width="92" height="92" style="position:absolute;right:10px;bottom:10px;
         width:92px;height:92px;pointer-events:none;"></canvas>
-      <div id="m3Pop" style="position:absolute;display:none;z-index:5;
+      <div id="m3Pop" style="position:absolute;display:none;z-index:6;
         background:#111a2ef2;border:1px solid #3b4668;border-radius:10px;padding:8px 10px;
         box-shadow:0 10px 26px #000a;font-size:.82rem;white-space:nowrap;"></div>
       <div id="m3Hud" style="position:absolute;left:10px;bottom:10px;pointer-events:none;
         background:#0b1020e6;border:1px solid var(--border,#2a3050);border-radius:9px;
         padding:8px 11px;font-size:.8rem;line-height:1.55;max-width:min(94%,520px);
         box-shadow:0 6px 18px #0007;"></div>
+
+      <!-- history floats over the preview; it is a glance, not a column -->
+      <div id="m3HistBox" style="position:absolute;right:10px;top:10px;z-index:5;width:210px;
+        max-height:calc(100% - 20px);display:flex;flex-direction:column;
+        background:#0b1020ee;border:1px solid var(--border,#2a3050);border-radius:10px;
+        box-shadow:0 10px 26px #0008;overflow:hidden;">
+        <div style="padding:6px 8px;border-bottom:1px solid var(--border,#2a3050);
+          font-size:.78rem;display:flex;align-items:center;gap:5px;">
+          <b>🕘 ประวัติ</b>
+          <span style="flex:1;"></span>
+          <button class="btn btn-ghost btn-sm" style="padding:1px 7px;" onclick="undoAction()" title="ย้อนกลับ (Ctrl+Z)">↶</button>
+          <button class="btn btn-ghost btn-sm" style="padding:1px 7px;" onclick="redoAction()" title="เดินหน้า (Ctrl+Y)">↷</button>
+          <button class="btn btn-ghost btn-sm" style="padding:1px 7px;" onclick="m3HistToggle()" title="ย่อเก็บ">–</button>
+        </div>
+        <div id="m3Hist" style="flex:1;overflow:auto;padding:5px;font-size:.78rem;"></div>
+      </div>
+      <button id="m3HistOpen" onclick="m3HistToggle()" title="เปิดประวัติ"
+        style="position:absolute;right:10px;top:10px;z-index:5;display:none;
+        background:#0b1020ee;border:1px solid var(--border,#2a3050);border-radius:9px;
+        color:inherit;cursor:pointer;padding:5px 9px;font-size:.8rem;">🕘</button>
     </div>
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center;">
       <button id="m3NavOrbit" class="btn btn-sm ${m3Nav==='orbit'?'btn-primary':'btn-ghost'}"
@@ -8372,18 +8402,53 @@ function histPush(label){
   let j;
   try{ j=_projJSON(collectState()); }catch(e){ return; }
   if(j.length>16e6) return;                       // absurdly large — skip silently
-  if(HPOS>=0 && HIST[HPOS] && HIST[HPOS].j===j) return;   // nothing actually changed
+  // The 3D model is far too big to serialise, so the snapshot holds a reference
+  // to the triangle array of the moment. Deleting a piece of the model makes a
+  // new array, so the references differ and the step is recorded.
+  const cur=HIST[HPOS];
+  if(HPOS>=0 && cur && cur.j===j && cur.tri===m3Tri) return;   // nothing changed
   HIST=HIST.slice(0,HPOS+1);
-  HIST.push({j,label:label||''});
+  // …and the state of the 3D card, so stepping back restores what was picked,
+  // which tab was open and which units were being read — not just the geometry.
+  HIST.push({j, kind:(label&&label.kind)||label||'', label:(label&&label.text)||HIST_NAME[label]||label||'—',
+    tri:m3Tri, n:m3NTri,
+    ui:{mode:m3Mode, sel:[...m3Sel], disp:m3Disp, unit:m3Unit,
+        qty:m3Qty, split:m3AutoSplit, up:m3UpAx, nav:m3Nav}});
   while(HIST.length>HMAX) HIST.shift();
   HPOS=HIST.length-1;
   updateHistUI();
 }
+/**
+ * Tab, units, quantity and what is picked are not worth a history step each —
+ * clicking around would bury the real work. They ride along with the step you
+ * are standing on, so walking back and forth restores the view you left.
+ */
+function _m3TouchUI(){
+  if(HLOCK || HPOS<0 || !HIST[HPOS]) return;
+  HIST[HPOS].ui={mode:m3Mode, sel:[...m3Sel], disp:m3Disp, unit:m3Unit,
+                 qty:m3Qty, split:m3AutoSplit, up:m3UpAx, nav:m3Nav};
+}
+
 function histGo(d){
   const n=HPOS+d;
   if(n<0||n>=HIST.length) return;
   HPOS=n; HLOCK=true;
-  try{ applyState(JSON.parse(HIST[HPOS].j)); } catch(e){} finally { HLOCK=false; }
+  const st=HIST[HPOS];
+  try{ applyState(JSON.parse(st.j)); } catch(e){} finally { HLOCK=false; }
+  const changed = st.tri!==m3Tri;
+  if(changed){                              // the 3D model changed at this step
+    m3Tri=st.tri; m3NTri=st.n||0;
+    if(m3Tri){ try{ _m3Analyse(); m3GL=null; }catch(e){} }
+  }
+  const u=st.ui;
+  if(u){
+    m3Mode=u.mode; m3Disp=u.disp; m3Unit=u.unit;
+    m3Qty=u.qty; m3AutoSplit=u.split; m3UpAx=u.up;
+    if(u.nav) m3SetNav(u.nav);
+    const src = m3Mode==='obj' ? m3Objs : m3Mode==='side' ? m3Sides : m3Faces;
+    m3Sel=new Set((u.sel||[]).filter(i=>i>=0 && i<src.length));
+  } else if(changed) m3Sel=new Set();
+  if(m3Tri){ try{ _m3PopHide(); render3D(changed); }catch(e){} }
   updateHistUI();
 }
 function undoAction(){ histGo(-1); }
@@ -8392,6 +8457,42 @@ function updateHistUI(){
   const u=document.getElementById('btnUndo'), r=document.getElementById('btnRedo');
   if(u){ u.disabled=HPOS<=0; u.style.opacity=u.disabled?.4:1; }
   if(r){ r.disabled=HPOS>=HIST.length-1; r.style.opacity=r.disabled?.4:1; }
+  _histList();
+}
+
+const HIST_NAME={start:'เริ่มต้น', open:'เปิดโปรเจกต์', '3d':'โมเดล 3D',
+  axis:'สลับแกนขึ้น', pieces:'ชิ้นงาน', settings:'ตั้งค่าแผ่น', nest:'จัดวาง CNC'};
+const HIST_ICON={start:'•', open:'📂', '3d':'📐', del:'🗑', keep:'🎯', restore:'↩',
+  axis:'🔄', pieces:'📦', settings:'⚙', nest:'🧩'};
+function _histList(){
+  const el=document.getElementById('m3Hist');
+  if(!el) return;
+  if(!HIST.length){ el.innerHTML='<div style="color:var(--muted);padding:6px;">ยังไม่มี</div>'; return; }
+  el.innerHTML=HIST.map((h,i)=>{
+    const now=i===HPOS, ahead=i>HPOS;
+    const ic=HIST_ICON[h.kind||h.label]||'•';
+    return `<div onclick="histJump(${i})" title="${esc(h.label||'')}"
+      style="display:flex;gap:7px;align-items:center;padding:5px 7px;border-radius:7px;cursor:pointer;
+      margin-bottom:2px;opacity:${ahead?.45:1};
+      background:${now?'#2563eb33':'transparent'};border:1px solid ${now?'#3b82f6aa':'transparent'};">
+      <span style="width:14px;text-align:center;">${ic}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(h.label||'—')}</span>
+      ${now?'<span style="color:#93c5fd;font-size:.68rem;">ตอนนี้</span>':''}
+    </div>`;
+  }).join('');
+  const cur=el.children && el.children[HPOS];
+  if(cur && cur.scrollIntoView) try{ cur.scrollIntoView({block:'nearest'}); }catch(e){}
+}
+let m3HistOpen=true;
+function m3HistToggle(){
+  m3HistOpen=!m3HistOpen;
+  const box=document.getElementById('m3HistBox'), btn=document.getElementById('m3HistOpen');
+  if(box) box.style.display=m3HistOpen?'flex':'none';
+  if(btn) btn.style.display=m3HistOpen?'none':'block';
+}
+function histJump(i){
+  if(i===HPOS || i<0 || i>=HIST.length) return;
+  histGo(i-HPOS);
 }
 
 // ─── Save / open a project file ───────────────────────
@@ -8761,7 +8862,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-j5';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-j9';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
