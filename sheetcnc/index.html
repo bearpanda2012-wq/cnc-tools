@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-j9</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k1</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -409,8 +409,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       <br>✂ หน้าที่ใหญ่กว่าแผ่นวัสดุ โปรแกรมจะ<b>แบ่งเป็นหลายแผ่นให้อัตโนมัติ</b> พร้อมบอกว่าต้องต่อกี่ท่อน
       &nbsp;|&nbsp; รูปทรงที่ได้เป็นเส้นขอบจริง ไม่ใช่กรอบสี่เหลี่ยม
       <br>📦 อ่านได้ <b>STL · OBJ · PLY · 3MF · glTF/GLB · COLLADA(.dae) · FBX · 3DS · VRML/X3D · OFF · AMF</b>
-      และ <b>Rhino .3dm</b> โดยตรง — ไฟล์จาก Blender / Rhino / 3ds Max โยนเข้ามาได้เลย
-      &nbsp;|&nbsp; <b>SketchUp</b> ให้ export เป็น <b>.dae</b> ก่อน (File ▸ Export ▸ 3D Model)
+      และ <b>Rhino .3dm · SketchUp .skp</b> โดยตรง — ไฟล์จาก SketchUp / Blender / Rhino / 3ds Max โยนเข้ามาได้เลย
     </div>
     <div class="dxf-import-drop" id="m3Drop"
       onclick="document.getElementById('m3Fi').click()"
@@ -421,9 +420,9 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       <p>คลิกหรือลากไฟล์ <b>3D</b> มาวาง</p>
       <p style="font-size:.74rem;margin-top:4px;">
         <b>.stl &nbsp;.obj &nbsp;.ply &nbsp;.3mf &nbsp;.glb &nbsp;.gltf &nbsp;.dae &nbsp;.fbx &nbsp;.3ds &nbsp;.wrl &nbsp;.x3d &nbsp;.off &nbsp;.amf</b>
-        &nbsp;· <b>.3dm</b> (Rhino — ครั้งแรกต้องต่อเน็ต)
-        <br><span style="opacity:.75;">SketchUp .skp / STEP / IGES: export เป็น .dae หรือ .stl ก่อน</span></p>
-      <input type="file" id="m3Fi" accept=".stl,.obj,.ply,.3mf,.glb,.gltf,.dae,.off,.amf,.wrl,.vrml,.x3d,.fbx,.3ds,.3dm" style="display:none" onchange="handle3DFile(this.files[0])">
+        &nbsp;· <b>.3dm</b> (Rhino) &nbsp;· <b>.skp</b> (SketchUp) — สองอันนี้ครั้งแรกต้องต่อเน็ต
+        <br><span style="opacity:.75;">STEP / IGES: export เป็น .dae หรือ .stl ก่อน</span></p>
+      <input type="file" id="m3Fi" accept=".stl,.obj,.ply,.3mf,.glb,.gltf,.dae,.off,.amf,.wrl,.vrml,.x3d,.fbx,.3ds,.3dm,.skp" style="display:none" onchange="handle3DFile(this.files[0])">
     </div>
     <div id="m3Result" style="display:none;margin-top:12px;"></div>
   </div>
@@ -6386,6 +6385,50 @@ function _m3_3DS(buf){
 let _m3_3DSPend=null;
 
 
+
+/* ── SketchUp · .skp ── */
+// SketchUp's format is closed, but openskp (MIT) reads it in plain JavaScript.
+// Loaded from a CDN the first time and cached by the browser afterwards.
+const SKP_URLS=[
+  'https://cdn.jsdelivr.net/npm/openskp@1.3.0/+esm',
+  'https://esm.sh/openskp@1.3.0',
+  'https://cdn.jsdelivr.net/npm/openskp/+esm'
+];
+let _skpP=null;
+function loadOpenSkp(){
+  if(_skpP) return _skpP;
+  _skpP=(async()=>{
+    if(typeof openskp!=='undefined' && openskp.buildScene) return openskp;
+    for(const u of SKP_URLS){
+      try{ const m=await import(u); if(m && m.buildScene) return m; }catch(e){}
+    }
+    _skpP=null;
+    throw new Error('โหลดตัวอ่านไฟล์ SketchUp (.skp) ไม่ได้ — ครั้งแรกต้องต่ออินเทอร์เน็ต '+
+                    'หรือใน SketchUp สั่ง File ▸ Export ▸ 3D Model เป็น .dae / .stl แล้วลากไฟล์นั้นมาแทน');
+  })();
+  return _skpP;
+}
+
+async function _m3SKP(buf){
+  const O=await loadOpenSkp();
+  let sc=null;
+  try{ sc=O.buildScene(buf); }
+  catch(e){ throw new Error('อ่านไฟล์ .skp ไม่สำเร็จ — '+(e&&e.message||e)); }
+  const prims=(sc && sc.glbPrimitives)||[];
+  const b=_m3Buf();
+  prims.forEach(p=>{
+    const P=p.positions, I=p.indices;
+    if(!P||!P.length) return;
+    // openskp hands back metres, already placed in world space (components baked)
+    const push=k=>{ const o=k*3; b.push3(P[o]*1000, P[o+1]*1000, P[o+2]*1000); };
+    if(I && I.length) for(let i=0;i+2<I.length;i+=3){ push(I[i]); push(I[i+1]); push(I[i+2]); }
+    else for(let i=0;i+2<P.length/3;i+=3){ push(i); push(i+1); push(i+2); }
+  });
+  if(b.n<9) throw new Error('ไฟล์ .skp นี้ไม่มีรูปทรงที่อ่านได้ (อาจมีแต่เส้นหรือกลุ่มที่ซ่อนอยู่)');
+  const out=b.done();
+  return {tri:out.subarray(0, Math.floor(out.length/9)*9), up:'y'};   // glTF axes
+}
+
 /* ── Rhino · .3dm ── */
 // openNURBS is a large, versioned binary format; hand-rolling a reader for it
 // would be guesswork. McNeel publish the real one as free WebAssembly, so the
@@ -6790,7 +6833,8 @@ const M3_READ={
   x3d:  b=>_m3WRL(new TextDecoder().decode(new Uint8Array(b))),
   fbx:  b=>_m3FBX(b),
   '3ds':b=>_m3_3DS(b),
-  '3dm':b=>_m3_3DM(b)                      // async — the loader awaits this one
+  '3dm':b=>_m3_3DM(b),                     // async — the loader awaits these two
+  skp: b=>_m3SKP(b)
 };
 // files that belong to another card — say where to take them, don't just refuse
 const M3_ELSE={
@@ -6799,11 +6843,6 @@ const M3_ELSE={
   png:'Excel', jpg:'Excel', jpeg:'Excel', webp:'Excel', bmp:'Excel', tif:'Excel', tiff:'Excel'
 };
 const M3_CAD=['step','stp','iges','igs','sldprt','sldasm','ipt','iam','f3d','catpart','prt','x_t','x_b','sat'];
-// SketchUp keeps its format closed — there is no reader for it outside their own
-// SDK, so the only honest answer is to point at their export menu.
-const M3_SKP='SketchUp (.skp) เป็นรูปแบบปิด ไม่มีตัวอ่านที่ใช้ได้นอกโปรแกรมของเขาเอง — '+
-  'ใน SketchUp สั่ง File ▸ Export ▸ 3D Model แล้วเลือก .dae หรือ .stl (มีมาให้ในตัว ไม่ต้องซื้อเพิ่ม) '+
-  'แล้วลากไฟล์นั้นเข้ามาแทน — อ่านได้เหมือนกันทุกอย่าง';
 
 /** Y-up (glTF, COLLADA, VRML, most FBX) → Z-up, which is what CAD and this app use. */
 function _m3AxisSwap(tf, toZ){
@@ -6837,7 +6876,6 @@ function _m3Analyse(){
 function handle3DFile(file){
   if(!file) return;
   const ext=(file.name.split('.').pop()||'').toLowerCase();
-  if(ext==='skp'){ _m3Fail(M3_SKP); return; }
   if(M3_CAD.includes(ext)){
     _m3Fail(`ไฟล์ .${ext} เก็บผิวโค้งจริงแบบ B-rep ไม่ใช่ mesh ยังอ่านไม่ได้ในเวอร์ชันนี้ — `+
             `เปิดใน CAD แล้ว Export เป็น .stl / .obj / .glb / .dae ก่อน (ฟรี ทุกโปรแกรมทำได้)`);
@@ -6865,6 +6903,7 @@ function handle3DFile(file){
       let res;
       try{
         if(ext==='3dm') _m3Busy('กำลังโหลดตัวอ่านไฟล์ Rhino… (ครั้งแรกโหลด ~3MB)');
+        if(ext==='skp') _m3Busy('กำลังโหลดตัวอ่านไฟล์ SketchUp… (ครั้งแรกต้องต่อเน็ต)');
         res=M3_READ[ext](e.target.result);
         if(res && typeof res.then==='function'){
           res.then(go).catch(err=>_m3Fail(err.message||String(err)));
@@ -8862,7 +8901,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-j9';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k1';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
