@@ -1,0 +1,31 @@
+{
+  "name": "CNC Tools",
+  "short_name": "CNC Tools",
+  "description": "เครื่องมือช่วยงาน CNC — ถอดแผ่น จัดวางชิ้นงาน แปลงรูปเป็น Tool Path และคัดลอกลายเส้น",
+  "lang": "th",
+  "start_url": "./",
+  "scope": "./",
+  "id": "cnc-tools",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "SheetCNC Pro", "short_name": "SheetCNC",
+      "description": "ถอดแผ่นและจัดวางชิ้นงานบนแผ่นวัสดุ",
+      "url": "./sheetcnc/", "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }] },
+    { "name": "CNC Pattern Generator", "short_name": "Pattern",
+      "description": "แปลงรูปภาพเป็น Tool Path",
+      "url": "./pattern-generator/", "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }] },
+    { "name": "LineTracer Pro", "short_name": "LineTracer",
+      "description": "คัดลอกลายเส้นจากรูปภาพเป็นเวกเตอร์",
+      "url": "./line-tracer/", "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }] }
+  ]
+}

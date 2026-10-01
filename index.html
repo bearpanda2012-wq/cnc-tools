@@ -1,66 +1,293 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>CNC Tools — เครื่องมือช่วยงาน CNC</title>
+<meta name="description" content="เครื่องมือช่วยงาน CNC — ถอดแผ่น จัดวางชิ้นงาน แปลงรูปเป็น Tool Path และคัดลอกลายเส้น">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#0b1020">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CNC Tools">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="icon" href="./icon-192.png">
 <style>
-:root {
-  --bg:#0f1117; --card:#1a1d2e; --border:#2d3154;
-  --accent:#4361ee; --accent2:#00d1a0; --text:#e2e8f0; --muted:#8b93a7;
+*{box-sizing:border-box}
+:root{
+  --bg:#0b1020; --bg2:#111a33; --card:#151e38; --card2:#1b2647;
+  --line:#2a3760; --tx:#e8ecf8; --dim:#9aa6c8;
+  --ac:#38d6c0; --ac2:#4b8cff; --w:#ffb53d; --p:#b66cff;
 }
-* { box-sizing:border-box; margin:0; padding:0; }
-body {
-  background:var(--bg); color:var(--text);
-  font-family:'Segoe UI', system-ui, sans-serif;
-  min-height:100vh; display:flex; flex-direction:column;
-  align-items:center; justify-content:center; padding:24px;
+html,body{margin:0;padding:0}
+body{
+  background:
+    radial-gradient(1200px 600px at 15% -10%, #1a2550 0%, transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, #16304a 0%, transparent 55%),
+    var(--bg);
+  color:var(--tx);
+  font-family:"Sarabun","Noto Sans Thai","Segoe UI",system-ui,-apple-system,sans-serif;
+  min-height:100vh; min-height:100dvh;
+  -webkit-text-size-adjust:100%;
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
 }
-h1 { font-size:1.9rem; letter-spacing:-.5px; margin-bottom:8px; }
-h1 span { color:var(--accent2); }
-.sub { color:var(--muted); margin-bottom:36px; font-size:.95rem; text-align:center; }
-.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 340px)); gap:20px; width:100%; max-width:1100px; justify-content:center; }
-.card {
-  background:var(--card); border:1px solid var(--border); border-radius:14px;
-  padding:26px 24px; text-decoration:none; color:var(--text);
-  transition:transform .15s, border-color .15s; display:block;
+.wrap{max-width:1040px;margin:0 auto;padding:28px 18px 56px}
+
+/* ---- header ---- */
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.logo{width:54px;height:54px;flex:0 0 auto;border-radius:14px;background:var(--bg2);
+  border:1px solid var(--line);display:grid;place-items:center;overflow:hidden}
+h1{font-size:26px;margin:0;letter-spacing:.3px;font-weight:700}
+.sub{color:var(--dim);font-size:14px;margin:3px 0 0}
+.badges{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
+.pill{font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);
+  background:#0f1730;color:var(--dim);white-space:nowrap}
+.pill.on{color:#0b1020;background:var(--ac);border-color:transparent;font-weight:600}
+.pill.off{color:#0b1020;background:var(--w);border-color:transparent;font-weight:600}
+
+/* ---- install bar ---- */
+.bar{margin:22px 0 26px;padding:16px 18px;border-radius:16px;
+  border:1px solid var(--line);
+  background:linear-gradient(135deg,#17224380,#1d2c5580);
+  display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.bar .t{font-weight:600;font-size:15px}
+.bar .d{color:var(--dim);font-size:13px;margin-top:2px}
+.bar .grow{flex:1 1 220px;min-width:0}
+button{font-family:inherit;cursor:pointer;border-radius:11px;font-size:14px;transition:.15s}
+.btn{background:var(--ac);color:#06201c;border:0;padding:11px 20px;font-weight:700}
+.btn:hover{filter:brightness(1.08)}
+.btn2{background:#1c2748;color:var(--tx);border:1px solid var(--line);padding:10px 16px}
+.btn2:hover{background:#243156}
+.hide{display:none !important}
+
+/* ---- cards ---- */
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(285px,1fr))}
+.card{display:flex;flex-direction:column;text-decoration:none;color:inherit;
+  background:linear-gradient(160deg,var(--card),var(--card2));
+  border:1px solid var(--line);border-radius:18px;padding:20px;
+  transition:transform .16s, border-color .16s, box-shadow .16s}
+.card:hover{transform:translateY(-3px);border-color:var(--ac);
+  box-shadow:0 14px 34px #0006}
+.ic{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;margin-bottom:14px}
+.card h2{font-size:18px;margin:0 0 7px;font-weight:700}
+.card p{margin:0;color:var(--dim);font-size:13.5px;line-height:1.65;flex:1}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+.tag{font-size:11.5px;padding:4px 9px;border-radius:7px;background:#0e1730;
+  border:1px solid var(--line);color:var(--dim)}
+.go{margin-top:16px;font-size:13.5px;font-weight:700;color:var(--ac)}
+
+/* ---- ios help ---- */
+.help{margin-top:26px;border:1px solid var(--line);border-radius:14px;
+  background:#0f1730cc;padding:16px 18px}
+.help h3{margin:0 0 9px;font-size:14.5px}
+.help ol{margin:0;padding-left:20px;color:var(--dim);font-size:13.5px;line-height:1.85}
+.help code{background:#1b2647;padding:1px 6px;border-radius:5px;color:var(--tx);font-size:12.5px}
+
+footer{margin-top:30px;color:#6f7da6;font-size:12.5px;display:flex;gap:12px;
+  align-items:center;flex-wrap:wrap}
+footer a{color:var(--dim)}
+@media (max-width:520px){
+  h1{font-size:22px} .wrap{padding:20px 14px 44px} .badges{margin-left:0;width:100%}
 }
-.card:hover { transform:translateY(-3px); border-color:var(--accent); }
-.icon { font-size:2rem; margin-bottom:14px; }
-.card h2 { font-size:1.15rem; margin-bottom:8px; }
-.card p { color:var(--muted); font-size:.88rem; line-height:1.55; }
-.tag { display:inline-block; margin-top:14px; font-size:.75rem; font-weight:700;
-  color:var(--accent2); border:1px solid var(--accent2); border-radius:99px; padding:3px 12px; }
-footer { margin-top:44px; color:var(--muted); font-size:.78rem; }
 </style>
 </head>
 <body>
-  <h1>CNC <span>Tools</span></h1>
-  <p class="sub">เครื่องมือช่วยงาน CNC — รันบนเบราว์เซอร์ ไม่ต้องติดตั้งโปรแกรม</p>
+<div class="wrap">
 
-  <div class="grid">
-    <a class="card" href="pattern-generator/">
-      <div class="icon">🖼️</div>
-      <h2>CNC Pattern Generator</h2>
-      <p>แปลงรูปภาพเป็น Tool Path สำหรับงาน CNC ปรับแต่งลวดลาย และ export ไฟล์ได้</p>
-      <span class="tag">เปิดใช้งาน →</span>
-    </a>
-
-    <a class="card" href="sheetcnc/">
-      <div class="icon">📐</div>
-      <h2>SheetCNC Pro</h2>
-      <p>ถอดแผ่นและจัดวางชิ้นงานบนแผ่นวัสดุ (Nesting) พร้อม export ข้อมูลเป็น Excel</p>
-      <span class="tag">เปิดใช้งาน →</span>
-    </a>
-
-    <a class="card" href="line-tracer/">
-      <div class="icon">✒️</div>
-      <h2>LineTracer Pro</h2>
-      <p>คัดลอกลายเส้นจากรูปภาพเป็นเส้นเวกเตอร์ สำหรับนำไปใช้ในงาน CNC</p>
-      <span class="tag">เปิดใช้งาน →</span>
-    </a>
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 48 48" width="40" height="40" aria-hidden="true">
+      <rect x="4" y="9" width="40" height="30" rx="3" fill="#0e1730" stroke="#2a3760"/>
+      <rect x="8"  y="13" width="13" height="10" rx="1.5" fill="#38d6c0"/>
+      <rect x="23" y="13" width="17" height="6"  rx="1.5" fill="#4b8cff"/>
+      <rect x="8"  y="25" width="9"  height="10" rx="1.5" fill="#ffb53d"/>
+      <rect x="19" y="21" width="21" height="14" rx="1.5" fill="#b66cff" opacity=".85"/>
+      <path d="M6 42h36" stroke="#38d6c0" stroke-width="2" stroke-linecap="round"/>
+    </svg>
   </div>
+  <div>
+    <h1>CNC Tools</h1>
+    <p class="sub">ชุดเครื่องมือช่วยงาน CNC — ใช้ฟรี ไม่ต้องสมัคร ทำงานในเครื่องคุณ</p>
+  </div>
+  <div class="badges">
+    <span class="pill" id="net">กำลังตรวจ…</span>
+    <span class="pill" id="mode">เบราว์เซอร์</span>
+  </div>
+</header>
 
-  <footer>สร้างด้วย Claude · โฮสต์บน GitHub Pages</footer>
+<div class="bar" id="bar">
+  <div class="grow">
+    <div class="t" id="barT">ติดตั้งเป็นแอปบนเครื่องได้</div>
+    <div class="d" id="barD">เปิดเต็มจอ ไม่มีแถบเบราว์เซอร์ มีไอคอนในหน้าโฮม และใช้งานออฟไลน์ได้</div>
+  </div>
+  <button class="btn hide" id="install">ติดตั้งแอป</button>
+  <button class="btn2" id="ios">วิธีติดตั้งบน iPhone / iPad</button>
+</div>
+
+<div class="grid">
+
+  <a class="card" href="./sheetcnc/">
+    <div class="ic" style="background:#38d6c01f;border:1px solid #38d6c055">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38d6c0" stroke-width="1.8">
+        <rect x="2.5" y="4" width="19" height="16" rx="1.5"/>
+        <rect x="5" y="6.5" width="7" height="5"/><rect x="14" y="6.5" width="5" height="9"/>
+        <rect x="5" y="13.5" width="4" height="4"/>
+      </svg>
+    </div>
+    <h2>SheetCNC Pro</h2>
+    <p>ถอดแผ่นและจัดวางชิ้นงานลงแผ่นวัสดุให้เหลือเศษน้อยที่สุด นำเข้าได้ทั้งไฟล์เวกเตอร์ ตาราง รูปภาพ และไฟล์ 3D แล้วส่งออกเป็น DXF</p>
+    <div class="tags"><span class="tag">Nesting</span><span class="tag">3D 16 นามสกุล</span><span class="tag">DXF</span><span class="tag">แบ่งแผ่น</span></div>
+    <div class="go">เปิดเครื่องมือ →</div>
+  </a>
+
+  <a class="card" href="./pattern-generator/">
+    <div class="ic" style="background:#4b8cff1f;border:1px solid #4b8cff55">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4b8cff" stroke-width="1.8">
+        <circle cx="7" cy="7" r="2.6"/><circle cx="16.5" cy="7" r="1.6"/>
+        <circle cx="7" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="2.6"/>
+        <path d="M3 21h18" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <h2>CNC Pattern Generator</h2>
+    <p>แปลงรูปภาพเป็นลายฉลุแบบ Halftone แล้วส่งออกเป็น G-code, DXF, SVG หรือ AI พร้อมเข้าเครื่องกัดได้ทันที</p>
+    <div class="tags"><span class="tag">Halftone</span><span class="tag">G-code</span><span class="tag">DXF / SVG / AI</span></div>
+    <div class="go">เปิดเครื่องมือ →</div>
+  </a>
+
+  <a class="card" href="./line-tracer/">
+    <div class="ic" style="background:#b66cff1f;border:1px solid #b66cff55">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#b66cff" stroke-width="1.8">
+        <path d="M3 17c3.5 0 4-11 8-11s4.5 11 10 11" stroke-linecap="round"/>
+        <circle cx="3" cy="17" r="1.6" fill="#b66cff" stroke="none"/>
+        <circle cx="21" cy="17" r="1.6" fill="#b66cff" stroke="none"/>
+      </svg>
+    </div>
+    <h2>LineTracer Pro</h2>
+    <p>คัดลอกลายเส้นจากรูปภาพให้กลายเป็นเวกเตอร์ที่แก้ไขต่อได้ เหมาะกับงานลอกลาย งานป้าย และงานฉลุ</p>
+    <div class="tags"><span class="tag">ลอกลายเส้น</span><span class="tag">Vector</span><span class="tag">SVG</span></div>
+    <div class="go">เปิดเครื่องมือ →</div>
+  </a>
+
+</div>
+
+<div class="help hide" id="iosHelp">
+  <h3>ติดตั้งบน iPhone / iPad (Safari)</h3>
+  <ol>
+    <li>เปิดหน้านี้ด้วย <code>Safari</code> (ถ้าเปิดจาก Chrome ให้เปลี่ยนมา Safari ก่อน)</li>
+    <li>แตะปุ่มแชร์ <code>􀈂</code> ที่แถบล่าง</li>
+    <li>เลื่อนลงแล้วเลือก <code>เพิ่มไปยังหน้าจอโฮม</code> / <code>Add to Home Screen</code></li>
+    <li>แตะ <code>เพิ่ม</code> — จะได้ไอคอน CNC Tools ที่หน้าโฮม เปิดแล้วเต็มจอไม่มีแถบเบราว์เซอร์</li>
+  </ol>
+  <h3 style="margin-top:14px">ติดตั้งบน Android / Windows / Mac</h3>
+  <ol>
+    <li>Chrome หรือ Edge: กดปุ่ม <code>ติดตั้งแอป</code> ด้านบน</li>
+    <li>ถ้าไม่เห็นปุ่ม ให้เปิดเมนู <code>⋮</code> แล้วเลือก <code>ติดตั้ง…</code> / <code>เพิ่มลงในหน้าจอหลัก</code></li>
+  </ol>
+</div>
+
+<footer>
+  <span id="ver">เวอร์ชัน —</span>
+  <span>·</span>
+  <button class="btn2" id="upd" style="padding:6px 12px;font-size:12.5px">ตรวจหาเวอร์ชันใหม่</button>
+  <span id="msg" style="color:var(--ac)"></span>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------- สถานะเน็ต ---------- */
+  function net(){
+    var e = $('net');
+    if(navigator.onLine){ e.textContent='ออนไลน์'; e.className='pill on'; }
+    else { e.textContent='ออฟไลน์ (ยังใช้ได้)'; e.className='pill off'; }
+  }
+  net();
+  addEventListener('online', net); addEventListener('offline', net);
+
+  /* ---------- ติดตั้งแล้วหรือยัง ---------- */
+  var standalone = matchMedia('(display-mode: standalone)').matches ||
+                   matchMedia('(display-mode: minimal-ui)').matches ||
+                   navigator.standalone === true;
+  if(standalone){
+    $('mode').textContent = 'แอป';
+    $('mode').className = 'pill on';
+    $('bar').classList.add('hide');
+  }
+
+  /* ---------- ปุ่มติดตั้ง ---------- */
+  var prompt_ = null;
+  addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    prompt_ = e;
+    $('install').classList.remove('hide');
+  });
+  $('install').addEventListener('click', async function(){
+    if(!prompt_) return;
+    $('install').disabled = true;
+    try{
+      prompt_.prompt();
+      var r = await prompt_.userChoice;
+      if(r && r.outcome === 'accepted'){
+        $('barT').textContent = 'ติดตั้งเรียบร้อย';
+        $('barD').textContent = 'เปิดแอป CNC Tools จากหน้าจอโฮมหรือเมนูเริ่มได้เลย';
+        $('install').classList.add('hide');
+      }
+    }catch(e){}
+    prompt_ = null;
+    $('install').disabled = false;
+  });
+  addEventListener('appinstalled', function(){ $('install').classList.add('hide'); });
+
+  $('ios').addEventListener('click', function(){
+    $('iosHelp').classList.toggle('hide');
+    if(!$('iosHelp').classList.contains('hide') && $('iosHelp').scrollIntoView)
+      try{ $('iosHelp').scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(e){}
+  });
+
+  /* ---------- service worker ---------- */
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js').then(function(reg){
+      navigator.serviceWorker.addEventListener('message', function(e){
+        if(e.data && e.data.version) $('ver').textContent = 'เวอร์ชัน ' + e.data.version;
+      });
+      function ask(){
+        if(navigator.serviceWorker.controller)
+          navigator.serviceWorker.controller.postMessage('version');
+      }
+      ask();
+      navigator.serviceWorker.addEventListener('controllerchange', ask);
+
+      reg.addEventListener('updatefound', function(){
+        var sw = reg.installing;
+        if(!sw) return;
+        sw.addEventListener('statechange', function(){
+          if(sw.state === 'installed' && navigator.serviceWorker.controller){
+            $('msg').textContent = 'มีเวอร์ชันใหม่ — กดโหลดใหม่';
+            $('upd').textContent = 'โหลดใหม่';
+            $('upd').onclick = function(){ sw.postMessage('skipWaiting'); location.reload(); };
+          }
+        });
+      });
+
+      $('upd').addEventListener('click', function(){
+        if($('upd').textContent === 'โหลดใหม่') return;
+        $('msg').textContent = 'กำลังตรวจ…';
+        reg.update().then(function(){
+          setTimeout(function(){
+            if($('msg').textContent === 'กำลังตรวจ…') $('msg').textContent = 'เป็นเวอร์ชันล่าสุดแล้ว';
+          }, 1200);
+        }).catch(function(){ $('msg').textContent = 'ตรวจไม่ได้ (ออฟไลน์)'; });
+      });
+    }).catch(function(){ $('ver').textContent = 'เวอร์ชัน — (ไม่ได้ติดตั้ง SW)'; });
+  } else {
+    $('ver').textContent = 'เบราว์เซอร์นี้ไม่รองรับการใช้ออฟไลน์';
+  }
+})();
+</script>
 </body>
 </html>
