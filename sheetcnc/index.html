@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k1</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k2</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -732,7 +732,12 @@ function updateOrientUI(){
   });
 }
 
-function saveSettings(){ histPush('settings'); }  // fires on every settings input
+function saveSettings(){
+  histPush('settings');
+  // The 3D card works out its splits from the sheet size, so those numbers go
+  // stale the moment the sheet changes unless it is redrawn here.
+  if(m3Tri) try{ render3D(); }catch(e){}
+}
 
 function toggleLang() {
   lang = lang === 'th' ? 'en' : 'th';
@@ -6778,14 +6783,18 @@ function _m3ClipRect(poly,x0,y0,x1,y1){
 
 /** A face wider than the sheet is cut into equal panels that do fit. */
 function _m3SplitToSheet(poly, w, h, maxW, maxH){
-  let nx=Math.max(1,Math.ceil(w/maxW - 1e-9)), ny=Math.max(1,Math.ceil(h/maxH - 1e-9));
-  const alt={nx:Math.max(1,Math.ceil(w/maxH - 1e-9)), ny:Math.max(1,Math.ceil(h/maxW - 1e-9))};
-  let rot=false;
-  if(alt.nx*alt.ny < nx*ny){ nx=alt.nx; ny=alt.ny; rot=true; }   // sheet turned 90°
-  if(nx*ny<=1) return {panels:[{poly, w, h, x0:0, y0:0}], nx:1, ny:1, rot:false};
+  // Cut at the sheet size itself: full 1200×2400 panels with the leftover as the
+  // last strip. Dividing into equal shares gives panels that fit but waste the
+  // sheet — a 5.2 m face became 5 pieces of 1040 on a 1200 sheet.
+  const count=(len,mx)=>Math.max(1, Math.ceil(len/mx - 1e-9));
+  let nx=count(w,maxW), ny=count(h,maxH), cw=maxW, ch=maxH;
+  const an=count(w,maxH)*count(h,maxW);
+  if(an < nx*ny){ nx=count(w,maxH); ny=count(h,maxW); cw=maxH; ch=maxW; }  // sheet turned 90°
+  if(nx*ny<=1) return {panels:[{poly, w, h, x0:0, y0:0}], nx:1, ny:1, cw:w, ch:h};
   const panels=[];
   for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){
-    const x0=i*w/nx, x1=(i+1)*w/nx, y0=j*h/ny, y1=(j+1)*h/ny;
+    const x0=i*cw, x1=Math.min(w, (i+1)*cw);
+    const y0=j*ch, y1=Math.min(h, (j+1)*ch);
     const c=_m3ClipRect(poly, x0-1e-9, y0-1e-9, x1+1e-9, y1+1e-9);
     if(c.length<3) continue;
     let mnX=1e18,mnY=1e18,mxX=-1e18,mxY=-1e18;
@@ -6795,7 +6804,7 @@ function _m3SplitToSheet(poly, w, h, maxW, maxH){
     if(pw<0.5 || ph<0.5 || Math.abs(_m3Area(c))<1) continue;
     panels.push({poly:c.map(p=>[p[0]-mnX, p[1]-mnY]), w:pw, h:ph, x0:mnX, y0:mnY, ix:i+1, iy:j+1});
   }
-  return {panels, nx, ny, rot};
+  return {panels, nx, ny, cw, ch};
 }
 
 /* ─────────── file intake ─────────── */
@@ -8111,7 +8120,7 @@ function render3D(rebuild){
     </div>`;
   }) : shown.map(r=>{
     const {i,f,w,h,big,sp,sel}=r;
-    const pw=sp&&sp.panels[0]?`${fmt(sp.panels[0].w)}×${fmt(sp.panels[0].h)} ${UL}`:'';
+    const pw=sp?`${fmt(sp.cw)}×${fmt(sp.ch)} ${UL}${sp.panels.some(p=>p.w<sp.cw-0.5||p.h<sp.ch-0.5)?' + เศษ':''}`:'';
     const warn=big?(m3AutoSplit&&sp
         ? `<span style="color:#4ade80;" title="ชิ้นนี้ใหญ่กว่าแผ่น ${fmt(maxW)}×${fmt(maxH)} ${UL} ที่ใช้ได้จริง จึงต้องตัดต่อ">✂ ต่อ ${sp.panels.length} ท่อน (${pw})</span>`
         : `<span style="color:#f87171;">⚠ ใหญ่กว่าแผ่น ${fmt(maxW)}×${fmt(maxH)} ${UL}</span>`):'';
@@ -8901,7 +8910,7 @@ function dxfItemPaths(item, offX, offY, sh){
   }
   return s;
 }
-const BUILD_TAG='25Jul-k1';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k2';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
