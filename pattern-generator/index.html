@@ -2,7 +2,10 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1c1c1e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>CNC Pattern Generator — Image to Tool Path</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -10,8 +13,9 @@
 body {
   font-family: 'Segoe UI', system-ui, sans-serif;
   background: #111; color: #e0e0e0;
-  height: 100vh; display: flex; flex-direction: column;
+  height: 100vh; height: 100dvh; display: flex; flex-direction: column;
   overflow: hidden; user-select: none;
+  -webkit-text-size-adjust: 100%; overscroll-behavior: none;
 }
 header {
   background: #1c1c1e; padding: 10px 18px;
@@ -70,6 +74,11 @@ header {
 .hdr-btn.active { background: rgba(10,122,255,.18); color: #4da3ff; border-color: rgba(10,122,255,.4); }
 .hdr-div { width: 1px; height: 18px; background: #333; margin: 0 5px; }
 #btnSidebarToggle { display: none; margin-left: 8px; }
+.sb-backdrop {
+  display: none; position: absolute; inset: 0; z-index: 55;
+  background: rgba(0,0,0,.55); -webkit-tap-highlight-color: transparent;
+}
+.sb-backdrop.show { display: block; }
 
 .autosave-ind {
   font-size: 9px; color: #4a4a4e; border: 1px solid #2c2c30;
@@ -299,6 +308,7 @@ input[type="color"] { width: 36px; height: 24px; border: none; border-radius: 5p
   width: 100%; height: 100%;
   cursor: grab; display: block;
   image-rendering: crisp-edges;
+  touch-action: none;            /* pinch/pan belong to the drawing, not the page */
 }
 #viewCanvas.dragging { cursor: grabbing; }
 /* pCanvas is the export canvas — kept hidden */
@@ -579,16 +589,140 @@ pre.gcode-content {
   .app-body { position: relative; }
   .header-sub { display: none; }
 }
-@media (max-width: 720px) {
-  header { padding: 8px 12px; gap: 8px; }
-  .header-title { font-size: 13px; }
-  .logo { width: 28px; height: 28px; }
-  .hdr-actions { margin-left: auto; gap: 1px; }
-  .hdr-btn { width: 30px; height: 30px; }   /* >=30px keeps touch targets usable */
-  .bottom-bar { flex-wrap: wrap; gap: 5px; }
-  .bottom-bar .btn { flex: 1 1 auto; font-size: 10px; padding: 7px 8px; }
-  .bottom-bar .status { flex-basis: 100%; }
-  .tab-btn { font-size: 10px; padding: 7px 8px; }
+@media (max-width: 860px) {
+  /* ══════════════ PHONE / SMALL TABLET ══════════════
+     One column: the drawing owns the screen, the controls slide in over it.
+     Everything a finger touches is >= 40px, and every text field is 16px so
+     iOS Safari stops zooming the page when it gets focus. */
+
+  /* ── header: clears the notch, bigger icon buttons ── */
+  header {
+    padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top));
+    gap: 6px;
+  }
+  .header-title { font-size: 13px; line-height: 1.25; }
+  .header-title #buildTag { margin-left: 5px; }
+  .logo { width: 30px; height: 30px; }
+  .hdr-actions { margin-left: auto; gap: 0; }
+  .hdr-btn { width: 38px; height: 38px; border-radius: 9px; }
+  .hdr-btn .ic { width: 17px; height: 17px; }
+  .hdr-div { margin: 0 2px; }
+  #btnSidebarToggle { width: 40px; height: 38px; margin-left: 2px;
+                      background: #26262b; border-color: #37373c; color: #e6e6ea; }
+
+  /* ── sidebar is a drawer; it starts closed, see initMobileUI() ── */
+  .sidebar {
+    width: min(86vw, 330px); padding: 10px 12px;
+    padding-bottom: calc(26px + env(safe-area-inset-bottom));
+  }
+
+  /* ── main tabs scroll sideways instead of squeezing ── */
+  .main-tabs { padding: 0 6px; overflow-x: auto; overflow-y: hidden;
+               scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .main-tabs::-webkit-scrollbar { display: none; }
+  .tab-btn { font-size: 12px; padding: 11px 13px; white-space: nowrap; flex: 0 0 auto; }
+
+  /* ── bottom bar: one scrollable row of full-size buttons,
+        status on its own line above so it never steals a button's width ── */
+  .bottom-bar {
+    flex-wrap: nowrap; overflow-x: auto; gap: 7px;
+    padding: 8px 10px; padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .bottom-bar::-webkit-scrollbar { display: none; }
+  .bottom-bar .btn {
+    flex: 0 0 auto; font-size: 12px; padding: 0 14px;
+    min-height: 42px; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .bottom-bar .status {
+    position: absolute; left: 0; right: 0; bottom: 100%;
+    margin: 0; padding: 4px 12px; font-size: 11px; text-align: left;
+    background: #141416; border-top: 1px solid #242428;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .main-area { position: relative; }
+  .bottom-bar { position: relative; }
+
+  /* ── form controls: 16px kills the iOS focus-zoom ── */
+  .num-in, select, input[type="text"], input[type="number"] {
+    font-size: 16px; padding: 9px 10px; border-radius: 7px;
+  }
+  .in-grp label { font-size: 11px; margin-bottom: 4px; }
+  input[type="range"] { height: 26px; }
+  input[type="color"] { width: 46px; height: 32px; }
+  .toggle { width: 46px; height: 27px; border-radius: 14px; }
+  .toggle::after { width: 23px; height: 23px; top: 2px; left: 2px; }
+  .toggle.on::after { transform: translateX(19px); }
+  .chk-lbl input[type="checkbox"] { width: 20px; height: 20px; }
+  .mode-btn { font-size: 12px; padding: 11px 6px; }
+  .tool-type-btn { min-height: 56px; font-size: 10px; }
+  .preset-row select { font-size: 15px; padding: 8px 8px; }
+  .cnc-size-btn { padding: 10px 8px; font-size: 12px; }
+
+  /* ── canvas overlays: keep them off the drawing ── */
+  .stats-ov, .sheet-info-ov {
+    top: 8px; right: 8px; left: auto; min-width: 0; max-width: 60vw;
+    padding: 7px 9px; font-size: 10px; border-radius: 7px;
+  }
+  .stats-ov { cursor: pointer; }                 /* tap to fold — see initMobileUI() */
+  .stats-ov.mini .st-row:not(:first-child) { display: none; }
+  .stats-ov.mini::after {
+    content: 'แตะเพื่อดูทั้งหมด'; display: block;
+    font-size: 8.5px; color: #55555a; margin-top: 3px;
+  }
+  .st-row { gap: 10px; }
+
+  /* ── zoom toolbar: real buttons, lifted clear of the status strip
+        that now sits along the bottom edge of the drawing area ── */
+  .zoom-toolbar { bottom: 32px; padding: 4px 8px; gap: 2px; }
+  .zt-btn { font-size: 18px; padding: 7px 12px; min-width: 40px; }
+  .zt-label { font-size: 12px; min-width: 50px; }
+
+  /* ── simulation controls wrap instead of overflowing ── */
+  .sim-controls { flex-wrap: wrap; padding: 8px 10px; gap: 7px; }
+  .sim-controls .btn { min-height: 38px; }
+  .sim-legend { margin-left: 0; flex-basis: 100%; gap: 10px; }
+  #simSpeed { flex: 1; min-width: 90px; }
+
+  /* ── every modal goes full-screen; fixed widths do not fit a phone ── */
+  .gcode-box, .export-box {
+    width: 100%; max-width: 100%; height: 100%; max-height: 100%;
+    border-radius: 0; border: none;
+  }
+  .gcode-modal, .export-modal { align-items: stretch; justify-content: stretch; }
+  .gcode-header, .export-header { padding-top: calc(14px + env(safe-area-inset-top)); }
+  .gcode-footer, .export-footer {
+    flex-wrap: wrap; padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+  .gcode-footer .btn, .export-footer .btn { min-height: 42px; }
+  .export-grid { grid-template-columns: repeat(2, 1fr); }
+  .exp-btn { padding: 13px 6px; }
+  #ltModal .lt-box { width: 100vw; height: 100vh; height: 100dvh; border-radius: 0; }
+
+  /* ── floating panels sized to the screen, not to a desktop column ── */
+  .hist-panel { left: 8px; right: 8px; width: auto; max-height: 68vh; top: 58px; }
+  .hist-item { padding: 10px 9px; font-size: 12.5px; }
+  .restore-bar {
+    left: 8px; right: 8px; transform: none; max-width: none; flex-wrap: wrap;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+  .restore-bar button { flex: 1 1 auto; min-height: 40px; }
+}
+
+@media (max-width: 400px) {
+  .header-title { font-size: 12px; }
+  .hdr-btn { width: 34px; height: 34px; }
+  .sidebar { width: 92vw; }
+  .stats-ov, .sheet-info-ov { max-width: 70vw; }
+}
+
+/* A phone in landscape has almost no height — give it back to the drawing. */
+@media (max-height: 460px) and (orientation: landscape) {
+  header { padding-top: 4px; padding-bottom: 4px; }
+  .logo, .header-sub { display: none; }
+  .tab-btn { padding: 7px 12px; }
+  .bottom-bar { padding-top: 5px; padding-bottom: 5px; }
+  .bottom-bar .btn { min-height: 36px; }
 }
 </style>
 </head>
@@ -696,6 +830,8 @@ pre.gcode-content {
 </header>
 
 <div class="app-body">
+
+  <div class="sb-backdrop" id="sbBackdrop" aria-hidden="true"></div>
 
   <!-- ═══ SIDEBAR ═══ -->
   <div class="sidebar mode-design">
@@ -3725,7 +3861,7 @@ function generateSpecialXYPattern(o, emit) {
 // first line, and in every export filename — so a file and a screenshot
 // always say which build produced them. Several rounds have been lost
 // analysing output from a stale copy of this page.
-const BUILD_TAG = '27Aug-b41';
+const BUILD_TAG = '27Aug-b42';
 
 const MAX_SHAPES_UI = 200000;   // raised: the grid loop no longer wastes iterations
 function updateSpacingNote() {
@@ -11290,8 +11426,91 @@ function download(name, content, mime) {
   return FILESAVE.save(name, content, mime);
 }
 
+// ══════════════════════════════════════════════════════════════
+// ── Mobile / touch UI ────────────────────────────────────────
+// The layout below 1024px turns the sidebar into a drawer that floats over
+// the drawing. On a phone that drawer is ~86vw, so leaving it open on load
+// buried the preview — which is exactly what the screen is for. It now starts
+// closed, dims the drawing while open, and closes on a backdrop tap, on Esc,
+// and whenever a main tab is chosen.
+// ══════════════════════════════════════════════════════════════
+const MOBILE_Q = '(max-width: 1024px)';
+function isSmallScreen() {
+  return !!(window.matchMedia && window.matchMedia(MOBILE_Q).matches);
+}
+
+const SIDEBAR = (() => {
+  const el  = () => document.querySelector('.sidebar');
+  const bd  = () => document.getElementById('sbBackdrop');
+  const btn = () => document.getElementById('btnSidebarToggle');
+
+  function isOpen() { const e = el(); return !!e && !e.classList.contains('hidden'); }
+
+  function sync() {
+    const open = isOpen(), small = isSmallScreen();
+    const b = bd();
+    // The backdrop only belongs to the small-screen drawer. On a desktop the
+    // sidebar sits in the flow and must never be dimmed over.
+    if (b) b.classList.toggle('show', open && small);
+    const t = btn();
+    if (t) { t.classList.toggle('active', open); t.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  }
+
+  function open()  { const e = el(); if (e) e.classList.remove('hidden'); sync(); }
+  function close() { const e = el(); if (e) e.classList.add('hidden');    sync(); }
+  function toggle(){ isOpen() ? close() : open(); }
+
+  // Crossing the breakpoint (rotation, desktop resize) must not strand the
+  // drawer: widening back to desktop always restores the docked sidebar.
+  function onBreakpoint() { if (!isSmallScreen()) open(); else close(); }
+
+  return { open, close, toggle, sync, isOpen, onBreakpoint };
+})();
+
+function initMobileUI() {
+  // Start closed on a phone so the first thing visible is the drawing.
+  if (isSmallScreen()) SIDEBAR.close(); else SIDEBAR.sync();
+
+  const bd = document.getElementById('sbBackdrop');
+  if (bd) bd.addEventListener('click', () => SIDEBAR.close());
+
+  // Choosing a view is a "done with the controls" gesture.
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.addEventListener('click', () => { if (isSmallScreen()) SIDEBAR.close(); });
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && isSmallScreen() && SIDEBAR.isOpen()) SIDEBAR.close();
+  });
+
+  if (window.matchMedia) {
+    const mq = window.matchMedia(MOBILE_Q);
+    const h  = () => SIDEBAR.onBreakpoint();
+    if (mq.addEventListener) mq.addEventListener('change', h);
+    else if (mq.addListener) mq.addListener(h);
+  }
+
+  // The stats overlay is seven rows of numbers parked on top of the pattern.
+  // Folded to one row by default on a phone; tap to open, tap to fold.
+  const ov = document.getElementById('statsOv');
+  if (ov) {
+    if (isSmallScreen()) ov.classList.add('mini');
+    ov.addEventListener('click', () => {
+      if (isSmallScreen()) ov.classList.toggle('mini');
+    });
+  }
+}
+
 window.addEventListener('resize', () => {
-  if (S.image) { fitCanvases(); scheduleRender(60); }
+  // Used to refit only when a photo was loaded. A procedural pattern has no
+  // S.image at all, so rotating a phone left the canvas at the old size and
+  // the drawing sat half off-screen until something else forced a redraw.
+  try { fitCanvases(); } catch (e) {}
+  scheduleRender(60);
+});
+// iOS fires resize before the new viewport size is readable; re-run after.
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => { try { fitCanvases(); } catch (e) {} scheduleRender(60); }, 320);
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -13670,10 +13889,8 @@ const HISTORY = {
 
     // ── Sidebar toggle (small screens) ──
     const sbBtn = $('btnSidebarToggle');
-    if (sbBtn) sbBtn.addEventListener('click', () => {
-      const sb = document.querySelector('.sidebar');
-      if (sb) { sb.classList.toggle('hidden'); sbBtn.classList.toggle('active', !sb.classList.contains('hidden')); }
-    });
+    if (sbBtn) sbBtn.addEventListener('click', () => SIDEBAR.toggle());
+    initMobileUI();
 
     // ── Undo / redo ──
     $('btnUndo').addEventListener('click', () => HISTORY.undo());
