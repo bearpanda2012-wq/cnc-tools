@@ -8842,6 +8842,147 @@ function dxfHeader(layers){
   s+='0\nENDSEC\n';
   return s;
 }
+/** R12 TEXT, centred on a point (72=1 centre, 73=2 middle).
+ *  When 72/73 are non-zero R12 reads the position from 11/21, not 10/20 —
+ *  both are written to the same point so either reader lands in the same place. */
+function _dxfCenterText(cx, cy, h, str, layer){
+  const X=(+cx).toFixed(3), Y=(+cy).toFixed(3);
+  return `0\nTEXT\n8\n${layer}\n10\n${X}\n20\n${Y}\n40\n${(+h).toFixed(3)}\n1\n${str}\n`
+       + `72\n1\n73\n2\n11\n${X}\n21\n${Y}\n`;
+}
+/** The piece's own code and size — "No.5" over "523 x 2400" — centred on the piece,
+ *  exactly what the on-screen preview draws. Goes on its own LABEL layer so it is
+ *  never mistaken for cutting geometry; freeze that layer to hide it.
+ *  Height is fitted to the piece: a narrow part gets text that still fits across it.
+ *  Parts too small to hold legible text are left unlabelled rather than scribbled on. */
+const LBL_W = 0.72;      // R12 txt advance width per unit of height
+const LBL_MIN = 2.0;     // mm — below this the text is unreadable, so skip it
+const LBL_MAX = 60;      // mm — annotation, not a billboard: a 2400mm panel would
+                         //      otherwise carry 150mm lettering across its face
+/** Is (x,y) inside this ring? Even-odd crossing count, piece-local coords. */
+function _ptInRing(x, y, ring){
+  let ins=false;
+  for(let i=0, j=ring.length-1; i<ring.length; j=i++){
+    const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+    if((yi>y)!==(yj>y) && x < (xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi) ins=!ins;
+  }
+  return ins;
+}
+/** Where the label may sit, in piece-local coords: {x, y, w, h}.
+ *  A rectangle's centre is on the material, so that is used directly and the
+ *  output is unchanged. An L, a C or a frame has its bounding-box centre in
+ *  thin air — the label was printed into the cut-out. For those, scan rows
+ *  across the part, take the widest run of solid material, and anchor there. */
+function _labelAnchor(item){
+  const w=+item.w, h=+item.h;
+  const ring=item.rotatedVerts || item.vertices;
+  const holes=(item.holes||[]).filter(o=>!o.isText && !o.open && o.vertices && o.vertices.length>=3);
+  const solid=(x,y)=> _ptInRing(x,y,ring) && !holes.some(o=>_ptInRing(x,y,o.vertices));
+  if(!ring || ring.length<3) return {x:w/2, y:h/2, w, h, solid:null};
+  if(solid(w/2, h/2)) return {x:w/2, y:h/2, w, h, solid};   // convex / rectangular: unchanged
+
+  const xsAt=(y, poly)=>{
+    const xs=[];
+    for(let i=0, j=poly.length-1; i<poly.length; j=i++){
+      const xi=poly[i][0], yi=poly[i][1], xj=poly[j][0], yj=poly[j][1];
+      if((yi>y)!==(yj>y)) xs.push((xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi);
+    }
+    return xs.sort((a,b)=>a-b);
+  };
+  const ROWS=41;
+  let best=null;
+  for(let r=1; r<ROWS; r++){
+    const y=h*r/ROWS;
+    const xs=xsAt(y, ring);
+    for(let k=0; k+1<xs.length; k+=2){
+      let segs=[[xs[k], xs[k+1]]];
+      for(const o of holes){                       // carve the holes out of the run
+        const hx=xsAt(y, o.vertices), next=[];
+        for(const [a,b] of segs){
+          let parts=[[a,b]];
+          for(let m=0; m+1<hx.length; m+=2){
+            const [ha,hb]=[hx[m],hx[m+1]], np=[];
+            for(const [pa,pb] of parts){
+              if(hb<=pa || ha>=pb){ np.push([pa,pb]); continue; }
+              if(ha>pa) np.push([pa,ha]);
+              if(hb<pb) np.push([hb,pb]);
+            }
+            parts=np;
+          }
+          next.push(...parts);
+        }
+        segs=next;
+      }
+      for(const [a,b] of segs){
+        const wid=b-a;
+        // widest run wins; ties go to the row nearest the middle of the part
+        const score = wid - Math.abs(y-h/2)*1e-3;
+        if(!best || score>best.score) best={score, x:(a+b)/2, y, w:wid};
+      }
+    }
+  }
+  if(!best) return {x:w/2, y:h/2, w, h, solid};
+  // How tall the solid column is at that anchor, and where its middle is — the
+  // scan row itself can sit near the edge of a thin arm, which pushed the second
+  // line straight off the material.
+  let up=0, dn=0; const stp=h/ROWS;
+  while(up<h && solid(best.x, best.y-up-stp)) up+=stp;
+  while(dn<h && solid(best.x, best.y+dn+stp)) dn+=stp;
+  return {x:best.x, y:best.y+(dn-up)/2, w:best.w, h:Math.max(stp, up+dn), solid};
+}
+function _pieceLabel(item, ix, iyTop){
+  const W=+item.w, H=+item.h;
+  if(!(W>0 && H>0)) return '';
+  const a=_labelAnchor(item);
+  const w=a.w, h=a.h;
+  const name=String(item.name==null?'':item.name).trim();
+  // The SIZE shown is always the part's real overall size, never the local run
+  const size=`${Math.round(W*10)/10} x ${Math.round(H*10)/10}`;
+  if(!name && !size) return '';
+  // anchor is piece-local Y-down; DXF is Y-up from the piece's top edge
+  const cx=ix + a.x, cy=iyTop - a.y;
+  // Fit across the piece, stay proportionate to BOTH sides, and never exceed
+  // the absolute cap. A long thin part is governed by its width, a small part
+  // by its height, a big panel by the cap.
+  const fit=(str,cap)=> Math.min(cap, (w*0.86)/Math.max(1,str.length*LBL_W));
+  const cap1 = name ? fit(name, Math.min(h*0.18, w*0.18, LBL_MAX)) : 0;
+  const cap2 = fit(size, Math.min(h*0.12, LBL_MAX*0.67, cap1 ? cap1*0.72 : LBL_MAX*0.67));
+
+  // Does a line of this height, at this offset, sit entirely on material?
+  // Checked rather than assumed: a slanted or L-shaped part is far smaller than
+  // its bounding box, and an offset that looks fine against the box runs off the
+  // real edge. Local Y is down.
+  const fits=(dy, th, str)=>{
+    if(!(th>=LBL_MIN)) return false;
+    if(!a.solid) return true;                    // rectangle: the box IS the part
+    const half=str.length*th*LBL_W/2;
+    for(const yy of [a.y-dy-th*0.55, a.y-dy, a.y-dy+th*0.55])
+      for(const xx of [a.x-half, a.x-half/2, a.x, a.x+half/2, a.x+half])
+        if(!a.solid(xx, yy)) return false;
+    return true;
+  };
+  // Largest height that still lands on material. Shrinking beats giving up: a
+  // triangle refusing its label outright is worse than a smaller one that fits.
+  const best=(dy, cap, str)=>{
+    if(!(cap>=LBL_MIN) || !str) return 0;
+    if(fits(dy, cap, str)) return cap;
+    let lo=LBL_MIN, hi=cap, got=0;
+    for(let i=0;i<10;i++){
+      const mid=(lo+hi)/2;
+      if(fits(dy*(mid/cap), mid, str)){ got=mid; lo=mid; } else hi=mid;
+    }
+    return got;
+  };
+  let h1=best(cap1*0.62, cap1, name);
+  let h2=best(-cap2*0.80, cap2, size);
+  if(h1>=LBL_MIN && h2>=LBL_MIN)
+    return _dxfCenterText(cx, cy + h1*0.62, h1, name, 'LABEL')
+         + _dxfCenterText(cx, cy - h2*0.80, h2, size, 'LABEL');
+  // No room for two lines — one centred line, as large as the part allows.
+  const c1=best(0, cap1, name); if(c1>=LBL_MIN) return _dxfCenterText(cx, cy, c1, name, 'LABEL');
+  const c2=best(0, cap2, size); if(c2>=LBL_MIN) return _dxfCenterText(cx, cy, c2, size, 'LABEL');
+  return '';
+}
 function dxfItemPaths(item, offX, offY, sh){
   let s='';
   const ix=(offX||0)+item.x;
@@ -8908,9 +9049,13 @@ function dxfItemPaths(item, offX, offY, sh){
     // Rectangle fallback: bottom-left in DXF Y-up = iyTop - item.h
     s+=dxfRectShape(ix, iyTop-item.h, item.w, item.h, 'CUT');
   }
+  // The code and size the preview shows on the piece were drawn on screen only
+  // and never reached the file — the one thing you need to tell two parts apart
+  // on the shop floor. Emitted for outline pieces and rectangles alike.
+  s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k2';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k3';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
@@ -8940,7 +9085,7 @@ function buildDXFSingle(groupIdx){
   if(!nestResult) return null;
   const {sheetGroups,sw,sh}=nestResult;
   const g=sheetGroups[groupIdx]; if(!g) return null;
-  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2};
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
   entities+=dxfRectShape(0,0,sw,sh,'SHEET');
@@ -8954,7 +9099,7 @@ function buildDXF(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return null; }
   const {sheetGroups,sw,sh}=nestResult;
   const GAP=150;
-  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2};
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
   sheetGroups.forEach((g,li)=>{
