@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k4</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k5</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -8977,10 +8977,10 @@ function _pieceLabel(item, ix, iyTop){
   let h2=best(-cap2*0.80, cap2, size);
   if(h1>=LBL_MIN && h2>=LBL_MIN)
     return _dxfCenterText(cx, cy + h1*0.62, h1, name, 'LABEL')
-         + _dxfCenterText(cx, cy - h2*0.80, h2, size, 'LABEL');
+         + _dxfCenterText(cx, cy - h2*0.80, h2, size, 'LABEL_SIZE');
   // No room for two lines — one centred line, as large as the part allows.
   const c1=best(0, cap1, name); if(c1>=LBL_MIN) return _dxfCenterText(cx, cy, c1, name, 'LABEL');
-  const c2=best(0, cap2, size); if(c2>=LBL_MIN) return _dxfCenterText(cx, cy, c2, size, 'LABEL');
+  const c2=best(0, cap2, size); if(c2>=LBL_MIN) return _dxfCenterText(cx, cy, c2, size, 'LABEL_SIZE');
   return '';
 }
 function dxfItemPaths(item, offX, offY, sh){
@@ -9055,7 +9055,7 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k4';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k5';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
@@ -9085,7 +9085,7 @@ function buildDXFSingle(groupIdx){
   if(!nestResult) return null;
   const {sheetGroups,sw,sh}=nestResult;
   const g=sheetGroups[groupIdx]; if(!g) return null;
-  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4};
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
   entities+=dxfRectShape(0,0,sw,sh,'SHEET');
@@ -9099,7 +9099,7 @@ function buildDXF(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return null; }
   const {sheetGroups,sw,sh}=nestResult;
   const GAP=150;
-  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4};
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
   sheetGroups.forEach((g,li)=>{
