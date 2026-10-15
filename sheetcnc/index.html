@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k9</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k10</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -1100,7 +1100,7 @@ function _codesOf(holes){
 /** Natural compare: "35-6" < "35-10" < "36-5". */
 function _natCmp(a,b){ return String(a).localeCompare(String(b), undefined, {numeric:true, sensitivity:'base'}); }
 // What goes into an exported DXF — chosen in the export dialog, remembered per browser.
-const DXF_OPT_DEF={holes:true, frame:true, code:true, name:false, size:true, titles:true};
+const DXF_OPT_DEF={holes:true, frame:true, code:true, name:false, size:true, titles:true, remnant:false};
 let DXF_OPT=(()=>{ try{ const v=JSON.parse(localStorage.getItem('sheetcnc_dxfopt')||'null');
   return Object.assign({}, DXF_OPT_DEF, v||{}); }catch(e){ return Object.assign({}, DXF_OPT_DEF); } })();
 function _saveDxfOpt(){ try{ localStorage.setItem('sheetcnc_dxfopt', JSON.stringify(DXF_OPT)); }catch(e){} }
@@ -4999,7 +4999,7 @@ function runNesting(){
       '<div style="font-size:1.6rem;margin-bottom:8px">⚙️</div>'+
       '<div id="nestBusyMsg" style="font-size:1rem"></div>'+
       '<div style="font-size:.8rem;opacity:.65;margin-top:8px;font-weight:500">'+
-      (lang==='en'?'this can take a few seconds — please wait':'อาจใช้เวลาสักครู่ กรุณารอ')+'</div></div>';
+      (lang==='en'?'up to ~8 seconds — also trying to free up a sheet':'ใช้เวลาไม่เกินประมาณ 8 วินาที — กำลังลองลดจำนวนแผ่น')+'</div></div>';
     document.body.appendChild(ov);
   }
   ov.style.display='flex';
@@ -5071,19 +5071,26 @@ function _runNestingSync() {
     wide:  (a,b)=>b.w-a.w,                                   // widest first (row packing)
     perim: (a,b)=>(b.w+b.h)-(a.w+a.h)
   };
-  const runPass=(rot,sortKey)=>{
-    const list=items.slice().sort(SORTS[sortKey]||SORTS.area);
+  // One packing pass. `order` (optional) = explicit item order; `deadline` (ms
+  // timestamp, optional) aborts the pass → null, so one slow pass can no longer
+  // blow the whole time budget (a 1° pass alone took 23 s on 22 toothed parts).
+  const runPass=(rot,sortKey,deadline,order)=>{
+    const list=order ? order.slice() : items.slice().sort(SORTS[sortKey]||SORTS.area);
     const out=[];
     for(const item of list){
-      let placed=false;
+      if(deadline && Date.now()>deadline) return null;
+      let target=null;
       for(const sheet of out){
-        if(place(item,sheet,sw,sh,edgeMargin,pieceGap,rot)){ placed=true; break; }
+        if(place(item,sheet,sw,sh,edgeMargin,pieceGap,rot)){ target=sheet; break; }
       }
-      if(!placed){
+      if(!target){
         const ns={ items:[] };
         out.push(ns);
         if(!place(item,ns,sw,sh,edgeMargin,pieceGap,rot)) out.pop();   // too large
+        else target=ns;
       }
+      // remember which item each placement came from (non-enumerable: never saved/exported)
+      if(target) Object.defineProperty(target.items[target.items.length-1],'__src',{value:item,enumerable:false});
     }
     return out;
   };
@@ -5091,23 +5098,52 @@ function _runNestingSync() {
   const scoreOf=sheets=>{
     let used=0, placed=0;
     sheets.forEach(s=>{ s.items.forEach(it=>{ used+=it.w*it.h; placed++; }); });
-    const lastFill=sheets.length? (sheets[sheets.length-1].items.length/Math.max(1,items.length)) : 0;
+    // emptiest sheet's share of the work (smaller = closer to freeing a sheet)
+    const fills=sheets.map(s=>s.items.reduce((a,it)=>a+it.w*it.h,0));
+    const lastFill=sheets.length? Math.min(...fills)/Math.max(1,used) : 0;
     return { sheets:sheets.length, placed, used, lastFill };
   };
   const better=(a,b)=>{                                   // is a better than b?
     if(!b) return true;
     if(a.placed!==b.placed) return a.placed>b.placed;     // place as many as possible
     if(a.sheets!==b.sheets) return a.sheets<b.sheets;     // then fewer sheets
-    return a.lastFill<b.lastFill;                          // then emptier final sheet
+    return a.lastFill<b.lastFill-1e-9;                     // then emptier weakest sheet
+  };
+  // Deterministic RNG → the same job always gives the same layout.
+  let _seed=items.length*7919+Math.round(sw*3+sh*7+pieceGap*11+edgeMargin*13)||1;
+  const rnd=()=>{ _seed=(_seed*16807)%2147483647; return _seed/2147483647; };
+  // ── IMPROVE: try to empty the weakest sheet ─────────────────────────────────
+  // First-fit can't undo an early greedy choice. Re-pack with the pieces from the
+  // emptiest sheet moved to the FRONT (they get first pick of space), plus a little
+  // size jitter on the rest. Fewer sheets / emptier last sheet wins. Measured on
+  // T35-42 (22 toothed parts, 2440×1220): 6 sheets → 5.
+  const improve=(best, bestScore, rot, until)=>{
+    let tries=0;
+    while(Date.now()<until){
+      const weak=best.reduce((m,S)=>{ const f=S.items.reduce((a,it)=>a+it.w*it.h,0); return (!m||f<m.f)?{S,f}:m; },null);
+      const front=(weak?weak.S.items:[]).map(it=>it.__src).filter(Boolean);
+      const rest=items.filter(it=>!front.includes(it));
+      const j=tries===0?0:0.35;
+      const key=new Map(rest.map(it=>[it,(it.w*it.h)*(1-j+2*j*rnd())]));
+      rest.sort((a,b)=>key.get(b)-key.get(a));
+      const fk=new Map(front.map(it=>[it,(it.w*it.h)*(1-j+2*j*rnd())]));
+      front.sort((a,b)=>fk.get(b)-fk.get(a));
+      const order = (tries%3===2) ? [...items.slice().sort((a,b)=>(b.w*b.h)*(0.7+0.6*rnd())-(a.w*a.h)*(0.7+0.6*rnd()))]
+                                  : [...front, ...rest];
+      const res=runPass(rot,null,until,order); tries++;
+      if(!res) break;
+      const sc=scoreOf(res);
+      if(better(sc,bestScore)){ best=res; bestScore=sc; }
+      if(bestScore.sheets<=1) break;
+    }
+    return {best, bestScore, tries};
   };
 
   let sheets, autoInfo=null;
+  const t0=Date.now();
   if(rotMode==='auto'){
-    // 🤖 Try several strategies and keep the best. The search size adapts to the
-    // number of pieces so big jobs still finish quickly.
+    // 🤖 Try several strategies and keep the best, inside ONE time budget.
     const n=items.length;
-    // Combos are ordered by expected pay-off so the best candidates run FIRST —
-    // if the time budget runs out, we still keep a strong result.
     const combos=[];
     const push=(r,s)=>combos.push([r,s]);
     push('rot90','area');                                 // cheapest — always a result fast
@@ -5115,31 +5151,45 @@ function _runNestingSync() {
     if(n<=60) push('free1','area');                       // 1° search only on smaller jobs
     if(n<=200) push('rot45','area');
     push('none','area');
-    for(const s of ['long','tall','wide']){               // alternative orderings
+    for(const s of ['long','tall','wide']){
       push('rot90',s);
       if(n<=200) push('free',s);
       if(n<=30)  push('free1',s);
       if(n<=100) push('rot45',s);
     }
-    let best=null, bestScore=null, tried=0;
-    // The page cannot repaint while this runs, so a long search reads as a freeze.
-    // Budget the whole search, and stop starting passes that clearly will not fit.
-    const t0=Date.now(), BUDGET=8000;
-    let slowest=0;
+    let best=null, bestScore=null, tried=0, bestRot='rot90';
+    const BUDGET=8000, SEARCH=5000;                       // ≤5 s strategies, rest → improve
+    const passMs={};
     for(const [r,s] of combos){
-      const left=BUDGET-(Date.now()-t0);
-      if(left<=0 || (tried>0 && slowest>left)) break;     // no time for another pass
+      const left=SEARCH-(Date.now()-t0);
+      if(left<=0) break;
+      // free1 = ~ NEST_ANGLE_STEP/1 × the work of 'free'; skip when it clearly won't fit
+      const est = r==='free1' && passMs.free ? passMs.free*Math.max(4, 12/Math.max(1,NEST_ANGLE_STEP)) : (passMs[r]||0);
+      if(est>left) continue;
       const tp=Date.now();
-      const res=runPass(r,s); const sc=scoreOf(res); tried++;
-      slowest=Math.max(slowest, Date.now()-tp);
-      if(better(sc,bestScore)){ bestScore=sc; best=res; autoInfo={rot:r,sort:s,...sc}; }
-      // Perfect result (everything on one sheet) → no need to keep searching
+      const res=runPass(r,s,t0+SEARCH); if(!res) continue;   // aborted at the deadline
+      const sc=scoreOf(res); tried++;
+      passMs[r]=Math.max(passMs[r]||0, Date.now()-tp);
+      if(better(sc,bestScore)){ bestScore=sc; best=res; bestRot=r; autoInfo={rot:r,sort:s,...sc}; }
       if(sc.sheets<=1 && sc.placed===items.length) break;
     }
-    sheets = best || runPass('rot90','area');
+    if(!best){ best=runPass('rot90','area'); bestScore=scoreOf(best); bestRot='rot90'; autoInfo={rot:'rot90',sort:'area',...bestScore}; }
+    if(bestScore.sheets>1){
+      const before=bestScore.sheets;
+      const r=improve(best,bestScore,bestRot,t0+BUDGET);
+      if(r.best!==best){ best=r.best; bestScore=r.bestScore; autoInfo={...autoInfo, ...r.bestScore, improved:before-r.bestScore.sheets}; }
+      tried+=r.tries;
+    }
+    sheets = best;
     if(autoInfo){ autoInfo.tried=tried; autoInfo.ms=Date.now()-t0; }
   } else {
     sheets = runPass(rotMode,'area');
+    // Same "empty the weakest sheet" search for a fixed rotation mode, short budget.
+    const sc=scoreOf(sheets);
+    if(sheets.length>1){
+      const r=improve(sheets,sc,rotMode,Date.now()+3500);
+      sheets=r.best;
+    }
   }
 
   const sheetGroups=deduplicateSheets(sheets);
@@ -5184,7 +5234,11 @@ function _gridInit(sw, sh, edgeMargin, pieceGap){
 /** Precompute scanline spans for a polygon in local (0,0) grid coords */
 function _polySpans(verts, mm){
   const n=verts.length;
-  const GX=verts.map(([x])=>x/mm), GY=verts.map(([,y])=>y/mm);
+  // Snap float noise (rotation leaves 1e-9 on a top edge): a top edge at 0.000000001
+  // instead of 0 skipped the piece's whole first row, so the grid let it 1 mm too
+  // close (6.00 mm when 7 was set).
+  const sn=v=>{ const r=Math.round(v); return Math.abs(v-r)<1e-6 ? r : v; };
+  const GX=verts.map(([x])=>sn(x/mm)), GY=verts.map(([,y])=>sn(y/mm));
   const y0=Math.floor(Math.min(...GY)), y1=Math.ceil(Math.max(...GY));
   const spans=[];
   for(let dgy=y0;dgy<=y1;dgy++){
@@ -5275,6 +5329,54 @@ function _dirFree(A, B, ux, uy, T, gap){
   }
   void ex; void ey;
   return best;
+}
+
+/** Usable leftover rectangles on a nested sheet (y-down, mm). Built on its own 5 mm
+ *  bitmap — a cell counts as used if any part, plus the piece gap around it, or the
+ *  edge margin touches it — so the sizes are conservative (never promise material
+ *  that isn't there). Up to `max` non-overlapping rectangles, biggest first. */
+const REM_MIN=150;      // mm — shorter side below this is scrap, not worth listing
+function _remnants(sheet, sw, sh, edge, gap, max=3){
+  if(!sheet||!sheet.items) return [];
+  if(sheet.__rem) return sheet.__rem;
+  const C=5, gw=Math.ceil(sw/C), gh=Math.ceil(sh/C);
+  const occ=new Uint8Array(gw*gh);
+  const ke=Math.ceil((edge||0)/C), kg=Math.ceil((gap||0)/C);
+  for(let y=0;y<gh;y++) for(let x=0;x<gw;x++)
+    if(x<ke||y<ke||x>=gw-ke||y>=gh-ke || (x+1)*C>sw || (y+1)*C>sh) occ[y*gw+x]=1;
+  for(const it of sheet.items){
+    const v=(it.rotatedVerts||it.vertices||[[0,0],[it.w,0],[it.w,it.h],[0,it.h]]).map(([a,b])=>[a+it.x,b+it.y]);
+    const sp=_polySpans(v,C);
+    for(const [gy,xa,xb] of sp){
+      for(let r=Math.max(0,gy-1-kg); r<=Math.min(gh-1,gy+kg); r++){
+        const x0=Math.max(0,Math.floor(xa)-kg), x1=Math.min(gw-1,Math.ceil(xb)+kg);
+        for(let x=x0;x<=x1;x++) occ[r*gw+x]=1;
+      }
+    }
+  }
+  const out=[], hgt=new Int32Array(gw);
+  for(let k=0;k<max;k++){
+    hgt.fill(0); let best=null;
+    for(let y=0;y<gh;y++){
+      for(let x=0;x<gw;x++) hgt[x]=occ[y*gw+x]?0:hgt[x]+1;
+      const st=[];                                   // largest rectangle in histogram
+      for(let x=0;x<=gw;x++){
+        const hh=x<gw?hgt[x]:0; let start=x;
+        while(st.length && st[st.length-1][1]>=hh){
+          const [sx,sh2]=st.pop();
+          const wC=x-sx, a=wC*sh2;
+          if(sh2>0 && (!best||a>best.a) && Math.min(wC,sh2)*C>=REM_MIN) best={a,x:sx,y:y-sh2+1,w:wC,h:sh2};
+          start=sx;
+        }
+        st.push([start,hh]);
+      }
+    }
+    if(!best) break;
+    out.push({x:best.x*C, y:best.y*C, w:best.w*C, h:best.h*C});
+    for(let y=best.y;y<best.y+best.h;y++) for(let x=best.x;x<best.x+best.w;x++) occ[y*gw+x]=1;
+  }
+  Object.defineProperty(sheet,'__rem',{value:out,enumerable:false,configurable:true});
+  return out;
 }
 /** Minimum edge-to-edge distance between two polygons (0 when they touch/overlap).
  *  `limit` (optional): only distances below it matter — anything larger may be
@@ -5845,6 +5947,19 @@ function drawSheetOnCanvas(canvas, sheet, sw, sh, {pad=4, maxW=null, maxH=null, 
     }
   });
 
+  // Usable leftover (detail view only): dashed outline + size
+  if(showLabels && nestResult){
+    _remnants(sheet, sw, sh, nestResult.edgeMargin, nestResult.pieceGap).forEach((r,k)=>{
+      const rx=ox+r.x*scale, ry=oy+r.y*scale, rw=r.w*scale, rh=r.h*scale;
+      ctx.save(); ctx.setLineDash([6,4]); ctx.strokeStyle='#facc15aa'; ctx.lineWidth=1.2;
+      ctx.strokeRect(rx+1,ry+1,rw-2,rh-2); ctx.setLineDash([]);
+      ctx.fillStyle='#facc1512'; ctx.fillRect(rx+1,ry+1,rw-2,rh-2);
+      const fs=Math.max(9,Math.min(13,rw/10,rh/3));
+      ctx.font=`600 ${fs}px Segoe UI,sans-serif`; ctx.fillStyle='#fde047'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(`${lang==='en'?'Offcut':'เศษ'} ${k+1}: ${r.w}×${r.h}`, rx+rw/2, ry+rh/2);
+      ctx.restore();
+    });
+  }
   // Footer & badge (detail view only)
   if(showLabels && group){
     ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='9px Segoe UI,sans-serif';
@@ -8841,10 +8956,12 @@ function _reportRows(){
   // Real outline area, not the bounding box. Rotated or curved parts have boxes
   // that overlap heavily, and summing those reported 194% efficiency on one sheet.
   const areaOf=it=>{ const p=pieces.find(x=>x.id===it.pieceId); return p?pieceArea(p):(+it.w*+it.h); };
-  const sum=[[th?'Layout':'แบบ', th?'Sheets':'จำนวนแผ่น', th?'Pieces/sheet':'ชิ้น/แผ่น', th?'Efficiency %':'ประสิทธิภาพ %']];
+  const sum=[[th?'Layout':'แบบ', th?'Sheets':'จำนวนแผ่น', th?'Pieces/sheet':'ชิ้น/แผ่น', th?'Efficiency %':'ประสิทธิภาพ %',
+              th?'Usable offcuts (mm)':'เศษที่ใช้ต่อได้ (mm)']];
   sheetGroups.forEach(g=>{
     const eff=(g.sheet.items.reduce((s,it)=>s+areaOf(it),0)/(sw*sh)*100);
-    sum.push([`Layout ${g.label}`, g.count, g.sheet.items.length, +eff.toFixed(1)]);
+    const rem=_remnants(g.sheet, sw, sh, nestResult.edgeMargin, nestResult.pieceGap).map(r=>`${r.w}x${r.h}`).join(' , ');
+    sum.push([`Layout ${g.label}`, g.count, g.sheet.items.length, +eff.toFixed(1), rem||'-']);
   });
   sum.push([]);
   sum.push([th?'Sheet size':'ขนาดแผ่น', `${sw} x ${sh} mm`]);
@@ -9035,6 +9152,7 @@ function openDxfExportDialog(mode){
     ${row('code', en?'Part code (text from the file)':'รหัสชิ้นงาน (ตัวอักษรจากไฟล์)', en?'e.g. 36-5 — kept exactly where the file has it':'เช่น 36-5 — ตำแหน่งตามไฟล์ต้นฉบับ', 'TEXT')}
     ${row('name', en?'Piece name':'ชื่อชิ้นงาน', en?'Name from the list (skipped when it equals the code)':'ชื่อจากรายการ (ไม่ใส่ซ้ำถ้าเหมือนรหัส)', 'LABEL')}
     ${row('size', en?'Piece size':'ขนาดชิ้นงาน', en?'e.g. 740 x 1340 — placed clear of the code':'เช่น 740 x 1340 — วางไม่ทับรหัส', 'LABEL_SIZE')}
+    ${row('remnant', en?'Usable offcuts':'เศษที่ใช้ต่อได้', en?'Outline + size of leftover areas (not for cutting)':'กรอบ + ขนาดพื้นที่เหลือ (ไม่ใช่เส้นตัด)', 'REMNANT')}
     ${row('titles', en?'Sheet titles & total':'หัวข้อแผ่น และสรุปจำนวน', en?'"Layout A | 2440 x 1220 | x1 sheet", TOTAL line':'"Layout A | 2440 x 1220 | x1 sheet" และบรรทัด TOTAL', 'SHEET')}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
       <button class="btn btn-ghost btn-sm" onclick="_dxfPreset('cut')">✂️ ${en?'Cut lines only':'เฉพาะเส้นตัด'}</button>
@@ -9048,8 +9166,8 @@ function openDxfExportDialog(mode){
   showEditPopup(en?'📐 DXF export — what to include':'📐 Export DXF — เลือกสิ่งที่จะใส่', body);
 }
 function _dxfPreset(k){
-  const v = k==='all' ? {holes:true,frame:true,code:true,name:true,size:true,titles:true}
-                      : {holes:true,frame:true,code:false,name:false,size:false,titles:false};
+  const v = k==='all' ? {holes:true,frame:true,code:true,name:true,size:true,titles:true,remnant:true}
+                      : {holes:true,frame:true,code:false,name:false,size:false,titles:false,remnant:false};
   Object.keys(v).forEach(n=>{ const el=document.getElementById('dxo_'+n); if(el) el.checked=v[n]; });
 }
 function _dxfDialogGo(mode){
@@ -9060,7 +9178,7 @@ function _dxfDialogGo(mode){
 /** Filename tag for a non-default selection, so two different exports never share a name. */
 function _dxfOptTag(){
   const o=DXF_OPT;
-  if(!o.code&&!o.name&&!o.size&&!o.titles) return '_cutonly';
+  if(!o.code&&!o.name&&!o.size&&!o.titles&&!o.remnant) return '_cutonly';
   return '';
 }
 function exportProjectMenu(){ closeExportMenu(); saveProject(); }
@@ -9278,8 +9396,16 @@ function _pieceLabel(item, ix, iyTop){
   }
   return pick?pick.out:'';
 }
+/** Small parts first: they are the ones that shift once the sheet around them is
+ *  cut loose. Ties keep the layout order. */
+function _cutOrder(items){
+  return items.map((it,k)=>({it,k,a:(+it.w)*(+it.h)})).sort((p,q)=>p.a-q.a||p.k-q.k).map(o=>o.it);
+}
 function dxfItemPaths(item, offX, offY, sh){
-  let s='';
+  // CUT ORDER for the machine: inner cuts (holes / slots) FIRST, then the outline —
+  // cutting the outline first frees the part and the inner cuts would run on a
+  // loose piece. Text/labels last (they are not cut).
+  let s='', outer='', txt='';
   const ix=(offX||0)+item.x;
   // Vertices are stored in canvas Y-down (vy=0=top).
   // DXF is Y-up: dxf_y = sh - canvas_item_y - vy
@@ -9296,10 +9422,10 @@ function dxfItemPaths(item, offX, offY, sh){
       // Stored bulges are Y-down (negated at import); negate again → original DXF sign
       const pts=rawV.map(v=>[ix+v.x, iyTop-v.y]);
       const bulges=rawV.map(v=>-v.b);
-      s+=dxfPolyline(pts,'CUT',closedFlag,bulges);
+      outer+=dxfPolyline(pts,'CUT',closedFlag,bulges);
     } else {
       const pts=verts.map(([vx,vy])=>[ix+vx, iyTop-vy]);
-      s+=dxfPolyline(pts,'CUT',closedFlag,null);
+      outer+=dxfPolyline(pts,'CUT',closedFlag,null);
     }
     if(item.holes?.length){
       item.holes.forEach(hole=>{
@@ -9330,7 +9456,7 @@ function dxfItemPaths(item, offX, offY, sh){
             if(tx.widthF!=null) out+=`41\n${(+tx.widthF).toFixed(4)}\n`;
             if(tx.style) out+=`7\n${tx.style}\n`;
             out+=`72\n${hj}\n11\n${p1[0]}\n21\n${p1[1]}\n`;
-            s+=out; return;
+            txt+=out; return;
           }
           const hjOut = hj;                       // 4 = Middle is valid R12 too
           // Re-emit as R12 TEXT preserving the ORIGINAL style: font (7), width
@@ -9345,7 +9471,7 @@ function dxfItemPaths(item, offX, offY, sh){
           if(hjOut) out+=`72\n${hjOut}\n`;
           if(hjOut||vj) out+=`11\n${ax}\n21\n${ay}\n`;   // alignment point for justified text
           if(vj) out+=`73\n${vj}\n`;
-          s+=out;
+          txt+=out;
           return;
         }
         if(!DXF_OPT.holes) return;
@@ -9369,10 +9495,11 @@ function dxfItemPaths(item, offX, offY, sh){
   // The code and size the preview shows on the piece were drawn on screen only
   // and never reached the file — the one thing you need to tell two parts apart
   // on the shop floor. Emitted for outline pieces and rectangles alike.
+  s+=outer+txt;
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k9';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k10';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
@@ -9399,32 +9526,46 @@ function _sheetTitle(offX, sw, sh, g){
   return _lbl(offX+margin,      baseY, h1, p1, 0)          // left-aligned
        + _lbl(offX+sw-margin,   baseY, h2, p2, 2, col);    // right-aligned to sheet edge
 }
+/** Offcut outlines on their own REMNANT layer (never CUT) — only when ticked. */
+function _dxfRemnants(sheet, offX, sw, sh){
+  if(!DXF_OPT.remnant || !nestResult) return '';
+  let o='';
+  _remnants(sheet, sw, sh, nestResult.edgeMargin, nestResult.pieceGap).forEach((r,k)=>{
+    const x=offX+r.x, y=sh-(r.y+r.h);
+    o+=dxfRectShape(x, y, r.w, r.h, 'REMNANT');
+    const th=Math.max(8, Math.min(40, r.w/14, r.h/4));
+    o+=_dxfCenterText(x+r.w/2, y+r.h/2, th, `OFFCUT ${k+1}: ${r.w} x ${r.h}`, 'REMNANT');
+  });
+  return o;
+}
 function buildDXFSingle(groupIdx){
   if(!nestResult) return null;
   const {sheetGroups,sw,sh}=nestResult;
   const g=sheetGroups[groupIdx]; if(!g) return null;
-  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30};
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30, REMNANT:8};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
   if(DXF_OPT.frame) entities+=dxfRectShape(0,0,sw,sh,'SHEET');
   entities+=_sheetTitle(0, sw, sh, g);
   // Summary line (left-aligned, further below so it never overlaps the titles)
   entities+=_lbl(20, -150, 40, `TOTAL: ${totalSheets} sheet${totalSheets>1?'s':''}`, 0);
-  g.sheet.items.forEach(item=>{ entities+=dxfItemPaths(item,0,0,sh); });
+  _cutOrder(g.sheet.items).forEach(item=>{ entities+=dxfItemPaths(item,0,0,sh); });
+  entities+=_dxfRemnants(g.sheet,0,sw,sh);
   return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
 }
 function buildDXF(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return null; }
   const {sheetGroups,sw,sh}=nestResult;
   const GAP=150;
-  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30};
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30, REMNANT:8};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
   sheetGroups.forEach((g,li)=>{
     const offX=li*(sw+GAP), offY=0;
     if(DXF_OPT.frame) entities+=dxfRectShape(offX,offY,sw,sh,'SHEET');
     entities+=_sheetTitle(offX, sw, sh, g);
-    g.sheet.items.forEach(item=>{ entities+=dxfItemPaths(item,offX,offY,sh); });
+    _cutOrder(g.sheet.items).forEach(item=>{ entities+=dxfItemPaths(item,offX,offY,sh); });
+    entities+=_dxfRemnants(g.sheet,offX,sw,sh);
   });
   // One overall summary, left-aligned below the first sheet. Spelling out every
   // layout makes it obvious at a glance whether the file is the combined export
