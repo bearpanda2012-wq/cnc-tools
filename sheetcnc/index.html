@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k8</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k9</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -245,8 +245,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
          box-shadow:0 12px 34px #000a;min-width:252px;padding:6px;text-align:left;">
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportExcel()">📊 Excel (.xlsx)</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportCSV()">📄 CSV รายการตัด (.csv)</button>
-      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportDXFmenu()">📐 DXF รวมทุก Layout</button>
-      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportDXFCutOnly()" title="เฉพาะเส้นตัด CUT / CUT_HOLE + กรอบแผ่น — ไม่มีตัวอักษรใด ๆ ปลอดภัยสำหรับ ArtCAM">✂️ DXF เฉพาะเส้นตัด (ไม่มีตัวอักษร)</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportDXFmenu()">📐 DXF รวมทุก Layout (เลือกสิ่งที่จะใส่)</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportSVG()">✒️ SVG (layout ที่เปิดอยู่)</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportImage('png')">🖼️ รูปภาพ PNG</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportImage('jpg')">🖼️ รูปภาพ JPG</button>
@@ -1100,7 +1099,11 @@ function _codesOf(holes){
 }
 /** Natural compare: "35-6" < "35-10" < "36-5". */
 function _natCmp(a,b){ return String(a).localeCompare(String(b), undefined, {numeric:true, sensitivity:'base'}); }
-let DXF_CUT_ONLY=false;   // export only cut geometry (+ sheet frame): no TEXT / LABEL / titles
+// What goes into an exported DXF — chosen in the export dialog, remembered per browser.
+const DXF_OPT_DEF={holes:true, frame:true, code:true, name:false, size:true, titles:true};
+let DXF_OPT=(()=>{ try{ const v=JSON.parse(localStorage.getItem('sheetcnc_dxfopt')||'null');
+  return Object.assign({}, DXF_OPT_DEF, v||{}); }catch(e){ return Object.assign({}, DXF_OPT_DEF); } })();
+function _saveDxfOpt(){ try{ localStorage.setItem('sheetcnc_dxfopt', JSON.stringify(DXF_OPT)); }catch(e){} }
 /** Full DXF parser — returns array of shape objects */
 /** Build a circle shape (smooth 4-bulge rawV so it exports as a true circle). */
 function _mkCircle(cx,cy,r,layer){
@@ -5223,6 +5226,56 @@ function _gridStamp(g, spans, gox, goy, ex){
   }
 }
 
+
+/** Segment-to-segment distance. */
+function _segDist(ax,ay,bx,by,cx,cy,dx,dy){
+  const pt=(px,py,x0,y0,x1,y1)=>{ const vx=x1-x0, vy=y1-y0, L=vx*vx+vy*vy;
+    let t=L?((px-x0)*vx+(py-y0)*vy)/L:0; t=t<0?0:t>1?1:t;
+    const qx=x0+t*vx-px, qy=y0+t*vy-py; return Math.sqrt(qx*qx+qy*qy); };
+  // proper intersection → 0
+  const o=(px,py,qx,qy,rx,ry)=>(qx-px)*(ry-py)-(qy-py)*(rx-px);
+  const d1=o(ax,ay,bx,by,cx,cy), d2=o(ax,ay,bx,by,dx,dy), d3=o(cx,cy,dx,dy,ax,ay), d4=o(cx,cy,dx,dy,bx,by);
+  if(((d1>0&&d2<0)||(d1<0&&d2>0)) && ((d3>0&&d4<0)||(d3<0&&d4>0))) return 0;
+  return Math.min(pt(ax,ay,cx,cy,dx,dy), pt(bx,by,cx,cy,dx,dy), pt(cx,cy,ax,ay,bx,by), pt(dx,dy,ax,ay,bx,by));
+}
+/** How far polygon A may translate along unit (ux,uy), up to T, while staying ≥ gap
+ *  from polygon B. EXACT per edge pair: the distance between two segments under a
+ *  translation is convex in t, so each pair either never drops below gap or drops
+ *  below it on one interval whose start is found by bisection. Unlike "clearance −
+ *  gap", a piece resting exactly `gap` from a neighbour BESIDE its path is not
+ *  frozen — that froze pieces 1 mm short (gaps read 6.00 when 5 was set). */
+function _dirFree(A, B, ux, uy, T, gap){
+  let best=T; if(!(T>0)) return 0;
+  const na=A.length, nb=B.length, R=gap+1e-9;
+  const ex=ux*T, ey=uy*T;
+  for(let i=0;i<na;i++){
+    const a0=A[i], a1=A[(i+1)%na];
+    // swept box of edge a over [0,best] + gap
+    const sx0=Math.min(a0[0],a1[0])+Math.min(0,ux*best)-gap, sx1=Math.max(a0[0],a1[0])+Math.max(0,ux*best)+gap;
+    const sy0=Math.min(a0[1],a1[1])+Math.min(0,uy*best)-gap, sy1=Math.max(a0[1],a1[1])+Math.max(0,uy*best)+gap;
+    for(let j=0;j<nb;j++){
+      const b0=B[j], b1=B[(j+1)%nb];
+      if(Math.max(b0[0],b1[0])<sx0||Math.min(b0[0],b1[0])>sx1||Math.max(b0[1],b1[1])<sy0||Math.min(b0[1],b1[1])>sy1) continue;
+      const f=t=>_segDist(a0[0]+ux*t,a0[1]+uy*t,a1[0]+ux*t,a1[1]+uy*t,b0[0],b0[1],b1[0],b1[1]);
+      const f0=f(0);
+      if(f0<R-1e-6){ return 0; }                       // already at/below the gap on this pair
+      if(f0-best>=R) continue;                         // 1-Lipschitz: can't reach gap within best
+      // moving apart (or parallel) at t=0 and convex → never gets closer
+      if(f(Math.min(best,1e-3))>=f0-1e-9 && f(best)>=f0-1e-9) continue;
+      // convex f: find its minimum on [0,best] (ternary), then first crossing (bisection)
+      let lo=0, hi=best;
+      for(let k=0;k<30;k++){ const m1=lo+(hi-lo)/3, m2=hi-(hi-lo)/3; if(f(m1)<=f(m2)) hi=m2; else lo=m1; }
+      const tm=(lo+hi)/2;
+      if(f(tm)>=R-1e-7) continue;                      // never closer than gap on this pair
+      let a=0, b=tm;                                   // f(a)≥R, f(b)<R
+      for(let k=0;k<45;k++){ const m=(a+b)/2; if(f(m)>=R) a=m; else b=m; }
+      if(a<best) best=a;
+      if(best<=1e-7) return 0;
+    }
+  }
+  void ex; void ey;
+  return best;
+}
 /** Minimum edge-to-edge distance between two polygons (0 when they touch/overlap).
  *  `limit` (optional): only distances below it matter — anything larger may be
  *  reported as `limit`. Curved parts carry 100+ points each, so comparing every
@@ -5388,19 +5441,37 @@ function place(item, sheet, sw, sh, edgeMargin, pieceGap, rotMode){
             // but tunnels straight over parts and was rejected. Travel is capped to
             // the grid cell the piece was found in.
             const MAXT=3*g.mm+1;
-            for(let round=0; round<2; round++){
-              for(let pass=0; pass<3; pass++){
-                const s=slack(x,y,0); if(s<=0.02) break;
-                const my=Math.sign(tgtY-y)*Math.min(Math.abs(tgtY-y), s, MAXT-Math.abs(y-gY));
-                if(Math.abs(my)<=0.02) break;
-                y+=my;
+            // Exact directional travel: sheet edge ahead + every nearby outline.
+            const free=(cx,cy,axis,cap)=>{
+              let s = axis
+                ? (NEST_FLIP_X ? (sw-edgeMargin)-(cx+w) : cx-edgeMargin)
+                : (NEST_FLIP_Y ? (sh-edgeMargin)-(cy+h) : cy-edgeMargin);
+              s=Math.min(s,cap); if(!(s>1e-7)) return 0;
+              const ux=axis?(NEST_FLIP_X?1:-1):0, uy=axis?0:(NEST_FLIP_Y?1:-1);
+              const me=verts.map(v=>[v[0]+cx, v[1]+cy]);
+              for(const o of nb){
+                // box gap along/around the path: skip neighbours that can never matter
+                const bx=Math.max(o.x0-(cx+w)-(ux>0?s:0), cx-o.x1-(ux<0?s:0), 0);
+                const by=Math.max(o.y0-(cy+h)-(uy>0?s:0), cy-o.y1-(uy<0?s:0), 0);
+                if(Math.sqrt(bx*bx+by*by) > pieceGap+1e-6) continue;
+                s=Math.min(s,_dirFree(me,o.p,ux,uy,s,pieceGap));
+                if(s<=1e-7) return 0;
               }
-              for(let pass=0; pass<3; pass++){
-                const s=slack(x,y,1); if(s<=0.02) break;
-                const mx=Math.sign(tgtX-x)*Math.min(Math.abs(tgtX-x), s, MAXT-Math.abs(x-gX));
-                if(Math.abs(mx)<=0.02) break;
-                x+=mx;
+              return s;
+            };
+            for(let round=0; round<3; round++){
+              let moved=false;
+              {
+                const cap=Math.min(Math.abs(tgtY-y), MAXT-Math.abs(y-gY));
+                const t=cap>0.001?free(x,y,0,cap):0;
+                if(t>0.001){ y+=Math.sign(tgtY-y)*t; moved=true; }
               }
+              {
+                const cap=Math.min(Math.abs(tgtX-x), MAXT-Math.abs(x-gX));
+                const t=cap>0.001?free(x,y,1,cap):0;
+                if(t>0.001){ x+=Math.sign(tgtX-x)*t; moved=true; }
+              }
+              if(!moved) break;
             }
             // safety: never accept a slide that broke the gap or an edge margin
             if(slack(x,y,0)<-1e-4 || slack(x,y,1)<-1e-4 ||
@@ -8945,13 +9016,52 @@ function exportSVG(){
   dlText(svg, `${projName()}_layout_${g.label}_${BUILD_TAG}.svg`, 'image/svg+xml');
 }
 function exportDXFmenu(){ closeExportMenu(); exportDXF(); }
-function exportDXFCutOnly(){
-  closeExportMenu();
+/** Export dialog: tick what goes into the DXF. mode = 'all' | 'current' | 'each'. */
+function openDxfExportDialog(mode){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
-  DXF_CUT_ONLY=true;
-  let dxf=null; try{ dxf=buildDXF(); } finally { DXF_CUT_ONLY=false; }
-  if(!dxf) return;
-  dlText(dxf,`all_layouts_${nestResult.sheetGroups.length}x_cutonly_${BUILD_TAG}.dxf`);
+  const en=lang==='en';
+  const g=nestResult.sheetGroups[(typeof activeSheet==='number')?activeSheet:0];
+  const what = mode==='current' ? (en?`Layout ${g?g.label:'A'} only`:`เฉพาะแบบ ${g?g.label:'A'}`)
+             : mode==='each' ? (en?'one file per layout':'แยกไฟล์ทีละแบบ')
+             : (en?`all ${nestResult.sheetGroups.length} layouts in one file`:`รวม ${nestResult.sheetGroups.length} แบบในไฟล์เดียว`);
+  const row=(k,label,hint,layer,dis)=>`<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 4px;border-bottom:1px solid var(--border,#2a3350);cursor:${dis?'default':'pointer'};">
+      <input type="checkbox" ${dis?'checked disabled':`id="dxo_${k}" ${DXF_OPT[k]?'checked':''}`} style="margin-top:3px;width:16px;height:16px;">
+      <span style="flex:1;"><b style="font-size:.86rem;">${label}</b>${layer?` <span style="font-size:.68rem;color:#64748b;">layer ${layer}</span>`:''}
+      <br><span style="font-size:.72rem;color:var(--muted,#94a3b8);">${hint}</span></span></label>`;
+  const body=`<div style="font-size:.78rem;color:var(--muted,#94a3b8);margin-bottom:6px;">${en?'Export':'Export'}: <b style="color:var(--text,#e2e8f0);">${what}</b></div>
+    ${row('cut', en?'Cut outlines':'เส้นตัดรอบชิ้นงาน', en?'Always included':'ใส่เสมอ', 'CUT', true)}
+    ${row('holes', en?'Inner cuts (holes / slots / inner lines)':'เส้นตัดภายใน (รู / ช่อง / เส้นใน)', en?'Holes and line work inside each piece':'รูและเส้นที่อยู่ในชิ้นงาน', 'CUT_HOLE')}
+    ${row('frame', en?'Sheet frame':'กรอบแผ่นวัสดุ', en?'Rectangle of the material sheet':'สี่เหลี่ยมขนาดแผ่นวัสดุ', 'SHEET')}
+    ${row('code', en?'Part code (text from the file)':'รหัสชิ้นงาน (ตัวอักษรจากไฟล์)', en?'e.g. 36-5 — kept exactly where the file has it':'เช่น 36-5 — ตำแหน่งตามไฟล์ต้นฉบับ', 'TEXT')}
+    ${row('name', en?'Piece name':'ชื่อชิ้นงาน', en?'Name from the list (skipped when it equals the code)':'ชื่อจากรายการ (ไม่ใส่ซ้ำถ้าเหมือนรหัส)', 'LABEL')}
+    ${row('size', en?'Piece size':'ขนาดชิ้นงาน', en?'e.g. 740 x 1340 — placed clear of the code':'เช่น 740 x 1340 — วางไม่ทับรหัส', 'LABEL_SIZE')}
+    ${row('titles', en?'Sheet titles & total':'หัวข้อแผ่น และสรุปจำนวน', en?'"Layout A | 2440 x 1220 | x1 sheet", TOTAL line':'"Layout A | 2440 x 1220 | x1 sheet" และบรรทัด TOTAL', 'SHEET')}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+      <button class="btn btn-ghost btn-sm" onclick="_dxfPreset('cut')">✂️ ${en?'Cut lines only':'เฉพาะเส้นตัด'}</button>
+      <button class="btn btn-ghost btn-sm" onclick="_dxfPreset('all')">☑️ ${en?'Everything':'ใส่ทั้งหมด'}</button>
+    </div>
+    <div style="font-size:.7rem;color:#fbbf24;margin-top:8px;">💡 ${en?'For ArtCAM: untick every text option, or turn off the TEXT / LABEL layers before making toolpaths.':'สำหรับ ArtCAM: เอาตัวอักษรออกทั้งหมด หรือปิด layer TEXT / LABEL ก่อนสร้าง toolpath'}</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
+      <button class="btn btn-ghost btn-sm" onclick="closeEditPopup()">${en?'Cancel':'ยกเลิก'}</button>
+      <button class="btn btn-success btn-sm" onclick="_dxfDialogGo('${mode}')">⬇️ Export DXF</button>
+    </div>`;
+  showEditPopup(en?'📐 DXF export — what to include':'📐 Export DXF — เลือกสิ่งที่จะใส่', body);
+}
+function _dxfPreset(k){
+  const v = k==='all' ? {holes:true,frame:true,code:true,name:true,size:true,titles:true}
+                      : {holes:true,frame:true,code:false,name:false,size:false,titles:false};
+  Object.keys(v).forEach(n=>{ const el=document.getElementById('dxo_'+n); if(el) el.checked=v[n]; });
+}
+function _dxfDialogGo(mode){
+  Object.keys(DXF_OPT_DEF).forEach(n=>{ const el=document.getElementById('dxo_'+n); if(el) DXF_OPT[n]=!!el.checked; });
+  _saveDxfOpt(); closeEditPopup();
+  if(mode==='current') _doExportDXFCurrent(); else if(mode==='each') _doExportDXFAll(); else _doExportDXF();
+}
+/** Filename tag for a non-default selection, so two different exports never share a name. */
+function _dxfOptTag(){
+  const o=DXF_OPT;
+  if(!o.code&&!o.name&&!o.size&&!o.titles) return '_cutonly';
+  return '';
 }
 function exportProjectMenu(){ closeExportMenu(); saveProject(); }
 function printMenu(){ closeExportMenu(); window.print(); }
@@ -9097,61 +9207,76 @@ function _labelAnchor(item){
   return {x:best.x, y:best.y+(dn-up)/2, w:best.w, h:Math.max(stp, up+dn), solid};
 }
 function _pieceLabel(item, ix, iyTop){
-  if(DXF_CUT_ONLY) return '';
-  // The piece already carries its own code from the imported file — a second
-  // centred label would sit on top of it. Its size is in the CSV / Excel report.
-  if(_codesOf(item.holes).length) return '';
   const W=+item.w, H=+item.h;
   if(!(W>0 && H>0)) return '';
-  const a=_labelAnchor(item);
-  const w=a.w, h=a.h;
-  const name=String(item.name==null?'':item.name).trim();
+  const codes=_codesOf(item.holes);
+  let name = DXF_OPT.name ? String(item.name==null?'':item.name).trim() : '';
+  if(name && DXF_OPT.code && codes.length && name===codes.join(', ')) name='';   // same as the code → don't repeat
+  name=_dxfStr(name);
   // The SIZE shown is always the part's real overall size, never the local run
-  const size=`${Math.round(W*10)/10} x ${Math.round(H*10)/10}`;
+  const size = DXF_OPT.size ? `${Math.round(W*10)/10} x ${Math.round(H*10)/10}` : '';
   if(!name && !size) return '';
-  // anchor is piece-local Y-down; DXF is Y-up from the piece's top edge
-  const cx=ix + a.x, cy=iyTop - a.y;
-  // Fit across the piece, stay proportionate to BOTH sides, and never exceed
-  // the absolute cap. A long thin part is governed by its width, a small part
-  // by its height, a big panel by the cap.
-  const fit=(str,cap)=> Math.min(cap, (w*0.86)/Math.max(1,str.length*LBL_W));
-  const cap1 = name ? fit(name, Math.min(h*0.18, w*0.18, LBL_MAX)) : 0;
-  const cap2 = fit(size, Math.min(h*0.12, LBL_MAX*0.67, cap1 ? cap1*0.72 : LBL_MAX*0.67));
-
-  // Does a line of this height, at this offset, sit entirely on material?
-  // Checked rather than assumed: a slanted or L-shaped part is far smaller than
-  // its bounding box, and an offset that looks fine against the box runs off the
-  // real edge. Local Y is down.
-  const fits=(dy, th, str)=>{
+  const a=_labelAnchor(item);
+  const ring=item.rotatedVerts||item.vertices;
+  const inner=(item.holes||[]).filter(o=>!o.isText && !o.open && o.vertices && o.vertices.length>=3);
+  const solidAt=(x,y)=> (!ring||ring.length<3) ? (x>=0&&x<=W&&y>=0&&y<=H)
+                      : (_ptInRing(x,y,ring) && !inner.some(o=>_ptInRing(x,y,o.vertices)));
+  // Boxes of the part code(s) exported with the piece (local, Y down) — labels keep clear.
+  const pad=4;
+  const cboxes = (DXF_OPT.code ? (item.holes||[]).filter(h=>h.isText&&h.vertices&&h.vertices.length>=5) : []).map(h=>{
+    const v=h.vertices.slice(1,5), xs=v.map(p=>p[0]), ys=v.map(p=>p[1]);
+    return {x0:Math.min(...xs)-pad, y0:Math.min(...ys)-pad, x1:Math.max(...xs)+pad, y1:Math.max(...ys)+pad};
+  });
+  const inCode=(x,y)=>cboxes.some(c=>x>=c.x0&&x<=c.x1&&y>=c.y0&&y<=c.y1);
+  // Candidate regions: the whole part, or — when a code is there — the free strips around it.
+  let regions;
+  if(!cboxes.length) regions=[{x:a.x, y:a.y, w:a.w, h:a.h}];
+  else {
+    const U={x0:Math.min(...cboxes.map(c=>c.x0)), y0:Math.min(...cboxes.map(c=>c.y0)),
+             x1:Math.max(...cboxes.map(c=>c.x1)), y1:Math.max(...cboxes.map(c=>c.y1))};
+    regions=[
+      {x:W/2, y:U.y1+(H-U.y1)/2, w:W, h:H-U.y1},     // below the code
+      {x:W/2, y:U.y0/2,          w:W, h:U.y0},       // above
+      {x:U.x0/2, y:H/2, w:U.x0,   h:H},              // left
+      {x:U.x1+(W-U.x1)/2, y:H/2, w:W-U.x1, h:H}      // right
+    ].filter(r=>r.w>LBL_MIN*3 && r.h>LBL_MIN*1.5);
+  }
+  const fits=(cx,cy,dy,th,str)=>{
     if(!(th>=LBL_MIN)) return false;
-    if(!a.solid) return true;                    // rectangle: the box IS the part
     const half=str.length*th*LBL_W/2;
-    for(const yy of [a.y-dy-th*0.55, a.y-dy, a.y-dy+th*0.55])
-      for(const xx of [a.x-half, a.x-half/2, a.x, a.x+half/2, a.x+half])
-        if(!a.solid(xx, yy)) return false;
+    for(const yy of [cy-dy-th*0.55, cy-dy, cy-dy+th*0.55])
+      for(const xx of [cx-half, cx-half/2, cx, cx+half/2, cx+half])
+        if(!solidAt(xx,yy) || inCode(xx,yy)) return false;
     return true;
   };
-  // Largest height that still lands on material. Shrinking beats giving up: a
-  // triangle refusing its label outright is worse than a smaller one that fits.
-  const best=(dy, cap, str)=>{
+  const best=(cx,cy,dy,cap,str)=>{
     if(!(cap>=LBL_MIN) || !str) return 0;
-    if(fits(dy, cap, str)) return cap;
+    if(fits(cx,cy,dy,cap,str)) return cap;
     let lo=LBL_MIN, hi=cap, got=0;
-    for(let i=0;i<10;i++){
-      const mid=(lo+hi)/2;
-      if(fits(dy*(mid/cap), mid, str)){ got=mid; lo=mid; } else hi=mid;
-    }
+    for(let i=0;i<10;i++){ const mid=(lo+hi)/2; if(fits(cx,cy,dy*(mid/cap),mid,str)){ got=mid; lo=mid; } else hi=mid; }
     return got;
   };
-  let h1=best(cap1*0.62, cap1, name);
-  let h2=best(-cap2*0.80, cap2, size);
-  if(h1>=LBL_MIN && h2>=LBL_MIN)
-    return _dxfCenterText(cx, cy + h1*0.62, h1, name, 'LABEL')
-         + _dxfCenterText(cx, cy - h2*0.80, h2, size, 'LABEL_SIZE');
-  // No room for two lines — one centred line, as large as the part allows.
-  const c1=best(0, cap1, name); if(c1>=LBL_MIN) return _dxfCenterText(cx, cy, c1, name, 'LABEL');
-  const c2=best(0, cap2, size); if(c2>=LBL_MIN) return _dxfCenterText(cx, cy, c2, size, 'LABEL_SIZE');
-  return '';
+  let pick=null;
+  for(const r of regions){
+    const w=r.w, h=r.h, full=!cboxes.length;
+    const fit=(str,cap)=> Math.min(cap, (w*0.86)/Math.max(1,str.length*LBL_W));
+    const cap1 = name ? fit(name, Math.min(h*(full?0.18:0.40), w*0.18, LBL_MAX)) : 0;
+    const cap2 = size ? fit(size, Math.min(h*(full?0.12:0.30), LBL_MAX*0.67, cap1 ? cap1*0.72 : LBL_MAX*0.67)) : 0;
+    let out='', score=0;
+    const h1=name&&size?best(r.x,r.y,cap1*0.62,cap1,name):0, h2=name&&size?best(r.x,r.y,-cap2*0.80,cap2,size):0;
+    if(h1>=LBL_MIN && h2>=LBL_MIN){
+      out=_dxfCenterText(ix+r.x, iyTop-r.y + h1*0.62, h1, name, 'LABEL')
+         +_dxfCenterText(ix+r.x, iyTop-r.y - h2*0.80, h2, size, 'LABEL_SIZE');
+      score=h1+h2;
+    } else {
+      const c1=name?best(r.x,r.y,0,cap1,name):0;
+      const c2=(!name||c1<LBL_MIN)&&size?best(r.x,r.y,0,cap2,size):0;
+      if(c1>=LBL_MIN){ out=_dxfCenterText(ix+r.x, iyTop-r.y, c1, name, 'LABEL'); score=c1*0.9; }
+      else if(c2>=LBL_MIN){ out=_dxfCenterText(ix+r.x, iyTop-r.y, c2, size, 'LABEL_SIZE'); score=c2*0.9; }
+    }
+    if(out && (!pick || score>pick.score)) pick={out,score};
+  }
+  return pick?pick.out:'';
 }
 function dxfItemPaths(item, offX, offY, sh){
   let s='';
@@ -9180,7 +9305,7 @@ function dxfItemPaths(item, offX, offY, sh){
       item.holes.forEach(hole=>{
         if(!hole.vertices?.length) return;
         if(hole.isText && hole.text){
-          if(DXF_CUT_ONLY) return;
+          if(!DXF_OPT.code) return;
           // Re-emit the original TEXT unchanged (string, height, angle, justification)
           // at the piece's placed position, on its own TEXT layer.
           const tx=hole.text;
@@ -9223,6 +9348,7 @@ function dxfItemPaths(item, offX, offY, sh){
           s+=out;
           return;
         }
+        if(!DXF_OPT.holes) return;
         const hClosed=!hole.open;            // open internal line work exports open (no chord)
         const hLayer=hole.open?'CUT':'CUT_HOLE';
         const hRawV=hole.rawV||null;
@@ -9246,11 +9372,11 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k8';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k9';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
-  if(DXF_CUT_ONLY) return '';
+  if(!DXF_OPT.titles) return '';
   let s=`0\nTEXT\n8\nSHEET\n`;
   if(color) s+=`62\n${color}\n`;
   s+=`10\n${(+x).toFixed(3)}\n20\n${(+y).toFixed(3)}\n40\n${h}\n1\n${_dxfStr(str)}\n`;
@@ -9280,7 +9406,7 @@ function buildDXFSingle(groupIdx){
   const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
-  entities+=dxfRectShape(0,0,sw,sh,'SHEET');
+  if(DXF_OPT.frame) entities+=dxfRectShape(0,0,sw,sh,'SHEET');
   entities+=_sheetTitle(0, sw, sh, g);
   // Summary line (left-aligned, further below so it never overlaps the titles)
   entities+=_lbl(20, -150, 40, `TOTAL: ${totalSheets} sheet${totalSheets>1?'s':''}`, 0);
@@ -9296,7 +9422,7 @@ function buildDXF(){
   let entities='';
   sheetGroups.forEach((g,li)=>{
     const offX=li*(sw+GAP), offY=0;
-    entities+=dxfRectShape(offX,offY,sw,sh,'SHEET');
+    if(DXF_OPT.frame) entities+=dxfRectShape(offX,offY,sw,sh,'SHEET');
     entities+=_sheetTitle(offX, sw, sh, g);
     g.sheet.items.forEach(item=>{ entities+=dxfItemPaths(item,offX,offY,sh); });
   });
@@ -9308,21 +9434,24 @@ function buildDXF(){
     `TOTAL: ${totalSheets} sheet${totalSheets>1?'s':''}  |  ${sheetGroups.length} layout${sheetGroups.length>1?'s':''}  (${brk})`, 0);
   return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
 }
-function exportDXF(){
+function exportDXF(){ openDxfExportDialog('all'); }
+function exportDXFCurrent(){ openDxfExportDialog('current'); }
+function exportDXFAll(){ openDxfExportDialog('each'); }
+function _doExportDXF(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
   const dxf=buildDXF(); if(!dxf) return;
   // ALWAYS "all_layouts…", even with a single layout. It used to fall back to
   // "layout_A", which is byte-for-byte the name the single-layout button produces —
   // so there was no way to tell the two downloads apart afterwards.
   const n=nestResult.sheetGroups.length;
-  dlText(dxf,`all_layouts_${n}x_${BUILD_TAG}.dxf`);
+  dlText(dxf,`all_layouts_${n}x${_dxfOptTag()}_${BUILD_TAG}.dxf`);
 }
-function exportDXFCurrent(){
+function _doExportDXFCurrent(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
   const idx = (typeof activeSheet==='number') ? activeSheet : 0;
   const dxf=buildDXFSingle(idx); if(!dxf) return;
   const g=nestResult.sheetGroups[idx];
-  dlText(dxf,`layout_${g.label}_${BUILD_TAG}.dxf`);
+  dlText(dxf,`layout_${g.label}${_dxfOptTag()}_${BUILD_TAG}.dxf`);
 }
 // first snapshot + keyboard shortcuts + click-away for the export menu
 function _bootUI(){
@@ -9344,12 +9473,12 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('DOMContentLoaded',_bootUI);
 try{ _bootUI(); }catch(e){}
 
-function exportDXFAll(){
+function _doExportDXFAll(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
   const {sheetGroups}=nestResult;
   sheetGroups.forEach((g,i)=>{
     const dxf=buildDXFSingle(i); if(!dxf) return;
-    dlText(dxf,`layout_${g.label}_${BUILD_TAG}.dxf`);
+    dlText(dxf,`layout_${g.label}${_dxfOptTag()}_${BUILD_TAG}.dxf`);
   });
 }
 function dlText(content,filename,type='text/plain'){
