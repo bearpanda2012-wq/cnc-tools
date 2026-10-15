@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k7</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k8</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -246,6 +246,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportExcel()">📊 Excel (.xlsx)</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportCSV()">📄 CSV รายการตัด (.csv)</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportDXFmenu()">📐 DXF รวมทุก Layout</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportDXFCutOnly()" title="เฉพาะเส้นตัด CUT / CUT_HOLE + กรอบแผ่น — ไม่มีตัวอักษรใด ๆ ปลอดภัยสำหรับ ArtCAM">✂️ DXF เฉพาะเส้นตัด (ไม่มีตัวอักษร)</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportSVG()">✒️ SVG (layout ที่เปิดอยู่)</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportImage('png')">🖼️ รูปภาพ PNG</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;" onclick="exportImage('jpg')">🖼️ รูปภาพ JPG</button>
@@ -1093,6 +1094,13 @@ function _drawTextHole(ctx, hole, toC, pxPerMm, color){
   ctx.fillText(str,0,by);
   ctx.restore();
 }
+/** Part codes = the TEXT strings carried inside a piece (from the imported file). */
+function _codesOf(holes){
+  return (holes||[]).filter(h=>h&&h.isText&&h.text&&h.text.str).map(h=>String(h.text.str).trim()).filter(Boolean);
+}
+/** Natural compare: "35-6" < "35-10" < "36-5". */
+function _natCmp(a,b){ return String(a).localeCompare(String(b), undefined, {numeric:true, sensitivity:'base'}); }
+let DXF_CUT_ONLY=false;   // export only cut geometry (+ sheet frame): no TEXT / LABEL / titles
 /** Full DXF parser — returns array of shape objects */
 /** Build a circle shape (smooth 4-bulge rawV so it exports as a true circle). */
 function _mkCircle(cx,cy,r,layer){
@@ -3169,6 +3177,14 @@ function showInspStep2() {
 
   mdxfShapes = outerWithHoles;
   mdxfGroups = buildShapeGroups(outerWithHoles);
+  // Sort the list by part code (35-5, 35-6, 36-5 …) — matches the job sheet. Pieces
+  // without a code go last, by size as before.
+  {
+    const key=g=>{ const c=[...new Set((g.indices||[]).flatMap(i=>_codesOf((outerWithHoles[i]||{}).holes)))].sort(_natCmp); return c[0]||null; };
+    const dec=mdxfGroups.map((g,k)=>({g,k,c:key(g)}));
+    dec.sort((a,b)=> (a.c===null)-(b.c===null) || (a.c!==null && _natCmp(a.c,b.c)) || a.k-b.k);
+    mdxfGroups=dec.map(d=>d.g);
+  }
 
   // Update step indicator
   document.querySelectorAll('.insp-step').forEach((el,i)=>{
@@ -3189,9 +3205,38 @@ function showInspStep2() {
   updateMdxfTotal();
 }
 
+function _codeAudit(groups){
+  // per group: codes of every instance; flags for missing / multiple / duplicate
+  const per=groups.map(g=>(g.indices||[]).map(i=>_codesOf((mdxfShapes[i]||{}).holes)));
+  const tally=new Map();
+  per.forEach(inst=>inst.forEach(cs=>cs.forEach(c=>tally.set(c,(tally.get(c)||0)+1))));
+  const dup=new Set([...tally].filter(([,n])=>n>1).map(([c])=>c));
+  const rows=per.map(inst=>({
+    codes:[...new Set(inst.flat())],
+    missing: inst.some(cs=>cs.length===0),
+    multi:   inst.some(cs=>cs.length>1),
+    dup:     inst.some(cs=>cs.some(c=>dup.has(c)))
+  }));
+  return {rows, dup:[...dup].sort(_natCmp),
+    missing:rows.filter(r=>r.missing).length, multi:rows.filter(r=>r.multi).length,
+    anyCode:tally.size>0};
+}
+
 function renderStep2HTML(outers) {
   const groups = mdxfGroups; // already computed in showInspStep2
-  const totalHoles = outers.reduce((s,o)=>s+(o.holes?.length||0),0);
+  const AUD = _codeAudit(groups);
+  const warnLines=[];
+  if(AUD.anyCode){
+    if(AUD.dup.length) warnLines.push(lang==='en'?`Duplicate code: <b>${AUD.dup.join(', ')}</b> (appears on more than one piece)`:`รหัสซ้ำ: <b>${AUD.dup.join(', ')}</b> (มีมากกว่า 1 ชิ้น)`);
+    if(AUD.missing)    warnLines.push(lang==='en'?`<b>${AUD.missing}</b> row(s) have a piece with no code`:`<b>${AUD.missing}</b> แถว มีชิ้นที่ไม่มีรหัส`);
+    if(AUD.multi)      warnLines.push(lang==='en'?`<b>${AUD.multi}</b> row(s) have a piece with more than one code`:`<b>${AUD.multi}</b> แถว มีชิ้นที่มีรหัสมากกว่า 1 ตัว`);
+  }
+  const warnHTML = warnLines.length ? `<div style="background:#7f1d1d33;border:1px solid #ef444488;color:#fecaca;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.8rem;line-height:1.6;">
+      ⚠️ ${lang==='en'?'Check part codes before nesting:':'ตรวจรหัสชิ้นงานก่อนจัดวาง:'}<br>• ${warnLines.join('<br>• ')}
+      <div style="color:#fca5a5aa;font-size:.72rem;margin-top:2px;">${lang==='en'?'Rows with a problem are marked red.':'แถวที่มีปัญหาขึ้นกรอบสีแดง'}</div></div>`
+    : (AUD.anyCode ? `<div style="background:#14532d33;border:1px solid #22c55e66;color:#bbf7d0;border-radius:8px;padding:6px 12px;margin-bottom:10px;font-size:.78rem;">
+      ✅ ${lang==='en'?'Part codes OK — every piece has exactly one unique code.':'รหัสชิ้นงานครบ — ทุกชิ้นมีรหัส 1 ตัว ไม่ซ้ำกัน'}</div>` : '');
+  const totalHoles = outers.reduce((s,o)=>s+((o.holes||[]).filter(h=>!h.isText).length),0);
   const totalPieces = outers.length;
   const totalGroups = groups.length;
 
@@ -3239,13 +3284,14 @@ function renderStep2HTML(outers) {
                   <b style="color:var(--text);">${g.count}×</b>
                   <span style="color:var(--muted);">${g.shape.w.toFixed(0)}×${g.shape.h.toFixed(0)} mm</span>
                   <span class="shape-pill ${g.shape.type==='circle'?'shape-free':'shape-rect'}">${g.shape.type==='circle'?'⭕':'⬛'}</span>
-                  ${g.shape.holes?.length?`<span style="color:#a78bfa;">🕳️${g.shape.holes.length}</span>`:''}
+                  ${(g.shape.holes||[]).filter(h=>!h.isText).length?`<span style="color:#a78bfa;">🕳️${(g.shape.holes||[]).filter(h=>!h.isText).length}</span>`:''}
                 </div>`).join('')}
             </div>
           </div>
         </div>
       </div>
 
+      ${warnHTML}
       <div class="mdxf-table-wrap">
         <table class="mdxf-table">
           <thead><tr>
@@ -3265,13 +3311,16 @@ function renderStep2HTML(outers) {
               const autoQty = g.count;
               const nHole = (s.holes||[]).filter(h=>!h.isText).length;
               // Part code = the TEXT found inside each copy of this piece (from the file)
-              const codes = [...new Set((g.indices||[]).flatMap(idx=>
-                ((mdxfShapes[idx]||{}).holes||[]).filter(h=>h.isText&&h.text&&h.text.str)
-                  .map(h=>h.text.str.trim())).filter(Boolean))];
+              const AR = AUD.rows[gi];
+              const codes = AR.codes;
+              const bad = AUD.anyCode && (AR.missing||AR.multi||AR.dup);
+              const why = [AR.dup?(lang==='en'?'duplicate code':'รหัสซ้ำ'):'', AR.missing?(lang==='en'?'no code':'ไม่มีรหัส'):'',
+                           AR.multi?(lang==='en'?'more than one code':'มีรหัสมากกว่า 1 ตัว'):''].filter(Boolean).join(', ');
               const codeHtml = codes.length
                 ? codes.map(c=>`<span style="background:#3b0764;color:#e9d5ff;border-radius:5px;padding:2px 7px;font-size:.76rem;font-weight:700;white-space:nowrap;">${c.replace(/</g,'&lt;')}</span>`).join(' ')
                 : `<span style="color:#f87171;font-size:.72rem;" title="${lang==='en'?'No text found inside this piece':'ไม่พบตัวอักษรภายในกรอบชิ้นนี้'}">⚠️ ${lang==='en'?'none':'ไม่มี'}</span>`;
-              return `<tr id="mdxfRow${gi}"
+              const defName = codes.length ? codes.join(', ') : `${s.w.toFixed(0)}×${s.h.toFixed(0)} mm${s.type==='circle'?' ⭕':''}`;
+              return `<tr id="mdxfRow${gi}" ${bad?`style="outline:2px solid #ef4444;outline-offset:-2px;background:#7f1d1d22;" title="${why}"`:''}
                 onmouseenter="mdxfGroupHighlight(${gi},true)"
                 onmouseleave="mdxfGroupHighlight(${gi},false)">
                 <td><input type="checkbox" class="mdxf-chk mdxf-item-chk" data-gidx="${gi}" checked onchange="updateMdxfTotal()"></td>
@@ -3291,10 +3340,10 @@ function renderStep2HTML(outers) {
                     ${autoQty} ${t('pieces_lbl')}
                   </span>
                 </td>
-                <td><div style="display:flex;flex-wrap:wrap;gap:3px;max-width:180px;">${codeHtml}</div></td>
+                <td><div style="display:flex;flex-wrap:wrap;gap:3px;max-width:180px;">${codeHtml}${bad&&codes.length?`<span style="color:#f87171;font-size:.7rem;">⚠️ ${why}</span>`:''}</div></td>
                 <td><input style="background:var(--surface);border:1px solid var(--border);border-radius:5px;
                   color:var(--text);padding:3px 7px;font-size:.78rem;width:150px;"
-                  id="mdxfName${gi}" value="${s.w.toFixed(0)}×${s.h.toFixed(0)} mm${s.type==='circle'?' ⭕':''}"></td>
+                  id="mdxfName${gi}" value="${defName.replace(/"/g,'&quot;')}"></td>
                 <td>
                   <div style="display:flex;align-items:center;gap:4px;">
                     <input type="number" min="1" value="${autoQty}"
@@ -5710,7 +5759,7 @@ function drawSheetOnCanvas(canvas, sheet, sw, sh, {pad=4, maxW=null, maxH=null, 
       }
     }
 
-    if(showLabels && pw>24 && ph>14){
+    if(showLabels && pw>24 && ph>14 && !_codesOf(item.holes).length){   // own code already drawn
       const fs=Math.min(11,ph*0.22,pw*0.12);
       ctx.fillStyle='rgba(255,255,255,0.92)';
       ctx.font=`bold ${fs}px Segoe UI,sans-serif`;
@@ -8731,16 +8780,18 @@ function _reportRows(){
   sum.push([th?'Edge margin':'ระยะห่างขอบแผ่น', nestResult.edgeMargin]);
   sum.push([th?'Piece gap':'ระยะห่างชิ้นงาน', nestResult.pieceGap]);
   sum.push([th?'Total sheets':'รวมแผ่น', nestResult.sheets.length]);
-  const pcs=[[th?'Piece':'ชิ้นงาน', th?'Qty':'จำนวน', th?'Width mm':'กว้าง mm', th?'Height mm':'ยาว mm',
+  const pcs=[[th?'Code':'รหัส', th?'Piece':'ชิ้นงาน', th?'Qty':'จำนวน', th?'Width mm':'กว้าง mm', th?'Height mm':'ยาว mm',
               th?'Area/pc m²':'พื้นที่/ชิ้น m²', th?'Total m²':'รวม m²']];
-  pieces.forEach(p=>{
-    pcs.push([p.name, p.qty, p.w, p.h,
+  const pCodes=p=>{ const sets=(p.textSets&&p.textSets.length)?p.textSets:[p.holes||[]];
+    return [...new Set(sets.flatMap(_codesOf))].sort(_natCmp).join(', '); };
+  pieces.slice().sort((a,b)=>_natCmp(pCodes(a)||'~'+a.name, pCodes(b)||'~'+b.name)).forEach(p=>{
+    pcs.push([pCodes(p), p.name, p.qty, p.w, p.h,
       +(pieceArea(p)/1e6).toFixed(5), +(pieceArea(p)*p.qty/1e6).toFixed(5)]);
   });
-  const lay=[[th?'Layout':'แบบ', th?'Piece':'ชิ้นงาน', th?'X mm':'X mm', th?'Y mm':'Y mm',
+  const lay=[[th?'Layout':'แบบ', th?'Sheets':'จำนวนแผ่น', th?'Code':'รหัส', th?'Piece':'ชิ้นงาน', th?'X mm':'X mm', th?'Y mm':'Y mm',
               th?'Width mm':'กว้าง mm', th?'Height mm':'ยาว mm', th?'Angle':'องศา']];
-  sheetGroups.forEach(g=>g.sheet.items.forEach(it=>{
-    lay.push([g.label, it.name, +(+it.x).toFixed(2), +(+it.y).toFixed(2),
+  sheetGroups.forEach(g=>g.sheet.items.slice().sort((a,b)=>_natCmp(_codesOf(a.holes).join(',')||'~'+a.name,_codesOf(b.holes).join(',')||'~'+b.name)).forEach(it=>{
+    lay.push([g.label, g.count, _codesOf(it.holes).join(', '), it.name, +(+it.x).toFixed(2), +(+it.y).toFixed(2),
               +(+it.w).toFixed(2), +(+it.h).toFixed(2), it.angle||0]);
   }));
   return {sum, pcs, lay, th};
@@ -8894,6 +8945,14 @@ function exportSVG(){
   dlText(svg, `${projName()}_layout_${g.label}_${BUILD_TAG}.svg`, 'image/svg+xml');
 }
 function exportDXFmenu(){ closeExportMenu(); exportDXF(); }
+function exportDXFCutOnly(){
+  closeExportMenu();
+  if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return; }
+  DXF_CUT_ONLY=true;
+  let dxf=null; try{ dxf=buildDXF(); } finally { DXF_CUT_ONLY=false; }
+  if(!dxf) return;
+  dlText(dxf,`all_layouts_${nestResult.sheetGroups.length}x_cutonly_${BUILD_TAG}.dxf`);
+}
 function exportProjectMenu(){ closeExportMenu(); saveProject(); }
 function printMenu(){ closeExportMenu(); window.print(); }
 
@@ -9038,6 +9097,10 @@ function _labelAnchor(item){
   return {x:best.x, y:best.y+(dn-up)/2, w:best.w, h:Math.max(stp, up+dn), solid};
 }
 function _pieceLabel(item, ix, iyTop){
+  if(DXF_CUT_ONLY) return '';
+  // The piece already carries its own code from the imported file — a second
+  // centred label would sit on top of it. Its size is in the CSV / Excel report.
+  if(_codesOf(item.holes).length) return '';
   const W=+item.w, H=+item.h;
   if(!(W>0 && H>0)) return '';
   const a=_labelAnchor(item);
@@ -9117,6 +9180,7 @@ function dxfItemPaths(item, offX, offY, sh){
       item.holes.forEach(hole=>{
         if(!hole.vertices?.length) return;
         if(hole.isText && hole.text){
+          if(DXF_CUT_ONLY) return;
           // Re-emit the original TEXT unchanged (string, height, angle, justification)
           // at the piece's placed position, on its own TEXT layer.
           const tx=hole.text;
@@ -9182,10 +9246,11 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k7';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k8';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
+  if(DXF_CUT_ONLY) return '';
   let s=`0\nTEXT\n8\nSHEET\n`;
   if(color) s+=`62\n${color}\n`;
   s+=`10\n${(+x).toFixed(3)}\n20\n${(+y).toFixed(3)}\n40\n${h}\n1\n${_dxfStr(str)}\n`;
