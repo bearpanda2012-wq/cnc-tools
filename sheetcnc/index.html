@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k14</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k15</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -9458,35 +9458,53 @@ function _verifyDXF(text, rects, itemsPerSheet){
   const ok = under===0 && outside===0 && polys.length===expectN && (minEdge===Infinity || minEdge>=edge-1e-3) && (!codesChecked || missing.length===0);
   return {ok, minGap, minEdge, under, outside, pieces:polys.length, expectN, codesChecked, codes:got.length, expectCodes:expectCodes.length, missing, gap, edge, overN, overMax};
 }
+function _dlPref(kind){ const v=lsGet('sheetcnc_dl_'+kind); return v===null ? true : v==='1'; }
 function _showVerifyPopup(jobs){
   const en=lang==='en';
   window.__dxfJobs=jobs;
+  const pick=(k,j)=>jobs.length>1 ? `<input type="checkbox" class="dxf-dl-pick" data-k="${k}" ${_dlPref(j.kind)?'checked':''} onchange="_dlPickChanged()" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px;" title="${en?'download this file':'ดาวน์โหลดไฟล์นี้'}">` : '';
   const f=v=>isFinite(v)?(Math.abs(v)<0.0005?0:v).toFixed(3):'—';
-  const rows=jobs.map(j=>{
-    if(j.kind==='check') return `<div style="padding:8px 10px;border:1px solid #64748b55;border-radius:8px;margin-bottom:6px;">
-      🔍 <b>${j.file}</b><div style="font-size:.74rem;color:#fbbf24;margin-top:2px;">${en?'CHECK file — pieces are blocks with their originals. Do NOT send to the machine.':'ไฟล์ตรวจสอบ — ชิ้นงานเป็น block รวมกับต้นฉบับ ห้ามส่งเข้าเครื่อง / ArtCAM'}</div></div>`;
+  const rows=jobs.map((j,ji)=>{
+    if(j.kind==='check') return `<label style="display:block;cursor:pointer;padding:8px 10px;border:1px solid #64748b55;border-radius:8px;margin-bottom:6px;">
+      ${pick(ji,j)}🔍 <b>${j.file}</b><div style="font-size:.74rem;color:#fbbf24;margin-top:2px;">${en?'CHECK file — pieces are blocks with their originals. Do NOT send to the machine.':'ไฟล์ตรวจสอบ — ชิ้นงานเป็น block รวมกับต้นฉบับ ห้ามส่งเข้าเครื่อง / ArtCAM'}</div></label>`;
     const r=_verifyDXF(j.text, j.rects, j.items); j.verify=r;
     const line=(okk,txt)=>`<div style="font-size:.8rem;margin:2px 0;color:${okk?'#86efac':'#fca5a5'};">${okk?'✅':'❌'} ${txt}</div>`;
-    return `<div style="padding:8px 10px;border:1px solid ${r.ok?'#22c55e88':'#ef4444'};border-radius:8px;margin-bottom:6px;background:${r.ok?'#14532d22':'#7f1d1d33'};">
-      ${r.ok?'✅':'⛔'} <b>${j.file}</b> <span style="font-size:.72rem;color:var(--muted);">${en?'(machine file)':'(ไฟล์ส่งเครื่อง)'}</span>
+    return `<label style="display:block;cursor:pointer;padding:8px 10px;border:1px solid ${r.ok?'#22c55e88':'#ef4444'};border-radius:8px;margin-bottom:6px;background:${r.ok?'#14532d22':'#7f1d1d33'};">
+      ${pick(ji,j)}${r.ok?'✅':'⛔'} <b>${j.file}</b> <span style="font-size:.72rem;color:var(--muted);">${en?'(machine file)':'(ไฟล์ส่งเครื่อง)'}</span>
       ${line(r.under===0, `${en?'Min piece gap':'ระยะห่างชิ้นงานต่ำสุด'} <b>${f(r.minGap)}</b> mm (${en?'set':'ตั้ง'} ${r.gap})${r.under?` — <b>${r.under}</b> ${en?'pair(s) too close':'คู่ชิดเกิน'}`:''}`)}
       ${line(!(r.minEdge<r.edge-1e-3) && r.outside===0, `${en?'Min edge margin':'ระยะขอบต่ำสุด'} <b>${f(r.minEdge)}</b> mm (${en?'set':'ตั้ง'} ${r.edge})${r.outside?` — <b>${r.outside}</b> ${en?'outside the sheet':'ชิ้นหลุดนอกแผ่น'}`:''}`)}
       ${line(r.pieces===r.expectN, `${en?'Pieces in file':'ชิ้นงานในไฟล์'} <b>${r.pieces}/${r.expectN}</b>`)}
       ${r.overN?`<div style="font-size:.8rem;margin:2px 0;color:#fcd34d;">⚠️ ${en?`${r.overN} inner line(s) run past their piece outline by up to <b>${r.overMax.toFixed(2)}</b> mm (as drawn in the source file)`:`เส้นภายใน ${r.overN} เส้น ยื่นเลยขอบชิ้นงานสูงสุด <b>${r.overMax.toFixed(2)}</b> mm (ตามที่วาดในไฟล์ต้นฉบับ)`}</div>`:''}
       ${r.codesChecked?line(r.missing.length===0, `${en?'Part codes':'รหัสชิ้นงาน'} <b>${r.codes}/${r.expectCodes}</b>${r.missing.length?` — ${en?'missing':'ขาด'}: ${r.missing.join(', ')}`:''}`):''}
-    </div>`;
+    </label>`;
   }).join('');
   const allOk=jobs.every(j=>j.kind==='check'||(j.verify&&j.verify.ok));
   const body=`<div style="font-size:.78rem;color:var(--muted);margin-bottom:8px;">${en?'The exported file was read back and measured:':'อ่านไฟล์ที่ export กลับมาวัดจริงแล้ว:'}</div>${rows}
     ${allOk?'':`<div style="color:#fca5a5;font-size:.8rem;margin:6px 0;">⚠️ ${en?'Something failed — check before cutting.':'มีรายการไม่ผ่าน — ตรวจสอบก่อนตัดจริง'}</div>`}
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
       <button class="btn btn-ghost btn-sm" onclick="closeEditPopup()">${en?'Cancel':'ยกเลิก'}</button>
-      <button class="btn ${allOk?'btn-success':'btn-danger'} btn-sm" onclick="_dlDxfJobs()">⬇️ ${en?'Download':'ดาวน์โหลด'} ${jobs.length} ${en?'file(s)':'ไฟล์'}${allOk?'':(en?' anyway':' ทั้งที่ไม่ผ่าน')}</button>
+      <button id="dxfDlBtn" class="btn ${allOk?'btn-success':'btn-danger'} btn-sm" onclick="_dlDxfJobs()" data-ok="${allOk?1:0}">⬇️</button>
     </div>`;
   showEditPopup(allOk?(en?'✅ DXF verified':'✅ ตรวจไฟล์ DXF ผ่าน'):(en?'⛔ DXF check failed':'⛔ ตรวจไฟล์ DXF ไม่ผ่าน'), body);
+  _dlPickChanged();
+}
+function _dlSelected(){
+  const jobs=window.__dxfJobs||[];
+  const boxes=[...document.querySelectorAll('.dxf-dl-pick')];
+  if(!boxes.length) return jobs;
+  return jobs.filter((j,k)=>{ const b=boxes.find(x=>+x.dataset.k===k); return b?b.checked:true; });
+}
+function _dlPickChanged(){
+  const en=lang==='en', btn=document.getElementById('dxfDlBtn'); if(!btn) return;
+  const sel=_dlSelected(), ok=btn.dataset.ok==='1';
+  // remember the choice per file kind
+  const jobs=window.__dxfJobs||[];
+  document.querySelectorAll('.dxf-dl-pick').forEach(b=>{ const j=jobs[+b.dataset.k]; if(j) lsSet('sheetcnc_dl_'+j.kind, b.checked?'1':'0'); });
+  btn.disabled=!sel.length; btn.style.opacity=sel.length?'':'0.5';
+  btn.textContent=`⬇️ ${en?'Download':'ดาวน์โหลด'} ${sel.length} ${en?'file(s)':'ไฟล์'}${ok?'':(en?' anyway':' ทั้งที่ไม่ผ่าน')}`;
 }
 function _dlDxfJobs(){
-  const jobs=window.__dxfJobs||[]; closeEditPopup();
+  const jobs=_dlSelected(); if(!jobs.length) return; closeEditPopup();
   jobs.forEach((j,k)=>setTimeout(()=>dlText(j.text,j.file), k*400));   // spaced so the browser keeps them all
 }
 /** Filename tag for a non-default selection, so two different exports never share a name. */
@@ -9814,7 +9832,7 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k14';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k15';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
