@@ -10,6 +10,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+(function(){ try{ var t=localStorage.getItem('sheetcnc_theme');
+  if(!t) t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';
+  document.documentElement.setAttribute('data-theme',t); }catch(e){ document.documentElement.setAttribute('data-theme','dark'); } })();
+</script>
 <style>
 :root {
   /* Cutting-mat palette: the colours the shop already reads in CAD —
@@ -17,6 +22,9 @@
   --bg:#0E1916; --surface:#13221E; --card:#182B26; --border:#27403A; --rule:#1F3530;
   --accent:#4FC3A1; --accent2:#FFC53D; --cut:#F2553D; --text:#E4EEE9; --muted:#89A39A;
   --success:#4FC3A1; --warning:#FFC53D; --danger:#F2553D; --radius:8px;
+  --hdr:#0B1513ee; --on-accent:#06231B; --grid1:#ffffff05; --grid2:#ffffff09; --mat:#0B1513;
+  /* one hue per step — the rail number and the card number share it */
+  --s1:#4FC3A1; --s2:#F2A541; --s3:#9C97F0; --s4:#F2553D; --s5:#5CB8E6;
   --f-head:'Bai Jamjuree','IBM Plex Sans Thai','Segoe UI',system-ui,sans-serif;
   --f-body:'IBM Plex Sans Thai','Segoe UI',system-ui,sans-serif;
 }
@@ -24,14 +32,14 @@
 body{background:var(--bg);color:var(--text);font-family:var(--f-body);min-height:100vh;line-height:1.5;
   /* faint cutting-mat grid: 10 mm minor / 50 mm major feel */
   background-image:
-    linear-gradient(#ffffff05 1px,transparent 1px),linear-gradient(90deg,#ffffff05 1px,transparent 1px),
-    linear-gradient(#ffffff09 1px,transparent 1px),linear-gradient(90deg,#ffffff09 1px,transparent 1px);
+    linear-gradient(var(--grid1) 1px,transparent 1px),linear-gradient(90deg,var(--grid1) 1px,transparent 1px),
+    linear-gradient(var(--grid2) 1px,transparent 1px),linear-gradient(90deg,var(--grid2) 1px,transparent 1px);
   background-size:16px 16px,16px 16px,80px 80px,80px 80px;}
 :focus-visible{outline:2px solid var(--accent2);outline-offset:2px;}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;}}
 
 /* ── Header ── */
-.header{background:#0B1513ee;backdrop-filter:blur(6px);border-bottom:1px solid var(--border);padding:8px 16px;
+.header{background:var(--hdr);backdrop-filter:blur(6px);border-bottom:1px solid var(--border);padding:8px 16px;
   display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:100;flex-wrap:wrap;}
 .logo{font-family:var(--f-head);font-size:1.2rem;font-weight:700;color:var(--text);white-space:nowrap;display:flex;align-items:center;gap:8px;}
 .logo span{color:var(--cut);}
@@ -44,10 +52,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--f-body);min-height
   cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:background .15s,border-color .15s,filter .15s;}
 .btn:hover{filter:brightness(1.12);}
 .btn:disabled{opacity:.45;cursor:not-allowed;filter:none;}
-.btn-primary{background:var(--accent);color:#06231B;}
+.btn-primary{background:var(--accent);color:var(--on-accent);}
 .btn-danger{background:transparent;color:#FF8A75;border-color:#F2553D66;}
 .btn-danger:hover{background:#F2553D22;}
-.btn-success{background:var(--success);color:#06231B;}
+.btn-success{background:var(--success);color:var(--on-accent);}
 .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);}
 .btn-ghost:hover{background:#ffffff08;border-color:#3A5A51;}
 .btn-sm{padding:5px 10px;font-size:.78rem;}
@@ -190,7 +198,7 @@ canvas{display:block;}
 .sh-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 
 /* ── Action bar ── */
-.abar{position:fixed;bottom:0;left:0;right:0;background:#0B1513f0;backdrop-filter:blur(6px);
+.abar{position:fixed;bottom:0;left:0;right:0;background:var(--hdr);backdrop-filter:blur(6px);
   border-top:1px solid var(--border);padding:10px 16px;display:flex;
   justify-content:center;align-items:center;gap:10px;z-index:99;}
 
@@ -300,13 +308,115 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
   .card{break-inside:avoid;border:1px solid #ccc;}
   body{background:#fff;color:#000;}
 }
+
+/* ════════ Light theme ════════ */
+html[data-theme="light"]{
+  --bg:#EEF3F0; --surface:#F7FAF8; --card:#FFFFFF; --border:#D3DED9; --rule:#E2EAE6;
+  --accent:#1E9573; --accent2:#B7791F; --cut:#E0452B; --text:#15231E; --muted:#5E776E;
+  --success:#1E9573; --warning:#B7791F; --danger:#D13B25;
+  --hdr:#FFFFFFe8; --on-accent:#FFFFFF; --grid1:#0000000a; --grid2:#00000010; --mat:#0E1916;
+  --s1:#1E9573; --s2:#C77A12; --s3:#6A63D9; --s4:#E0452B; --s5:#2E8CC0;
+}
+html[data-theme="light"] .card{box-shadow:0 1px 0 #0000000a, 0 8px 24px -18px #1a3a3066;}
+html[data-theme="light"] .btn-danger{color:#C2341F;border-color:#E0452B55;}
+html[data-theme="light"] .logo{color:var(--text);}
+html[data-theme="light"] .notice{background:#F0F7F4;color:#2E5A4C;}
+html[data-theme="light"] .rs-n{background:var(--card);}
+html[data-theme="light"] .rail-step.done .rs-s{color:#3E6B5C;}
+html[data-theme="light"] .dxf-import-drop{background-color:#FFF6F3;}
+html[data-theme="light"] .dxf-import-drop:hover,html[data-theme="light"] .dxf-import-drop.dragover{background-color:#FFEDE7!important;}
+html[data-theme="light"] .imp-tab.active{background:#fff;}
+/* layout canvases stay a dark cutting mat in both themes — cut lines read like CAD */
+html[data-theme="light"] .cv-wrap,html[data-theme="light"] .insp-canvas-box,
+html[data-theme="light"] .layout-thumb canvas,html[data-theme="light"] .mdxf-canvas{background:var(--mat)!important;}
+/* JS-rendered markup carries dark-theme text colours inline → darker twins in light mode */
+html[data-theme="light"] [style*="color:#fbbf24"],html[data-theme="light"] [style*="color:#fcd34d"],
+html[data-theme="light"] [style*="color:#fde68a"],html[data-theme="light"] [style*="color:#FFC53D"],
+html[data-theme="light"] [style*="color:#f59e0b"]{color:#8F5A00!important;}
+html[data-theme="light"] [style*="color:#fca5a5"],html[data-theme="light"] [style*="color:#f87171"],
+html[data-theme="light"] [style*="color:#fecaca"],html[data-theme="light"] [style*="color:#FF8A75"],
+html[data-theme="light"] [style*="color:#ef4444"]{color:#B3261A!important;}
+html[data-theme="light"] [style*="color:#B9D6CB"],html[data-theme="light"] [style*="color:#7FD9BC"],
+html[data-theme="light"] [style*="color:#86efac"],html[data-theme="light"] [style*="color:#bbf7d0"],
+html[data-theme="light"] [style*="color:#6ee7b7"],html[data-theme="light"] [style*="color:#4ade80"],
+html[data-theme="light"] [style*="color:#22c55e"],html[data-theme="light"] [style*="color:#10b981"]{color:#1B6B53!important;}
+html[data-theme="light"] [style*="color:#a78bfa"],html[data-theme="light"] [style*="color:#c4b5fd"],
+html[data-theme="light"] [style*="color:#e9d5ff"]{color:#5A3FB8!important;}
+html[data-theme="light"] [style*="color:#e2e8f0"],html[data-theme="light"] [style*="color:#e6e8f2"]{color:var(--text)!important;}
+html[data-theme="light"] [style*="color:#94a3b8"],html[data-theme="light"] [style*="color:#64748b"]{color:var(--muted)!important;}
+html[data-theme="light"] [style*="background:#15372E"],html[data-theme="light"] [style*="background:#102620"]{background:#E4F2EC!important;}
+html[data-theme="light"] [style*="background:#3b0764"],html[data-theme="light"] [style*="background:#2d1a4a"]{background:#EEE8FF!important;}
+html[data-theme="light"] [style*="background:#2a1f00"],html[data-theme="light"] [style*="background:#78350f33"]{background:#FFF4DC!important;}
+html[data-theme="light"] [style*="background:#2d1a1a"],html[data-theme="light"] [style*="background:#2a1a1a"]{background:#FDE8E4!important;}
+html[data-theme="light"] .cls-outer,html[data-theme="light"] .shape-rect{background:#E4F2EC;color:#1B6B53;}
+html[data-theme="light"] .cls-hole,html[data-theme="light"] .shape-free{background:#EEE8FF;color:#5A3FB8;}
+html[data-theme="light"] .cls-skip{background:#FDE8E4;color:#B3261A;}
+html[data-theme="light"] .insp-row-outer td{background:#F2F8F5;}
+html[data-theme="light"] .insp-row-hole td{background:#F6F2FF;}
+html[data-theme="light"] .insp-row-skip td{background:#FDF1EF;}
+html[data-theme="light"] .warn-box{background:#FFF4DC;color:#8F5A00;}
+html[data-theme="light"] .info-box{background:#F0F7F4;color:#2E5A4C;}
+html[data-theme="light"] .ferr{background:#FDE8E4;}
+html[data-theme="light"] .insp-tbl th,html[data-theme="light"] .mdxf-table th{background:var(--surface);}
+html[data-theme="light"] .layout-count-badge{color:var(--text);}
+
+/* theme switch icon + smooth swap */
+#themeBtn .th-ico::before{content:'☀️';}
+html[data-theme="light"] #themeBtn .th-ico::before{content:'🌙';}
+html.theme-anim, html.theme-anim *{transition:background-color .35s ease,border-color .35s ease,color .35s ease!important;}
+
+/* ════════ Colour per step ════════ */
+.rail-step[data-k="sheet"]{--sc:var(--s1);} .rail-step[data-k="import"]{--sc:var(--s2);}
+.rail-step[data-k="pieces"]{--sc:var(--s3);} .rail-step[data-k="nest"]{--sc:var(--s4);}
+.rail-step[data-k="export"]{--sc:var(--s5);}
+#secSheet{--sc:var(--s1);} #secImport{--sc:var(--s2);} #secPieces{--sc:var(--s3);} #resSection{--sc:var(--s4);}
+.rail-step.done .rs-n{background:var(--sc);border-color:var(--sc);color:var(--on-accent);}
+.rail-step.now .rs-n{border-color:var(--sc);color:var(--sc);box-shadow:0 0 0 4px color-mix(in srgb,var(--sc) 18%,transparent);}
+.rail-step.done::after{border-left-color:var(--sc);}
+.step-no{border-color:var(--sc,var(--accent));color:var(--sc,var(--accent));}
+.step-card,#resSection>.card:first-child{border-top:3px solid var(--sc,var(--accent));}
+.set-group legend{color:var(--sc,var(--accent));}
+.stat{position:relative;overflow:hidden;}
+.stat::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--sc,var(--accent));opacity:.55;}
+.stat:nth-child(5n+1)::after{background:var(--s4);} .stat:nth-child(5n+2)::after{background:var(--s3);}
+.stat:nth-child(5n+3)::after{background:var(--s1);} .stat:nth-child(5n+4)::after{background:var(--s2);}
+.stat:nth-child(5n)::after{background:var(--s5);}
+
+/* ════════ Motion (purposeful, short) ════════ */
+@keyframes cutpath{to{background-position:0 24px;}}
+.rail-step::after{border-left:0!important;width:2px;background:repeating-linear-gradient(to bottom,#3A5A51 0 6px,transparent 6px 12px);}
+html[data-theme="light"] .rail-step::after{background:repeating-linear-gradient(to bottom,#B9CBC4 0 6px,transparent 6px 12px);}
+.rail-step.done::after{background:var(--sc);}
+.rail-step.now::after{background:repeating-linear-gradient(to bottom,var(--sc) 0 6px,transparent 6px 12px);animation:cutpath .9s linear infinite;}
+@keyframes ants{to{background-position:24px 0,-24px 100%,0 -24px,100% 24px;}}
+.dxf-import-drop{border:0!important;background-image:
+  linear-gradient(90deg,var(--cut) 50%,transparent 0),linear-gradient(90deg,var(--cut) 50%,transparent 0),
+  linear-gradient(0deg,var(--cut) 50%,transparent 0),linear-gradient(0deg,var(--cut) 50%,transparent 0);
+  background-repeat:repeat-x,repeat-x,repeat-y,repeat-y;background-size:12px 2px,12px 2px,2px 12px,2px 12px;
+  background-position:0 0,0 100%,0 0,100% 0;background-color:color-mix(in srgb,var(--cut) 5%,transparent);}
+.dxf-import-drop:hover,.dxf-import-drop.dragover{animation:ants .8s linear infinite;background-color:color-mix(in srgb,var(--cut) 10%,transparent)!important;}
+.btn{transition:background .15s,border-color .15s,filter .15s,transform .08s;}
+.btn:active{transform:scale(.97);}
+.card{transition:border-color .2s, box-shadow .2s;}
+@keyframes rise{from{opacity:0;transform:translateY(10px) scale(.985);}to{opacity:1;transform:none;}}
+.layout-thumb.enter{animation:rise .45s cubic-bezier(.2,.7,.2,1) both;}
+details[open]>*:not(summary){animation:rise .25s ease both;}
+.imp-pane:not([hidden]){animation:rise .25s ease both;}
+@keyframes pop{0%{transform:scale(.9);opacity:0}100%{transform:none;opacity:1}}
+#shapeEditOverlay>div{animation:pop .22s cubic-bezier(.2,.8,.2,1) both;}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--cut) 0%,transparent)}50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--cut) 22%,transparent)}}
+.rail-go.ready{animation:glow 1.8s ease-in-out 3;}
+@media (prefers-reduced-motion:reduce){
+  .rail-step.now::after,.dxf-import-drop:hover,.rail-go.ready{animation:none!important;}
+  .layout-thumb.enter,details[open]>*,.imp-pane,#shapeEditOverlay>div{animation:none!important;}
+}
 </style>
 </head>
 <body>
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k18</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k19</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -330,6 +440,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
     </div>
   </div>
   <button class="btn btn-danger btn-sm" id="resetBtn" onclick="resetAll()" data-i18n="resetBtn">🗑️ รีเซ็ต</button>
+  <button class="btn btn-ghost btn-sm" id="themeBtn" onclick="toggleTheme()" title="สลับโหมดมืด / สว่าง" aria-label="สลับโหมดมืด / สว่าง" style="min-width:38px;"><span class="th-ico"></span></button>
   <button class="btn btn-ghost btn-sm" id="langBtn" onclick="toggleLang()" style="font-weight:800;letter-spacing:.5px;min-width:68px;">🌐 EN</button>
 </div>
 
@@ -838,6 +949,36 @@ function updateOrientUI(){
   });
 }
 
+// ── Theme ────────────────────────────────────────────────────────────────────
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme')==='light'?'light':'dark';
+  const nx=cur==='light'?'dark':'light';
+  const root=document.documentElement;
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches){ root.classList.add('theme-anim'); setTimeout(()=>root.classList.remove('theme-anim'),420); }
+  root.setAttribute('data-theme',nx); lsSet('sheetcnc_theme',nx);
+}
+// ── Results reveal: numbers count up once, layout thumbnails rise in order ───
+(function(){
+  const reduce=()=>typeof matchMedia!=='undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const countUp=el=>{
+    const raw=el.textContent; const m=raw.match(/^(\s*)([0-9]+(?:\.[0-9]+)?)(.*)$/s); if(!m) return;
+    const target=parseFloat(m[2]), dec=(m[2].split('.')[1]||'').length; if(!(target>0)) return;
+    const t0=performance.now(), D=650;
+    const step=t=>{ const k=Math.min(1,(t-t0)/D), e=1-Math.pow(1-k,3);
+      el.textContent=m[1]+(target*e).toFixed(dec)+m[3]; if(k<1) requestAnimationFrame(step); else el.textContent=raw; };
+    requestAnimationFrame(step);
+  };
+  const watch=()=>{
+    if(typeof MutationObserver==='undefined' || typeof matchMedia==='undefined') return;
+    const sg=document.getElementById('statsGrid'), lo=document.getElementById('layoutOverview');
+    if(sg) new MutationObserver(()=>{ if(reduce()) return; sg.querySelectorAll('.sv').forEach(el=>{ const n=el.firstChild; if(n&&n.nodeType===3) countUp({get textContent(){return n.textContent;},set textContent(v){n.textContent=v;}}); }); })
+      .observe(sg,{childList:true});
+    if(lo) new MutationObserver(()=>{ if(reduce()) return; lo.querySelectorAll('.layout-thumb').forEach((t,k)=>{ t.style.animationDelay=(k*60)+'ms'; t.classList.add('enter'); }); })
+      .observe(lo,{childList:true});
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',watch); else watch();
+})();
+
 // ── Import tabs + step rail status ────────────────────────────────────────────
 function impTab(k){
   document.querySelectorAll('.imp-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===k));
@@ -858,6 +999,7 @@ function updateRail(){
     set('rsExport', R ? 'กดเพื่อตรวจและดาวน์โหลด' : 'จัดวางก่อน');
     mark('sheet', true); mark('import', !!nFile || nP>0, !nFile && !nP); mark('pieces', nP>0, (!!nFile)&&!nP);
     mark('nest', !!R, nP>0&&!R); mark('export', false, !!R);
+    const go=document.querySelector('.rail-go'); if(go){ const want=nP>0&&!R; if(want&&!go.dataset.glowed){ go.classList.add('ready'); go.dataset.glowed='1'; } if(!want){ go.classList.remove('ready'); if(R) delete go.dataset.glowed; } }
   }catch(e){}
 }
 setInterval(updateRail, 700);
@@ -10076,7 +10218,7 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k18';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k19';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
