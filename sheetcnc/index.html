@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k10</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k11</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -1100,7 +1100,7 @@ function _codesOf(holes){
 /** Natural compare: "35-6" < "35-10" < "36-5". */
 function _natCmp(a,b){ return String(a).localeCompare(String(b), undefined, {numeric:true, sensitivity:'base'}); }
 // What goes into an exported DXF — chosen in the export dialog, remembered per browser.
-const DXF_OPT_DEF={holes:true, frame:true, code:true, name:false, size:true, titles:true, remnant:false};
+const DXF_OPT_DEF={holes:true, frame:true, code:true, name:false, size:true, titles:true, remnant:false, source:false};
 let DXF_OPT=(()=>{ try{ const v=JSON.parse(localStorage.getItem('sheetcnc_dxfopt')||'null');
   return Object.assign({}, DXF_OPT_DEF, v||{}); }catch(e){ return Object.assign({}, DXF_OPT_DEF); } })();
 function _saveDxfOpt(){ try{ localStorage.setItem('sheetcnc_dxfopt', JSON.stringify(DXF_OPT)); }catch(e){} }
@@ -9153,6 +9153,7 @@ function openDxfExportDialog(mode){
     ${row('name', en?'Piece name':'ชื่อชิ้นงาน', en?'Name from the list (skipped when it equals the code)':'ชื่อจากรายการ (ไม่ใส่ซ้ำถ้าเหมือนรหัส)', 'LABEL')}
     ${row('size', en?'Piece size':'ขนาดชิ้นงาน', en?'e.g. 740 x 1340 — placed clear of the code':'เช่น 740 x 1340 — วางไม่ทับรหัส', 'LABEL_SIZE')}
     ${row('remnant', en?'Usable offcuts':'เศษที่ใช้ต่อได้', en?'Outline + size of leftover areas (not for cutting)':'กรอบ + ขนาดพื้นที่เหลือ (ไม่ใช่เส้นตัด)', 'REMNANT')}
+    ${row('source', en?'Original pieces (for checking)':'ชิ้นงานต้นฉบับ (สำหรับตรวจสอบ)', en?'Under each sheet: its pieces exactly as in the source file (not rotated), grouped per sheet — not cut':'ใต้แต่ละแผ่น: ชิ้นงานของแผ่นนั้นตามไฟล์ต้นฉบับ (ไม่หมุน) จัดเป็นกลุ่มต่อแผ่น — ไม่ใช่เส้นตัด', 'SOURCE')}
     ${row('titles', en?'Sheet titles & total':'หัวข้อแผ่น และสรุปจำนวน', en?'"Layout A | 2440 x 1220 | x1 sheet", TOTAL line':'"Layout A | 2440 x 1220 | x1 sheet" และบรรทัด TOTAL', 'SHEET')}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
       <button class="btn btn-ghost btn-sm" onclick="_dxfPreset('cut')">✂️ ${en?'Cut lines only':'เฉพาะเส้นตัด'}</button>
@@ -9166,8 +9167,8 @@ function openDxfExportDialog(mode){
   showEditPopup(en?'📐 DXF export — what to include':'📐 Export DXF — เลือกสิ่งที่จะใส่', body);
 }
 function _dxfPreset(k){
-  const v = k==='all' ? {holes:true,frame:true,code:true,name:true,size:true,titles:true,remnant:true}
-                      : {holes:true,frame:true,code:false,name:false,size:false,titles:false,remnant:false};
+  const v = k==='all' ? {holes:true,frame:true,code:true,name:true,size:true,titles:true,remnant:true,source:true}
+                      : {holes:true,frame:true,code:false,name:false,size:false,titles:false,remnant:false,source:false};
   Object.keys(v).forEach(n=>{ const el=document.getElementById('dxo_'+n); if(el) el.checked=v[n]; });
 }
 function _dxfDialogGo(mode){
@@ -9178,7 +9179,8 @@ function _dxfDialogGo(mode){
 /** Filename tag for a non-default selection, so two different exports never share a name. */
 function _dxfOptTag(){
   const o=DXF_OPT;
-  if(!o.code&&!o.name&&!o.size&&!o.titles&&!o.remnant) return '_cutonly';
+  if(!o.code&&!o.name&&!o.size&&!o.titles&&!o.remnant&&!o.source) return '_cutonly';
+  if(o.source) return '_check';
   return '';
 }
 function exportProjectMenu(){ closeExportMenu(); saveProject(); }
@@ -9499,7 +9501,7 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k10';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k11';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
@@ -9526,6 +9528,49 @@ function _sheetTitle(offX, sw, sh, g){
   return _lbl(offX+margin,      baseY, h1, p1, 0)          // left-aligned
        + _lbl(offX+sw-margin,   baseY, h2, p2, 2, col);    // right-aligned to sheet edge
 }
+/** CHECK GROUP: under each sheet, every piece on that sheet drawn exactly as it is in
+ *  the source file (no rotation, original text), sorted by part code and framed as one
+ *  group per sheet. Layers SOURCE / SOURCE_TEXT only — never CUT, so nothing here is
+ *  machined. Lets the user tick off "this sheet really has 36-5, 37-6 …". */
+function _dxfSourceGroup(g, offX, sw, sh){
+  if(!DXF_OPT.source) return '';
+  const items=g.sheet.items.slice().sort((a,b)=>_natCmp(_codesOf(srcOf(a).holes).join(',')||'~'+a.name,_codesOf(srcOf(b).holes).join(',')||'~'+b.name));
+  function srcOf(it){
+    if(it.__src) return it.__src;                       // the exact item that was placed (own text)
+    const p=pieces.find(q=>q.id===it.pieceId)||{};
+    const holes=(p.textSets&&p.textSets.length)?[...(p.holes||[]).filter(h=>!h.isText),...p.textSets[0]]:(p.holes||[]);
+    return {w:p.w??it.w, h:p.h??it.h, vertices:p.vertices||null, rawV:p.rawV||null, holes, open:p.open, name:p.name||it.name};
+  }
+  const GAPX=60, GAPY=80, TOP0=-260;                    // below the sheet titles / TOTAL line
+  // shelf layout inside this sheet's column width
+  let x=0, y=0, rowH=0; const pos=[];
+  for(const it of items){
+    const s=srcOf(it), w=+s.w, h=+s.h;
+    if(x>0 && x+w>sw){ x=0; y+=rowH+GAPY; rowH=0; }
+    pos.push({s,x,y}); x+=w+GAPX; rowH=Math.max(rowH,h);
+  }
+  const totalH=y+rowH;
+  // Draw with the normal piece writer, then move everything onto SOURCE layers.
+  const keep={...DXF_OPT};
+  DXF_OPT.holes=true; DXF_OPT.code=true; DXF_OPT.name=false; DXF_OPT.size=false;
+  let o='';
+  try{
+    for(const {s:src,x:px,y:py} of pos){
+      const fake={x:px, y:0, w:+src.w, h:+src.h, angle:0, rotatedVerts:null,
+                  vertices:src.vertices||null, rawV:src.rawV||null, holes:src.holes||null, open:src.open, name:src.name};
+      const T=TOP0-py;                                    // DXF y of this piece's top edge
+      o+=dxfItemPaths(fake, offX, sh-T, sh);
+    }
+  } finally { Object.assign(DXF_OPT, keep); }
+  o=o.replace(/\n8\n(CUT|CUT_HOLE)\n/g,'\n8\nSOURCE\n').replace(/\n8\nTEXT\n/g,'\n8\nSOURCE_TEXT\n')
+     .replace(/^0\n/,'0\n');
+  // frame + caption for the whole group
+  const fx=offX-20, fy=TOP0-totalH-20, fw=Math.min(sw, Math.max(...pos.map(p=>p.x+(+p.s.w)),0))+40, fh=totalH+40;
+  o+=dxfRectShape(fx, fy, fw, fh, 'SOURCE');
+  const cap=`SOURCE (original) - Layout ${g.label} - ${items.length} pcs: ${items.map(it=>_codesOf(srcOf(it).holes).join('/')||_dxfStr(it.name)).join(', ')}`;
+  o+=`0\nTEXT\n8\nSOURCE_TEXT\n10\n${(fx).toFixed(3)}\n20\n${(fy-40).toFixed(3)}\n40\n24\n1\n${_dxfStr(cap)}\n`;
+  return o;
+}
 /** Offcut outlines on their own REMNANT layer (never CUT) — only when ticked. */
 function _dxfRemnants(sheet, offX, sw, sh){
   if(!DXF_OPT.remnant || !nestResult) return '';
@@ -9542,7 +9587,7 @@ function buildDXFSingle(groupIdx){
   if(!nestResult) return null;
   const {sheetGroups,sw,sh}=nestResult;
   const g=sheetGroups[groupIdx]; if(!g) return null;
-  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30, REMNANT:8};
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30, REMNANT:8, SOURCE:8, SOURCE_TEXT:9};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
   if(DXF_OPT.frame) entities+=dxfRectShape(0,0,sw,sh,'SHEET');
@@ -9551,13 +9596,14 @@ function buildDXFSingle(groupIdx){
   entities+=_lbl(20, -150, 40, `TOTAL: ${totalSheets} sheet${totalSheets>1?'s':''}`, 0);
   _cutOrder(g.sheet.items).forEach(item=>{ entities+=dxfItemPaths(item,0,0,sh); });
   entities+=_dxfRemnants(g.sheet,0,sw,sh);
+  entities+=_dxfSourceGroup(g, 0, sw, sh);
   return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
 }
 function buildDXF(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return null; }
   const {sheetGroups,sw,sh}=nestResult;
   const GAP=150;
-  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30, REMNANT:8};
+  const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30, REMNANT:8, SOURCE:8, SOURCE_TEXT:9};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
   let entities='';
   sheetGroups.forEach((g,li)=>{
@@ -9566,6 +9612,7 @@ function buildDXF(){
     entities+=_sheetTitle(offX, sw, sh, g);
     _cutOrder(g.sheet.items).forEach(item=>{ entities+=dxfItemPaths(item,offX,offY,sh); });
     entities+=_dxfRemnants(g.sheet,offX,sw,sh);
+    entities+=_dxfSourceGroup(g, offX, sw, sh);
   });
   // One overall summary, left-aligned below the first sheet. Spelling out every
   // layout makes it obvious at a glance whether the file is the combined export
