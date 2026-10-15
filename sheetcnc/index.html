@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k16</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k17</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -1108,7 +1108,7 @@ function _textProbes(s){
  *  nesting rotation), cap height = DXF height, width factor. toC maps mm → canvas. */
 function _drawTextHole(ctx, hole, toC, pxPerMm, color){
   const t=hole.text, v=hole.vertices; if(!t||!v||!v.length) return;
-  const str=t.str||''; if(!str) return;
+  const str=_uDecode(t.str||''); if(!str) return;
   const A=toC(v[0][0],v[0][1]);
   let rot=0, P5=null, P6=null;
   if(v.length>=7){
@@ -1137,6 +1137,8 @@ function _drawTextHole(ctx, hole, toC, pxPerMm, color){
   ctx.fillText(str,0,by);
   ctx.restore();
 }
+/** AutoCAD writes non-ASCII text as \U+XXXX — decode for DISPLAY only (the file keeps the raw form). */
+function _uDecode(str){ return String(str==null?'':str).replace(/\\U\+([0-9A-Fa-f]{4})/g,(m,h)=>String.fromCharCode(parseInt(h,16))); }
 /** Part codes = the TEXT strings carried inside a piece (from the imported file). */
 function _codesOf(holes){
   return (holes||[]).filter(h=>h&&h.isText&&h.text&&h.text.str).map(h=>String(h.text.str).trim()).filter(Boolean);
@@ -1145,8 +1147,10 @@ function _codesOf(holes){
 function _natCmp(a,b){ return String(a).localeCompare(String(b), undefined, {numeric:true, sensitivity:'base'}); }
 // What goes into an exported DXF — chosen in the export dialog, remembered per browser.
 const DXF_OPT_DEF={holes:true, frame:true, code:true, name:false, size:true, titles:true, remnant:false, source:false, clip:false};
+// (clip is now chosen per row at import — kept here only so old saved settings load)
 let DXF_OPT=(()=>{ try{ const v=JSON.parse(localStorage.getItem('sheetcnc_dxfopt')||'null');
   return Object.assign({}, DXF_OPT_DEF, v||{}); }catch(e){ return Object.assign({}, DXF_OPT_DEF); } })();
+DXF_OPT.clip=false;
 function _saveDxfOpt(){ try{ localStorage.setItem('sheetcnc_dxfopt', JSON.stringify(DXF_OPT)); }catch(e){} }
 
 /** Arc geometry of a bulge segment p0→p1: centre, radius, start angle, signed sweep. */
@@ -3378,9 +3382,11 @@ function _codeAudit(groups){
 function renderStep2HTML(outers) {
   const groups = mdxfGroups; // already computed in showInspStep2
   const AUD = _codeAudit(groups);
+  const OVR = groups.map(g=>_overrunInfo(g.shape));
+  const anyOver = OVR.some(o=>o.n>0);
   const warnLines=[];
   if(AUD.anyCode){
-    if(AUD.dup.length) warnLines.push(lang==='en'?`Duplicate code: <b>${AUD.dup.join(', ')}</b> (appears on more than one piece)`:`รหัสซ้ำ: <b>${AUD.dup.join(', ')}</b> (มีมากกว่า 1 ชิ้น)`);
+    if(AUD.dup.length) warnLines.push(lang==='en'?`Duplicate code: <b>${_uDecode(AUD.dup.join(', '))}</b> (appears on more than one piece)`:`รหัสซ้ำ: <b>${_uDecode(AUD.dup.join(', '))}</b> (มีมากกว่า 1 ชิ้น)`);
     if(AUD.missing)    warnLines.push(lang==='en'?`<b>${AUD.missing}</b> row(s) have a piece with no code`:`<b>${AUD.missing}</b> แถว มีชิ้นที่ไม่มีรหัส`);
     if(AUD.multi)      warnLines.push(lang==='en'?`<b>${AUD.multi}</b> row(s) have a piece with more than one code`:`<b>${AUD.multi}</b> แถว มีชิ้นที่มีรหัสมากกว่า 1 ตัว`);
   }
@@ -3445,6 +3451,13 @@ function renderStep2HTML(outers) {
       </div>
 
       ${warnHTML}
+      ${anyOver?`<div style="background:#78350f33;border:1px solid #f59e0b88;color:#fde68a;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.8rem;line-height:1.6;">
+        ✂️ ${lang==='en'?`<b>${OVR.filter(o=>o.n).length}</b> row(s) have inner lines that run past the piece outline (up to <b>${Math.max(...OVR.map(o=>o.max)).toFixed(1)}</b> mm).`:`มี <b>${OVR.filter(o=>o.n).length}</b> แถว ที่เส้นภายในยื่นเลยขอบชิ้น (สูงสุด <b>${Math.max(...OVR.map(o=>o.max)).toFixed(1)}</b> mm)`}
+        <div style="margin-top:4px;">${lang==='en'?'Keep = cut as drawn (e.g. groove run-out) — the nesting keeps the gap from the line ends too. Trim = cut off at the outline.':'เก็บไว้ = ตัดตามแบบ (เช่น เผื่อเซาะร่อง) — การวางแผ่นจะเว้นระยะจากปลายเส้นด้วย · ตัดที่ขอบ = ตัดเส้นให้จบพอดีขอบชิ้น'}</div>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" onclick="setAllOverrun('keep')">📏 ${lang==='en'?'Keep all':'เก็บไว้ทั้งหมด'}</button>
+          <button class="btn btn-ghost btn-sm" onclick="setAllOverrun('trim')">✂️ ${lang==='en'?'Trim all':'ตัดที่ขอบทั้งหมด'}</button>
+        </div></div>`:''}
       <div class="mdxf-table-wrap">
         <table class="mdxf-table">
           <thead><tr>
@@ -3454,6 +3467,7 @@ function renderStep2HTML(outers) {
             <th>${t('col_holes')}</th>
             <th>${t('col_found')}</th>
             <th>${t('col_code')}</th>
+            ${anyOver?`<th title="${lang==='en'?'Inner lines that run past the outline':'เส้นภายในที่ยื่นเลยขอบชิ้น'}">${lang==='en'?'Overrun lines':'เส้นยื่นเลยขอบ'}</th>`:''}
             <th>${t('col_name')}</th>
             <th>${t('qty_lbl')}</th>
           </tr></thead>
@@ -3470,9 +3484,9 @@ function renderStep2HTML(outers) {
               const why = [AR.dup?(lang==='en'?'duplicate code':'รหัสซ้ำ'):'', AR.missing?(lang==='en'?'no code':'ไม่มีรหัส'):'',
                            AR.multi?(lang==='en'?'more than one code':'มีรหัสมากกว่า 1 ตัว'):''].filter(Boolean).join(', ');
               const codeHtml = codes.length
-                ? codes.map(c=>`<span style="background:#3b0764;color:#e9d5ff;border-radius:5px;padding:2px 7px;font-size:.76rem;font-weight:700;white-space:nowrap;">${c.replace(/</g,'&lt;')}</span>`).join(' ')
+                ? codes.map(c=>`<span style="background:#3b0764;color:#e9d5ff;border-radius:5px;padding:2px 7px;font-size:.76rem;font-weight:700;white-space:nowrap;">${_uDecode(c).replace(/</g,'&lt;')}</span>`).join(' ')
                 : `<span style="color:#f87171;font-size:.72rem;" title="${lang==='en'?'No text found inside this piece':'ไม่พบตัวอักษรภายในกรอบชิ้นนี้'}">⚠️ ${lang==='en'?'none':'ไม่มี'}</span>`;
-              const defName = codes.length ? codes.join(', ') : `${s.w.toFixed(0)}×${s.h.toFixed(0)} mm${s.type==='circle'?' ⭕':''}`;
+              const defName = codes.length ? _uDecode(codes.join(', ')) : `${s.w.toFixed(0)}×${s.h.toFixed(0)} mm${s.type==='circle'?' ⭕':''}`;
               return `<tr id="mdxfRow${gi}" ${bad?`style="outline:2px solid #ef4444;outline-offset:-2px;background:#7f1d1d22;" title="${why}"`:''}
                 onmouseenter="mdxfGroupHighlight(${gi},true)"
                 onmouseleave="mdxfGroupHighlight(${gi},false)">
@@ -3493,6 +3507,9 @@ function renderStep2HTML(outers) {
                     ${autoQty} ${t('pieces_lbl')}
                   </span>
                 </td>
+                ${anyOver?`<td>${OVR[gi].n?`<select class="mdxf-over" id="mdxfOver${gi}" title="${OVR[gi].n} ${lang==='en'?'line(s), up to':'เส้น ยื่นสูงสุด'} ${OVR[gi].max.toFixed(1)} mm" style="background:var(--surface);border:1px solid #f59e0b88;border-radius:5px;color:var(--text);padding:3px 5px;font-size:.76rem;">
+                    <option value="keep">📏 ${lang==='en'?'Keep':'เก็บไว้'} (${OVR[gi].max.toFixed(1)}mm)</option>
+                    <option value="trim">✂️ ${lang==='en'?'Trim at edge':'ตัดที่ขอบ'}</option></select>`:'<span style="color:var(--muted)">—</span>'}</td>`:''}
                 <td><div style="display:flex;flex-wrap:wrap;gap:3px;max-width:180px;">${codeHtml}${bad&&codes.length?`<span style="color:#f87171;font-size:.7rem;">⚠️ ${why}</span>`:''}</div></td>
                 <td><input style="background:var(--surface);border:1px solid var(--border);border-radius:5px;
                   color:var(--text);padding:3px 7px;font-size:.78rem;width:150px;"
@@ -3837,6 +3854,33 @@ function drawMdxfPreview(highlightIdx) {
   });
 }
 
+/** Inner open lines that run past the piece outline (source coords). */
+function _overrunInfo(sh){
+  const R=sh.vertices; let n=0, max=0;
+  if(!R||R.length<3||sh.open) return {n,max};
+  for(const h of (sh.holes||[])){
+    if(!h.open||h.isText||!h.vertices||h.vertices.length<2) continue;
+    let o=0;
+    for(const [x,y] of h.vertices) if(!pointInPolygon(x,y,R)){
+      let d=Infinity; for(let i=0;i<R.length;i++){ const a=R[i], b=R[(i+1)%R.length];
+        const vx=b[0]-a[0], vy=b[1]-a[1], L=vx*vx+vy*vy; let t=L?((x-a[0])*vx+(y-a[1])*vy)/L:0; t=t<0?0:t>1?1:t;
+        d=Math.min(d, Math.hypot(a[0]+t*vx-x, a[1]+t*vy-y)); }
+      o=Math.max(o,d); }
+    if(o>0.05){ n++; max=Math.max(max,o); }
+  }
+  return {n,max};
+}
+/** Convex hull (monotone chain). */
+function _hull(pts){
+  const P=pts.map(p=>[p[0],p[1]]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  if(P.length<3) return P;
+  const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+  const lo=[], up=[];
+  for(const p of P){ while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0) lo.pop(); lo.push(p); }
+  for(let i=P.length-1;i>=0;i--){ const p=P[i]; while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0) up.pop(); up.push(p); }
+  up.pop(); lo.pop(); return lo.concat(up);
+}
+function setAllOverrun(mode){ document.querySelectorAll('.mdxf-over').forEach(el=>{ el.value=mode; }); }
 function mdxfAddSelected() {
   const selected = [];
   document.querySelectorAll('.mdxf-item-chk').forEach(chk=>{
@@ -3847,7 +3891,8 @@ function mdxfAddSelected() {
       const s = g.shape;
       const name = document.getElementById('mdxfName'+gi)?.value || `${s.w.toFixed(0)}×${s.h.toFixed(0)} mm`;
       const qty = +document.getElementById('mdxfQty'+gi)?.value || g.count;
-      selected.push({s, name, qty, gi, indices: g.indices||[]});
+      const ov = document.getElementById('mdxfOver'+gi)?.value || 'keep';
+      selected.push({s, name, qty, gi, indices: g.indices||[], ov});
     }
   });
 
@@ -3861,31 +3906,57 @@ function mdxfAddSelected() {
     rawV: h.rawV && /\.(dxf)$/i.test(inspFileName) ? h.rawV.map(v=>({x:v.x-ref.minX, y:ref.h-(v.y-ref.minY), b:-v.b})) : null
   });
 
-  selected.forEach(({s, name, qty, indices})=>{
+  // Overrun handling. TRIM: clip the lines at the outline (source coords). KEEP: the
+  // lines stay as drawn, and the piece is nested by an envelope (convex hull of the
+  // outline + line ends) so the gap is kept from the line tips too — the true outline
+  // is still what gets cut (piece.outline).
+  const trimShape = sh => ({...sh, holes:(sh.holes||[]).flatMap(h=>{
+    if(!h.open||h.isText||!h.vertices||h.vertices.length<2) return [h];
+    if(h.rawV&&h.rawV.some(v=>Math.abs(v.b)>1e-10)) return [h];
+    if(h.vertices.every(([x,y])=>pointInPolygon(x,y,sh.vertices))) return [h];
+    return _clipLineToRing(h.vertices, sh.vertices).map(l=>{ const xs=l.map(p=>p[0]), ys=l.map(p=>p[1]);
+      return {...h, vertices:l, rawV:null, minX:Math.min(...xs), minY:Math.min(...ys), w:Math.max(...xs)-Math.min(...xs), h:Math.max(...ys)-Math.min(...ys)}; });
+  })});
+  const envOf = sh => {
+    const pts=[...sh.vertices];
+    (sh.holes||[]).forEach(h=>{ if(h.open&&!h.isText&&h.vertices) h.vertices.forEach(p=>{ if(!pointInPolygon(p[0],p[1],sh.vertices)) pts.push(p); }); });
+    const H=_hull(pts), xs=H.map(p=>p[0]), ys=H.map(p=>p[1]);
+    const mnX=Math.min(...xs), mnY=Math.min(...ys);
+    return {hull:H, minX:mnX, minY:mnY, w:Math.max(...xs)-mnX, h:Math.max(...ys)-mnY};
+  };
+
+  selected.forEach(({s:s0, name, qty, indices, ov})=>{
+    const over=_overrunInfo(s0).n>0;
+    const s = (over && ov==='trim') ? trimShape(s0) : s0;
+    const env = (over && ov==='keep') ? envOf(s0) : null;
+    const ref = env ? {minX:env.minX, minY:env.minY, h:env.h} : s;   // frame everything is normalised to
+    const nv = ([x,y])=>[x-ref.minX, flip ? ref.h-(y-ref.minY) : y-ref.minY];
     const id = uid();
     const color = COLORS[pieces.length % COLORS.length];
     // Each grouped instance keeps its OWN text position. Non-text line work is
     // identical across the group (that's why they grouped), so it comes from the
     // representative; only the TEXT differs, captured per instance in textSets.
     const instShapes = (indices||[]).map(idx=>mdxfShapes[idx]).filter(Boolean);
-    const textSets = instShapes.map(sh =>
-      (sh.holes||[]).filter(h=>h.isText&&h.text).map(h=>normHole(h, sh)));
+    const textSets = instShapes.map(sh => { const r = env ? envOf(sh) : sh;
+      return (sh.holes||[]).filter(h=>h.isText&&h.text).map(h=>normHole(h, r)); });
     pieces.push({
       id, name, qty,
       source: 'dxf',
       // EXACT size (no rounding). Rounding 37.5→38 made every spacing calculation
       // 0.5mm wrong (gaps came out 10.5 / 9.5 instead of 10).
-      w: Math.max(0.01, Math.round(s.w*1000)/1000),
-      h: Math.max(0.01, Math.round(s.h*1000)/1000),
+      w: Math.max(0.01, Math.round((env?env.w:s.w)*1000)/1000),
+      h: Math.max(0.01, Math.round((env?env.h:s.h)*1000)/1000),
       area: s.area,
       open: s.open || false,
       stlData: null,
       dxfData: s,
       color,
       // Normalize to (0,0) and apply Y-flip for Y-up sources (DXF, EPS, AI).
-      vertices: s.vertices.map(([x,y])=>[x-s.minX, flip ? s.h-(y-s.minY) : y-s.minY]),
-      rawV: s.rawV && /\.(dxf)$/i.test(inspFileName) ? s.rawV.map(v=>({x:v.x-s.minX, y:s.h-(v.y-s.minY), b:-v.b})) : null,
-      holes: (s.holes||[]).map(h=>normHole(h, s)),
+      vertices: (env ? env.hull : s.vertices).map(nv),
+      outline: env ? s.vertices.map(nv) : null,          // true cut outline when nested by the envelope
+      overrun: over ? ov : null,
+      rawV: s.rawV && /\.(dxf)$/i.test(inspFileName) ? s.rawV.map(v=>({x:v.x-ref.minX, y:ref.h-(v.y-ref.minY), b:-v.b})) : null,
+      holes: (s.holes||[]).map(h=>normHole(h, ref)),
       textSets: (textSets.length && textSets.some(t=>t.length)) ? textSets : null,
       fileName: 'multi-dxf'
     });
@@ -5209,7 +5280,7 @@ function _runNestingSync() {
         const tset = p.textSets[i % p.textSets.length] || [];
         holes = [...nonText, ...tset];
       }
-      items.push({pieceId:p.id, name:p.name, color:p.color,
+      items.push({pieceId:p.id, name:p.name, color:p.color, outline:p.outline||null,
         w:p.w, h:p.h, vertices:p.vertices||null, holes, rawV:p.rawV||null, open:p.open||false});
     }
   });
@@ -5749,6 +5820,7 @@ function place(item, sheet, sw, sh, edgeMargin, pieceGap, rotMode){
             pieceId:item.pieceId, name:item.name, color:item.color,
             x, y, w, h, angle:angle||0,
             rotatedVerts:(angle||item.vertices)?verts:null,
+            rotatedOutline: item.outline ? (angle ? computeRotatedHoles([{vertices:item.outline}], angle, item.w, item.h, item.vertices)[0].vertices : item.outline) : null,
             vertices:item.vertices||null,
             holes:placedHoles,
             rawV:placedRawV,
@@ -6029,7 +6101,7 @@ function drawSheetOnCanvas(canvas, sheet, sw, sh, {pad=4, maxW=null, maxH=null, 
       ? item.color : COLORS[(sheet.items.indexOf(item))%COLORS.length] || '#4cc9f0';
 
     // Use rotatedVerts (normalized, origin at 0,0) if available
-    const drawVerts = item.rotatedVerts || item.vertices;
+    const drawVerts = item.rotatedOutline || item.rotatedVerts || item.vertices;
     if(drawVerts && drawVerts.length>=3){
       // Vertices are stored in canvas Y-down convention (vy=0 = top of piece).
       // toCnv maps piece-local (vx,vy) directly to canvas pixels — no flip needed.
@@ -9307,7 +9379,6 @@ function openDxfExportDialog(mode){
   const body=`<div style="font-size:.78rem;color:var(--muted,#94a3b8);margin-bottom:6px;">${en?'Export':'Export'}: <b style="color:var(--text,#e2e8f0);">${what}</b></div>
     ${row('cut', en?'Cut outlines':'เส้นตัดรอบชิ้นงาน', en?'Always included':'ใส่เสมอ', 'CUT', true)}
     ${row('holes', en?'Inner cuts (holes / slots / inner lines)':'เส้นตัดภายใน (รู / ช่อง / เส้นใน)', en?'Holes and line work inside each piece':'รูและเส้นที่อยู่ในชิ้นงาน', 'CUT_HOLE')}
-    ${row('clip', en?'Trim inner lines at the piece outline':'ตัดเส้นภายในที่ยื่นเลยขอบชิ้น ให้จบที่ขอบ', en?'Inner line work that runs past the outline is cut off exactly at the outline (changes the source drawing)':'เส้นลาย/เส้นภายในที่ยื่นออกนอกชิ้น จะถูกตัดให้จบพอดีขอบชิ้น (เปลี่ยนจากแบบต้นฉบับ)', 'CUT')}
     ${row('frame', en?'Sheet frame':'กรอบแผ่นวัสดุ', en?'Rectangle of the material sheet':'สี่เหลี่ยมขนาดแผ่นวัสดุ', 'SHEET')}
     ${row('code', en?'Part code (text from the file)':'รหัสชิ้นงาน (ตัวอักษรจากไฟล์)', en?'e.g. 36-5 — kept exactly where the file has it':'เช่น 36-5 — ตำแหน่งตามไฟล์ต้นฉบับ', 'TEXT')}
     ${row('name', en?'Piece name':'ชื่อชิ้นงาน', en?'Name from the list (skipped when it equals the code)':'ชื่อจากรายการ (ไม่ใส่ซ้ำถ้าเหมือนรหัส)', 'LABEL')}
@@ -9491,7 +9562,7 @@ function _showVerifyPopup(jobs){
       ${line(r.under===0, `${en?'Min piece gap':'ระยะห่างชิ้นงานต่ำสุด'} <b>${f(r.minGap)}</b> mm (${en?'set':'ตั้ง'} ${r.gap})${r.under?` — <b>${r.under}</b> ${en?'pair(s) too close':'คู่ชิดเกิน'}`:''}`)}
       ${line(!(r.minEdge<r.edge-1e-3) && r.outside===0, `${en?'Min edge margin':'ระยะขอบต่ำสุด'} <b>${f(r.minEdge)}</b> mm (${en?'set':'ตั้ง'} ${r.edge})${r.outside?` — <b>${r.outside}</b> ${en?'outside the sheet':'ชิ้นหลุดนอกแผ่น'}`:''}`)}
       ${line(r.pieces===r.expectN, `${en?'Pieces in file':'ชิ้นงานในไฟล์'} <b>${r.pieces}/${r.expectN}</b>`)}
-      ${(r.overBad||r.overEdgeBad)?line(false, en?`Inner lines that run past their piece: <b>${r.overBad}</b> come closer than ${r.gap} mm to another piece${isFinite(r.overNear)?` (min ${r.overNear.toFixed(2)} mm)`:''}, <b>${r.overEdgeBad}</b> break the sheet edge margin — tick “Trim inner lines” or fix the drawing`:`เส้นภายในที่ยื่นเลยขอบ: <b>${r.overBad}</b> เส้นเข้าใกล้ชิ้นอื่นเกิน ${r.gap} mm${isFinite(r.overNear)?` (ใกล้สุด ${r.overNear.toFixed(2)} mm)`:''}, <b>${r.overEdgeBad}</b> เส้นชิดหรือเลยขอบแผ่น — ติ๊ก “ตัดเส้นภายในให้จบที่ขอบ” หรือแก้แบบ`):''}
+      ${(r.overBad||r.overEdgeBad)?line(false, en?`Inner lines that run past their piece: <b>${r.overBad}</b> come closer than ${r.gap} mm to another piece${isFinite(r.overNear)?` (min ${r.overNear.toFixed(2)} mm)`:''}, <b>${r.overEdgeBad}</b> break the sheet edge margin — choose “Trim at edge” for those rows when importing, or re-nest with “Keep”`:`เส้นภายในที่ยื่นเลยขอบ: <b>${r.overBad}</b> เส้นเข้าใกล้ชิ้นอื่นเกิน ${r.gap} mm${isFinite(r.overNear)?` (ใกล้สุด ${r.overNear.toFixed(2)} mm)`:''}, <b>${r.overEdgeBad}</b> เส้นชิดหรือเลยขอบแผ่น — ตอนนำเข้าให้เลือก “ตัดที่ขอบ” หรือ “เก็บไว้” แล้วจัดวางใหม่`):''}
       ${r.overN?`<div style="font-size:.8rem;margin:2px 0;color:#fcd34d;">⚠️ ${en?`${r.overN} inner line(s) run past their piece outline by up to <b>${r.overMax.toFixed(2)}</b> mm (as drawn in the source file)`:`เส้นภายใน ${r.overN} เส้น ยื่นเลยขอบชิ้นงานสูงสุด <b>${r.overMax.toFixed(2)}</b> mm (ตามที่วาดในไฟล์ต้นฉบับ)`}</div>`:''}
       ${r.codesChecked?line(r.missing.length===0, `${en?'Part codes':'รหัสชิ้นงาน'} <b>${r.codes}/${r.expectCodes}</b>${r.missing.length?` — ${en?'missing':'ขาด'}: ${r.missing.join(', ')}`:''}`):''}
     </label>`;
@@ -9620,7 +9691,7 @@ function _ptInRing(x, y, ring){
  *  across the part, take the widest run of solid material, and anchor there. */
 function _labelAnchor(item){
   const w=+item.w, h=+item.h;
-  const ring=item.rotatedVerts || item.vertices;
+  const ring=item.rotatedOutline || item.rotatedVerts || item.vertices;
   const holes=(item.holes||[]).filter(o=>!o.isText && !o.open && o.vertices && o.vertices.length>=3);
   const solid=(x,y)=> _ptInRing(x,y,ring) && !holes.some(o=>_ptInRing(x,y,o.vertices));
   if(!ring || ring.length<3) return {x:w/2, y:h/2, w, h, solid:null};
@@ -9686,7 +9757,7 @@ function _pieceLabel(item, ix, iyTop){
   const size = DXF_OPT.size ? `${Math.round(W*10)/10} x ${Math.round(H*10)/10}` : '';
   if(!name && !size) return '';
   const a=_labelAnchor(item);
-  const ring=item.rotatedVerts||item.vertices;
+  const ring=item.rotatedOutline||item.rotatedVerts||item.vertices;
   const inner=(item.holes||[]).filter(o=>!o.isText && !o.open && o.vertices && o.vertices.length>=3);
   const solidAt=(x,y)=> (!ring||ring.length<3) ? (x>=0&&x<=W&&y>=0&&y<=H)
                       : (_ptInRing(x,y,ring) && !inner.some(o=>_ptInRing(x,y,o.vertices)));
@@ -9790,7 +9861,7 @@ function dxfItemPaths(item, offX, offY, sh){
   // where canvas_item_y = item.y from top of sheet.
   const iyTop = (sh||0) - ((offY||0)+item.y); // DXF Y of the piece's top edge
 
-  const verts = item.rotatedVerts || item.vertices;
+  const verts = item.rotatedOutline || item.rotatedVerts || item.vertices;   // the TRUE outline (not the nesting envelope)
   const rawV = item.rawV || null;
   const closedFlag = !item.open;        // open shapes (arcs) export WITHOUT a closing chord
   if(verts && verts.length>=2){
@@ -9884,7 +9955,7 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k16';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k17';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
@@ -9942,7 +10013,7 @@ function _dxfSourceGroup(g, offX, sw, sh){
     if(it.__src) return it.__src;                       // the exact item that was placed (own text)
     const p=pieces.find(q=>q.id===it.pieceId)||{};
     const holes=(p.textSets&&p.textSets.length)?[...(p.holes||[]).filter(h=>!h.isText),...p.textSets[0]]:(p.holes||[]);
-    return {w:p.w??it.w, h:p.h??it.h, vertices:p.vertices||null, rawV:p.rawV||null, holes, open:p.open, name:p.name||it.name};
+    return {w:p.w??it.w, h:p.h??it.h, vertices:p.vertices||null, outline:p.outline||null, rawV:p.rawV||null, holes, open:p.open, name:p.name||it.name};
   }
   const key=it=>_codesOf(srcOf(it).holes).join(',')||'~'+it.name;
   const items=g.sheet.items.slice().sort((a,b)=>_natCmp(key(a),key(b)));
@@ -9961,7 +10032,7 @@ function _dxfSourceGroup(g, offX, sw, sh){
   try{
     for(const P of pos){
       const sr=P.sr;
-      const fake={x:P.x, y:0, w:+sr.w, h:+sr.h, angle:0, rotatedVerts:null,
+      const fake={x:P.x, y:0, w:+sr.w, h:+sr.h, angle:0, rotatedVerts:null, rotatedOutline:sr.outline||null,
                   vertices:sr.vertices||null, rawV:sr.rawV||null, holes:sr.holes||null, open:sr.open, name:sr.name};
       const T=TOP0-P.y;                                   // DXF y of this copy's top edge
       src.set(P.it, toSrc(dxfItemPaths(fake, offX, sh-T, sh)));
