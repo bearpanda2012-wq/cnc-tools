@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k15</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k16</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -1144,7 +1144,7 @@ function _codesOf(holes){
 /** Natural compare: "35-6" < "35-10" < "36-5". */
 function _natCmp(a,b){ return String(a).localeCompare(String(b), undefined, {numeric:true, sensitivity:'base'}); }
 // What goes into an exported DXF — chosen in the export dialog, remembered per browser.
-const DXF_OPT_DEF={holes:true, frame:true, code:true, name:false, size:true, titles:true, remnant:false, source:false};
+const DXF_OPT_DEF={holes:true, frame:true, code:true, name:false, size:true, titles:true, remnant:false, source:false, clip:false};
 let DXF_OPT=(()=>{ try{ const v=JSON.parse(localStorage.getItem('sheetcnc_dxfopt')||'null');
   return Object.assign({}, DXF_OPT_DEF, v||{}); }catch(e){ return Object.assign({}, DXF_OPT_DEF); } })();
 function _saveDxfOpt(){ try{ localStorage.setItem('sheetcnc_dxfopt', JSON.stringify(DXF_OPT)); }catch(e){} }
@@ -9307,6 +9307,7 @@ function openDxfExportDialog(mode){
   const body=`<div style="font-size:.78rem;color:var(--muted,#94a3b8);margin-bottom:6px;">${en?'Export':'Export'}: <b style="color:var(--text,#e2e8f0);">${what}</b></div>
     ${row('cut', en?'Cut outlines':'เส้นตัดรอบชิ้นงาน', en?'Always included':'ใส่เสมอ', 'CUT', true)}
     ${row('holes', en?'Inner cuts (holes / slots / inner lines)':'เส้นตัดภายใน (รู / ช่อง / เส้นใน)', en?'Holes and line work inside each piece':'รูและเส้นที่อยู่ในชิ้นงาน', 'CUT_HOLE')}
+    ${row('clip', en?'Trim inner lines at the piece outline':'ตัดเส้นภายในที่ยื่นเลยขอบชิ้น ให้จบที่ขอบ', en?'Inner line work that runs past the outline is cut off exactly at the outline (changes the source drawing)':'เส้นลาย/เส้นภายในที่ยื่นออกนอกชิ้น จะถูกตัดให้จบพอดีขอบชิ้น (เปลี่ยนจากแบบต้นฉบับ)', 'CUT')}
     ${row('frame', en?'Sheet frame':'กรอบแผ่นวัสดุ', en?'Rectangle of the material sheet':'สี่เหลี่ยมขนาดแผ่นวัสดุ', 'SHEET')}
     ${row('code', en?'Part code (text from the file)':'รหัสชิ้นงาน (ตัวอักษรจากไฟล์)', en?'e.g. 36-5 — kept exactly where the file has it':'เช่น 36-5 — ตำแหน่งตามไฟล์ต้นฉบับ', 'TEXT')}
     ${row('name', en?'Piece name':'ชื่อชิ้นงาน', en?'Name from the list (skipped when it equals the code)':'ชื่อจากรายการ (ไม่ใส่ซ้ำถ้าเหมือนรหัส)', 'LABEL')}
@@ -9413,7 +9414,8 @@ function _verifyDXF(text, rects, itemsPerSheet){
   const segD=(x,y,a,b)=>{ const vx=b[0]-a[0], vy=b[1]-a[1], L=vx*vx+vy*vy; let t=L?((x-a[0])*vx+(y-a[1])*vy)/L:0; t=t<0?0:t>1?1:t; return Math.hypot(a[0]+t*vx-x, a[1]+t*vy-y); };
   const ringD=(x,y,R)=>{ let m=Infinity; for(let i=0;i<R.length;i++){ const d=segD(x,y,R[i],R[(i+1)%R.length]); if(d<m) m=d; if(m<0.5) break; } return m; };
   const BB=polys.map(box), AR=polys.map(p=>p.closed?area(p):0);
-  let overN=0, overMax=0;
+  let overN=0, overMax=0; const overLines=[];
+  const gap=+nestResult.pieceGap, edge=+nestResult.edgeMargin;
   const internal=polys.map((p,k)=>{
     if(p.closed) return polys.some((q,j)=>{
       if(j===k || !q.closed || AR[j]<=AR[k]) return false;
@@ -9430,14 +9432,29 @@ function _verifyDXF(text, rects, itemsPerSheet){
     if(host<0) return false;
     // how far does it run past its piece's outline? (by design in some drawings — warn)
     let o=0; for(const [x,y] of p) if(!pointInPolygon(x,y,polys[host])) o=Math.max(o, ringD(x,y,polys[host]));
-    if(o>0.05){ overN++; overMax=Math.max(overMax,o); }
+    if(o>0.05){ overN++; overMax=Math.max(overMax,o); overLines.push({k,host}); }
     return true;
   });
+  // An overrunning line is CUT too: it must keep the gap to other pieces and the margin to the sheet edge.
+  let overNear=Infinity, overBad=0, overEdgeBad=0;
+  for(const {k,host} of overLines){
+    const L=polys[k], b=BB[k];
+    for(let j=0;j<polys.length;j++){
+      if(j===host||j===k||internal[j]) continue;
+      const q=BB[j]; if(b[0]>q[2]+gap+5||q[0]>b[2]+gap+5||b[1]>q[3]+gap+5||q[1]>b[3]+gap+5) continue;
+      let d=Infinity; const Q=polys[j];
+      for(let a=0;a+1<L.length;a++) for(let c=0;c<Q.length;c++){ const e=Q[c], f2=Q[(c+1)%Q.length];
+        const dd=_segDist(L[a][0],L[a][1],L[a+1][0],L[a+1][1],e[0],e[1],f2[0],f2[1]); if(dd<d) d=dd; }
+      if(d<overNear) overNear=d;
+      if(d<gap-1e-3){ overBad++; break; }
+    }
+    const r=rects.find(R=>b[0]<=R.x1&&b[2]>=R.x0&&b[1]<=R.y1&&b[3]>=R.y0);
+    if(r && Math.min(b[0]-r.x0, b[1]-r.y0, r.x1-b[2], r.y1-b[3]) < edge-1e-3) overEdgeBad++;
+  }
   const keepIdx=polys.map((_,k)=>k).filter(k=>!internal[k]);
   const polysTop=keepIdx.map(k=>polys[k]);
   polys.length=0; polysTop.forEach(p=>polys.push(p));
   const B=polys.map(box);
-  const gap=+nestResult.pieceGap, edge=+nestResult.edgeMargin;
   let minGap=Infinity, minEdge=Infinity, under=0, outside=0;
   const perSheet=rects.map(()=>[]);
   B.forEach((b,k)=>{ const si=rects.findIndex(r=>b[0]>=r.x0-0.01&&b[2]<=r.x1+0.01&&b[1]>=r.y0-0.01&&b[3]<=r.y1+0.01);
@@ -9455,8 +9472,8 @@ function _verifyDXF(text, rects, itemsPerSheet){
   const got=texts.map(_dxfStr).sort();
   const missing=expectCodes.filter((c,i,arr)=>{ const n=arr.filter(x=>x===c).length, m=got.filter(x=>x===c).length; return m<n && arr.indexOf(c)===i; });
   const codesChecked = DXF_OPT.code && expectCodes.length>0;
-  const ok = under===0 && outside===0 && polys.length===expectN && (minEdge===Infinity || minEdge>=edge-1e-3) && (!codesChecked || missing.length===0);
-  return {ok, minGap, minEdge, under, outside, pieces:polys.length, expectN, codesChecked, codes:got.length, expectCodes:expectCodes.length, missing, gap, edge, overN, overMax};
+  const ok = under===0 && overBad===0 && overEdgeBad===0 && outside===0 && polys.length===expectN && (minEdge===Infinity || minEdge>=edge-1e-3) && (!codesChecked || missing.length===0);
+  return {ok, minGap, minEdge, under, outside, pieces:polys.length, expectN, codesChecked, codes:got.length, expectCodes:expectCodes.length, missing, gap, edge, overN, overMax, overBad, overEdgeBad, overNear};
 }
 function _dlPref(kind){ const v=lsGet('sheetcnc_dl_'+kind); return v===null ? true : v==='1'; }
 function _showVerifyPopup(jobs){
@@ -9474,6 +9491,7 @@ function _showVerifyPopup(jobs){
       ${line(r.under===0, `${en?'Min piece gap':'ระยะห่างชิ้นงานต่ำสุด'} <b>${f(r.minGap)}</b> mm (${en?'set':'ตั้ง'} ${r.gap})${r.under?` — <b>${r.under}</b> ${en?'pair(s) too close':'คู่ชิดเกิน'}`:''}`)}
       ${line(!(r.minEdge<r.edge-1e-3) && r.outside===0, `${en?'Min edge margin':'ระยะขอบต่ำสุด'} <b>${f(r.minEdge)}</b> mm (${en?'set':'ตั้ง'} ${r.edge})${r.outside?` — <b>${r.outside}</b> ${en?'outside the sheet':'ชิ้นหลุดนอกแผ่น'}`:''}`)}
       ${line(r.pieces===r.expectN, `${en?'Pieces in file':'ชิ้นงานในไฟล์'} <b>${r.pieces}/${r.expectN}</b>`)}
+      ${(r.overBad||r.overEdgeBad)?line(false, en?`Inner lines that run past their piece: <b>${r.overBad}</b> come closer than ${r.gap} mm to another piece${isFinite(r.overNear)?` (min ${r.overNear.toFixed(2)} mm)`:''}, <b>${r.overEdgeBad}</b> break the sheet edge margin — tick “Trim inner lines” or fix the drawing`:`เส้นภายในที่ยื่นเลยขอบ: <b>${r.overBad}</b> เส้นเข้าใกล้ชิ้นอื่นเกิน ${r.gap} mm${isFinite(r.overNear)?` (ใกล้สุด ${r.overNear.toFixed(2)} mm)`:''}, <b>${r.overEdgeBad}</b> เส้นชิดหรือเลยขอบแผ่น — ติ๊ก “ตัดเส้นภายในให้จบที่ขอบ” หรือแก้แบบ`):''}
       ${r.overN?`<div style="font-size:.8rem;margin:2px 0;color:#fcd34d;">⚠️ ${en?`${r.overN} inner line(s) run past their piece outline by up to <b>${r.overMax.toFixed(2)}</b> mm (as drawn in the source file)`:`เส้นภายใน ${r.overN} เส้น ยื่นเลยขอบชิ้นงานสูงสุด <b>${r.overMax.toFixed(2)}</b> mm (ตามที่วาดในไฟล์ต้นฉบับ)`}</div>`:''}
       ${r.codesChecked?line(r.missing.length===0, `${en?'Part codes':'รหัสชิ้นงาน'} <b>${r.codes}/${r.expectCodes}</b>${r.missing.length?` — ${en?'missing':'ขาด'}: ${r.missing.join(', ')}`:''}`):''}
     </label>`;
@@ -9734,6 +9752,33 @@ function _pieceLabel(item, ix, iyTop){
 function _cutOrder(items){
   return items.map((it,k)=>({it,k,a:(+it.w)*(+it.h)})).sort((p,q)=>p.a-q.a||p.k-q.k).map(o=>o.it);
 }
+/** Keep only the parts of an open polyline that lie inside ring R (piece-local).
+ *  Every segment is split where it crosses the outline; a piece is kept when its
+ *  midpoint is inside. Returns a list of polylines. */
+function _clipLineToRing(line, R){
+  const out=[]; let cur=null;
+  const hits=(a,b)=>{ const ts=[0,1];
+    for(let i=0;i<R.length;i++){ const c=R[i], d=R[(i+1)%R.length];
+      const rx=b[0]-a[0], ry=b[1]-a[1], sx=d[0]-c[0], sy=d[1]-c[1], den=rx*sy-ry*sx;
+      if(Math.abs(den)<1e-12) continue;
+      const t=((c[0]-a[0])*sy-(c[1]-a[1])*sx)/den, u=((c[0]-a[0])*ry-(c[1]-a[1])*rx)/den;
+      if(t>1e-9&&t<1-1e-9&&u>=-1e-9&&u<=1+1e-9) ts.push(t); }
+    return ts.sort((x,y)=>x-y); };
+  for(let k=0;k+1<line.length;k++){
+    const a=line[k], b=line[k+1], ts=hits(a,b);
+    for(let m=0;m+1<ts.length;m++){
+      const t0=ts[m], t1=ts[m+1]; if(t1-t0<1e-9) continue;
+      const P=t=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t], mid=P((t0+t1)/2);
+      if(pointInPolygon(mid[0],mid[1],R)){
+        const p0=P(t0), p1=P(t1);
+        if(cur && Math.hypot(cur[cur.length-1][0]-p0[0],cur[cur.length-1][1]-p0[1])<1e-6) cur.push(p1);
+        else { if(cur) out.push(cur); cur=[p0,p1]; }
+      } else if(cur){ out.push(cur); cur=null; }
+    }
+  }
+  if(cur) out.push(cur);
+  return out.filter(l=>l.length>=2);
+}
 function dxfItemPaths(item, offX, offY, sh){
   // CUT ORDER for the machine: inner cuts (holes / slots) FIRST, then the outline —
   // cutting the outline first frees the part and the inner cuts would run on a
@@ -9811,6 +9856,13 @@ function dxfItemPaths(item, offX, offY, sh){
         const hClosed=!hole.open;            // open internal line work exports open (no chord)
         const hLayer=hole.open?'CUT':'CUT_HOLE';
         const hRawV=hole.rawV||null;
+        if(DXF_OPT.clip && hole.open && !(hRawV&&hRawV.some(v=>Math.abs(v.b)>1e-10)) && verts && verts.length>=3){
+          const R=verts, inside=hole.vertices.every(([x,y])=>pointInPolygon(x,y,R));
+          if(!inside){
+            _clipLineToRing(hole.vertices, R).forEach(l=>{ s+=dxfPolyline(l.map(([vx,vy])=>[ix+vx, iyTop-vy]),'CUT',false,null); });
+            return;
+          }
+        }
         if(hRawV&&hRawV.length>=3){
           const hpts=hRawV.map(v=>[ix+v.x, iyTop-v.y]);
           const hbulges=hRawV.map(v=>-v.b);
@@ -9832,7 +9884,7 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k15';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k16';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
