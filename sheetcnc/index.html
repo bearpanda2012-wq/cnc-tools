@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k5</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k7</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -609,7 +609,7 @@ const TR = {
     hoverHighlight:'วางเมาส์เหนือแถวเพื่อ highlight ชิ้นทั้งกลุ่ม',
     col_type:'ประเภท', col_layer:'Layer', col_cx:'Center X', col_cy:'Center Y',
     col_w:'กว้าง (mm)', col_h:'สูง (mm)', col_aream2:'พื้นที่ (m²)', col_cls:'Classify',
-    col_found:'ตรวจพบ', col_name:'ชื่อ (แก้ได้)', col_holes:'🕳️ รู',
+    col_found:'ตรวจพบ', col_code:'รหัสชิ้นงาน', col_name:'ชื่อ (แก้ได้)', col_holes:'🕳️ รู',
     leg_outer:'กรอบนอก (คำนวน + nesting)', leg_hole:'รู/ช่อง (แสดง + export)', leg_skip:'ข้าม',
     cost_mat:'ค่าวัสดุ', cost_labor:'ค่าแรง CNC', cost_total:'รวมทั้งหมด',
     cost_unit_sheet:'แผ่น', cost_unit_labor:'บาท/m²',
@@ -678,7 +678,7 @@ const TR = {
     hoverHighlight:'Hover over a row to highlight the whole group',
     col_type:'Type', col_layer:'Layer', col_cx:'Center X', col_cy:'Center Y',
     col_w:'Width (mm)', col_h:'Height (mm)', col_aream2:'Area (m²)', col_cls:'Classify',
-    col_found:'Found', col_name:'Name (editable)', col_holes:'🕳️ Holes',
+    col_found:'Found', col_code:'Part code', col_name:'Name (editable)', col_holes:'🕳️ Holes',
     leg_outer:'Outer frame (nest + calculate)', leg_hole:'Hole/cutout (show + export)', leg_skip:'Skip',
     cost_mat:'Material cost', cost_labor:'CNC labor', cost_total:'Total',
     cost_unit_sheet:'sheets', cost_unit_labor:'THB/m²',
@@ -954,6 +954,145 @@ function circleVerts(cx,cy,r,startDeg,endDeg,segs=36) {
   return {xs,ys};
 }
 
+
+/** Read one TEXT / MTEXT / ATTRIB entity starting at pairs[j] (just after the type).
+ *  tf (optional) = block-insert transform {pt:(x,y)=>[x,y], rot, sy}. Returns {shape,next}. */
+function _readTextEnt(pairs, j, kind, tf){
+  const isM=(kind==='MTEXT'), isA=(kind==='ATTRIB');
+  let tx=0, ty=0, tx2=null, ty2=null, th=10, ang=0, layer='0', str='', extra='', hj=0, vj=0;
+  let style=null, widthF=null, obliq=null, gen71=null, refW=null, flags=0;
+  while (j < pairs.length && pairs[j][0]!=='0') {
+    const [c,v]=pairs[j];
+    if (c==='8') layer=v;
+    if (c==='10') tx=+v;   if (c==='20') ty=+v;
+    if (c==='11') tx2=+v;  if (c==='21') ty2=+v;   // TEXT: alignment point · MTEXT: X-direction vector
+    if (c==='40') th=+v;
+    if (c==='50') ang=+v;
+    if (c==='7')  style=v;
+    if (c==='41') { if(isM) refW=+v; else widthF=+v; }
+    if (c==='51') obliq=+v;
+    if (c==='71') gen71=+v;
+    if (c==='70') flags=+v;
+    if (c==='72') hj=+v;
+    if (!isM && !isA && c==='73') vj=+v;           // TEXT vertical justification
+    if (isA && c==='74') vj=+v;                     // ATTRIB uses 74 (73 = field length)
+    if (c==='1') str+=v;
+    if (c==='3') extra+=v;
+    j++;
+  }
+  if (isA && (flags&1)) return {shape:null, next:j};     // invisible attribute
+  const rawStr = extra + str;
+  str = rawStr;
+  let ax2=null, ay2=null;
+  if (isM) {
+    str = str.replace(/\\P/gi,' ').replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/[{}]/g,'').replace(/\\~/g,' ');
+    const att = gen71 || 1;                    // 1=TL 2=TC 3=TR 4=ML 5=MC 6=MR 7=BL 8=BC 9=BR
+    hj = (att%3===1)?0 : (att%3===2)?1 : 2;
+    const row = Math.ceil(att/3);
+    vj = row===1?3 : row===2?2 : 1;
+    // MTEXT 11/21 is the text DIRECTION vector — it overrides code 50. Ignoring it
+    // drew rotated labels horizontally (they "jumped" and fell out of narrow parts).
+    if (tx2!==null || ty2!==null){
+      const dx=tx2||0, dy=ty2||0;
+      if (Math.hypot(dx,dy)>1e-9) ang=Math.atan2(dy,dx)*180/Math.PI;
+    }
+    tx2=null; ty2=null;
+  }
+  if (!str || !(th>0)) return {shape:null, next:j};
+  let ax=tx, ay=ty;
+  if (!isM){
+    if (hj===3 || hj===5){                   // ALIGNED / FIT: baseline runs 10/20 → 11/21
+      if (tx2!==null && ty2!==null){ ax2=tx2; ay2=ty2; ang=Math.atan2(ay2-ty,ax2-tx)*180/Math.PI; }
+      vj=0;
+    } else if ((hj!==0 || vj!==0) && (tx2!==null || ty2!==null)) {
+      ax = tx2!==null?tx2:tx; ay = ty2!==null?ty2:ty;   // justified → real position is 11/21
+    }
+  }
+  if (tf){                                    // inside an INSERTed block
+    [ax,ay]=tf.pt(ax,ay);
+    if (ax2!==null) [ax2,ay2]=tf.pt(ax2,ay2);
+    th*=Math.abs(tf.sy||1); ang+=tf.rot||0;
+  }
+  return {shape:_mkTextShape({str, raw:rawStr, ax, ay, ax2, ay2, th, ang, hj, vj,
+     ent:isM?'MTEXT':'TEXT', style, widthF, oblique:obliq, gen71:isM?null:gen71, refW, layer}), next:j};
+}
+
+/** Build a text shape. vertices: [0]=anchor (justification point), [1..4]=ROTATED
+ *  bbox, [5]=baseline start, [6]=baseline end. All 7 points ride through every
+ *  transform, so position AND direction stay correct after nesting rotation. */
+function _mkTextShape(o){
+  const {str, ax, ay, th} = o;
+  let hj=o.hj||0, vj=o.vj||0;
+  const a=(o.ang||0)*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
+  let tw = str.length * th * 0.66 * (o.widthF||1);    // estimated width (for containment)
+  if (o.ax2!=null) tw = Math.max(th*0.3, Math.hypot(o.ax2-ax, o.ay2-ay));
+  // local box relative to anchor (x along baseline, y up)
+  let lx0, ly0;
+  if (hj===4){ lx0=-tw/2; ly0=-th/2; }                 // TEXT "Middle"
+  else {
+    lx0 = (hj===1)?-tw/2 : (hj===2)?-tw : 0;
+    ly0 = (vj===3)?-th : (vj===2)?-th/2 : 0;
+  }
+  if (hj===3||hj===5){ lx0=0; ly0=0; }
+  const P=(lx,ly)=>[ax+lx*ca-ly*sa, ay+lx*sa+ly*ca];
+  const box=[P(lx0,ly0),P(lx0+tw,ly0),P(lx0+tw,ly0+th),P(lx0,ly0+th)];
+  const verts=[[ax,ay], ...box, P(lx0,0), P(lx0+tw,0)];   // [5],[6] = along text direction
+  const xs=box.map(p=>p[0]), ys=box.map(p=>p[1]);
+  const mnX=Math.min(...xs), mnY=Math.min(...ys), mxX=Math.max(...xs), mxY=Math.max(...ys);
+  return { type:'text', layer:o.layer||'0', isText:true,
+    text:{ str, raw:o.raw||str, h:th, angle:o.ang||0, hj, vj, ent:o.ent||'TEXT',
+           style:o.style||null, widthF:o.widthF??null, oblique:o.oblique??null,
+           gen71:o.gen71??null, refW:o.refW??null, fit:(hj===3||hj===5) },
+    vertices:verts, area:Math.max(tw*th,1),
+    w:mxX-mnX, h:mxY-mnY, minX:mnX, minY:mnY, cx:(mnX+mxX)/2, cy:(mnY+mxY)/2 };
+}
+
+/** Points used to decide which piece a text belongs to: box centre first, then the
+ *  first character (width is only an estimate — the real font may be narrower). */
+function _textProbes(s){
+  const v=s.vertices, t=s.text||{}, th=t.h||10;
+  const c=[(v[1][0]+v[3][0])/2,(v[1][1]+v[3][1])/2];
+  // first-character centre: from box corner 1 along baseline dir by ~0.4h, up by 0.5h
+  const dx=v[2][0]-v[1][0], dy=v[2][1]-v[1][1], L=Math.hypot(dx,dy)||1;
+  const ux=dx/L, uy=dy/L, nx=v[4][0]-v[1][0], ny=v[4][1]-v[1][1];
+  const f=[v[1][0]+ux*th*0.4+nx*0.5, v[1][1]+uy*th*0.4+ny*0.5];
+  return [c,f];
+}
+
+/** Draw an imported TEXT exactly where/how the file has it: anchor + justification,
+ *  real direction (taken from the transformed baseline points, so it follows any
+ *  nesting rotation), cap height = DXF height, width factor. toC maps mm → canvas. */
+function _drawTextHole(ctx, hole, toC, pxPerMm, color){
+  const t=hole.text, v=hole.vertices; if(!t||!v||!v.length) return;
+  const str=t.str||''; if(!str) return;
+  const A=toC(v[0][0],v[0][1]);
+  let rot=0, P5=null, P6=null;
+  if(v.length>=7){
+    P5=toC(v[5][0],v[5][1]); P6=toC(v[6][0],v[6][1]);
+    rot=Math.atan2(P6[1]-P5[1], P6[0]-P5[0]);
+  }
+  const hpx=(t.h||10)*pxPerMm;
+  if(hpx<1.2) return;                                   // too small to read — skip, don't inflate
+  const fpx=hpx/0.72;                                    // font em ≈ cap height / 0.72
+  ctx.save();
+  ctx.fillStyle=color;
+  ctx.font=`${fpx}px Arial,'Segoe UI',sans-serif`;
+  ctx.textBaseline='alphabetic';
+  if(t.fit && P5 && P6){
+    ctx.translate(P5[0],P5[1]); ctx.rotate(rot);
+    const want=Math.hypot(P6[0]-P5[0],P6[1]-P5[1]), got=ctx.measureText(str).width||1;
+    ctx.scale(want/got,1); ctx.textAlign='left'; ctx.fillText(str,0,0);
+    ctx.restore(); return;
+  }
+  ctx.translate(A[0],A[1]); ctx.rotate(rot);
+  if(t.widthF && t.widthF>0) ctx.scale(t.widthF,1);
+  const hj=t.hj||0, vj=t.vj||0;
+  ctx.textAlign = (hj===1||hj===4)?'center' : hj===2?'right' : 'left';
+  // baseline offset below the anchor (canvas y is down): top → +h, middle → +h/2
+  const by = (hj===4||vj===2)? hpx/2 : vj===3? hpx : 0;
+  ctx.fillText(str,0,by);
+  ctx.restore();
+}
 /** Full DXF parser — returns array of shape objects */
 /** Build a circle shape (smooth 4-bulge rawV so it exports as a true circle). */
 function _mkCircle(cx,cy,r,layer){
@@ -975,6 +1114,8 @@ function _parseBlocks(pairs){
     const prims=[];
     while(j<pairs.length && !(pairs[j][0]==='0'&&pairs[j][1]==='ENDBLK')){
       const [c,v]=pairs[j];
+      if(c==='0'&&(v==='TEXT'||v==='MTEXT')){ prims.push({k:'text',at:j+1,kind:v}); j++;
+        while(j<pairs.length&&pairs[j][0]!=='0') j++; continue; }
       if(c==='0'&&v==='CIRCLE'){ j++; let cx=0,cy=0,r=0;
         while(j<pairs.length&&pairs[j][0]!=='0'){const a=pairs[j][0],b=pairs[j][1];if(a==='10')cx=+b;if(a==='20')cy=+b;if(a==='40')r=+b;j++;}
         prims.push({k:'circle',cx,cy,r}); continue; }
@@ -1052,6 +1193,11 @@ function parseDXFFull(text) {
         const ra=rot*Math.PI/180, ca=Math.cos(ra), sa=Math.sin(ra);
         const tf=(px,py)=>{ const X=px*sx, Y=py*sy; return [ix+X*ca-Y*sa, iy+X*sa+Y*ca]; };
         prims.forEach(pr=>{
+          if (pr.k==='text'){
+            const r=_readTextEnt(pairs, pr.at, pr.kind, {pt:tf, rot, sy});
+            if (r.shape){ r.shape.layer=layer; shapes.push(r.shape); }
+            return;
+          }
           if (pr.k==='circle'){
             const [ccx,ccy]=tf(pr.cx,pr.cy); const rr=pr.r*Math.abs(sx);
             if (rr>0) shapes.push(_mkCircle(ccx,ccy,rr,layer));
@@ -1253,57 +1399,10 @@ function parseDXFFull(text) {
 
       // ── TEXT / MTEXT ───────────────────────────────────
       // Kept exactly as-is (string, height, angle preserved) and re-exported.
-      if (val === 'TEXT' || val === 'MTEXT') {
-        const isM = (val==='MTEXT');
-        i++;
-        let tx=0, ty=0, tx2=null, ty2=null, th=10, ang=0, layer='0', str='', extra='', hj=0, vj=0;
-        let style=null, widthF=null, obliq=null, gen71=null, refW=null;   // preserve text STYLE exactly
-        while (i < pairs.length && pairs[i][0]!=='0') {
-          const [c,v]=pairs[i];
-          if (c==='8') layer=v;
-          if (c==='10') tx=+v;   if (c==='20') ty=+v;
-          if (c==='11') tx2=+v;  if (c==='21') ty2=+v;   // alignment point (justified text)
-          if (c==='40') th=+v;
-          if (c==='50') ang=+v;
-          if (c==='7')  style=v;                          // text STYLE (font) name
-          if (c==='41') { if(isM) refW=+v; else widthF=+v; } // width factor (TEXT) / ref width (MTEXT)
-          if (c==='51') obliq=+v;                         // oblique angle
-          if (c==='71') gen71=+v;                         // TEXT gen flags / MTEXT attachment point
-          if (c==='72') hj=+v;   if (c==='73') vj=+v;     // horiz / vert justification
-          if (c==='1') str+=v;
-          if (c==='3') extra+=v;   // MTEXT long-text continuation (precedes code 1)
-          i++;
-        }
-        const rawStr = extra + str;                       // ORIGINAL string (MTEXT fmt codes intact)
-        str = rawStr;
-        if (isM) str = str.replace(/\\P/g,' ').replace(/\{[^}]*\}/g,'').replace(/\\[A-Za-z][^;]*;/g,''); // strip MTEXT fmt codes for display only
-        if (isM) {
-          // MTEXT: codes 72/73 are NOT justification. The insertion point (10/20)
-          // sits at the attachment corner given by code 71. Derive TEXT-style hj/vj
-          // from it so the anchor + baseline land EXACTLY where the file has them.
-          const att = gen71 || 1;                    // 1=TL 2=TC 3=TR 4=ML 5=MC 6=MR 7=BL 8=BC 9=BR
-          hj = (att%3===1)?0 : (att%3===2)?1 : 2;     // left / center / right
-          const row = Math.ceil(att/3);               // 1=top 2=middle 3=bottom
-          vj = row===1?3 : row===2?2 : 1;             // top / middle / bottom
-          tx2=null; ty2=null;                         // MTEXT has no separate 11/21 alignment point
-        }
-        if (str && th>0) {
-          // For justified text the REAL position is the alignment point (11/21).
-          const useAlign = (hj!==0 || vj!==0) && (tx2!==null || ty2!==null);
-          const ax = useAlign ? (tx2!==null?tx2:tx) : tx;
-          const ay = useAlign ? (ty2!==null?ty2:ty) : ty;
-          const tw = str.length * th * 0.62;   // rough width for bbox/containment
-          // bbox around the anchor per justification (hj:0/1/2 = L/C/R, vj:0/2/3 = base/mid/top)
-          const x0 = ax - (hj===1?tw/2 : hj===2?tw : 0);
-          const y0 = ay - (vj===3?th : vj===2?th/2 : 0);  // baseline: text sits above → box [ay, ay+th]
-          // verts[0] = the anchor (carried through all transforms); rest = bbox corners
-          const verts=[[ax,ay],[x0,y0],[x0+tw,y0],[x0+tw,y0+th],[x0,y0+th]];
-          shapes.push({ type:'text', layer, isText:true,
-            text:{ str, raw:rawStr, h:th, angle:ang, hj, vj,
-                   ent:isM?'MTEXT':'TEXT', style, widthF, oblique:obliq, gen71, refW },
-            vertices:verts, area:Math.max(tw*th,1),
-            w:tw, h:th, minX:x0, minY:y0, cx:x0+tw/2, cy:y0+th/2 });
-        }
+      if (val === 'TEXT' || val === 'MTEXT' || val === 'ATTRIB') {
+        const r=_readTextEnt(pairs, i+1, val);
+        i=r.next;
+        if (r.shape) shapes.push(r.shape);
         continue;
       }
 
@@ -2288,8 +2387,8 @@ function autoClassify() {
   inspRaw.forEach((s,i)=>{
     if (inspCls[i]!=='outer') return;
     if (!(s.open || s.isText)) return;
-    const cx=s.minX+s.w/2, cy=s.minY+s.h/2;
-    const inside = outerPolys.some(o=>o!==s && pointInPolygon(cx,cy,o.vertices));
+    const probes = s.isText ? _textProbes(s) : [[s.minX+s.w/2, s.minY+s.h/2]];
+    const inside = outerPolys.some(o=>o!==s && probes.some(([px,py])=>pointInPolygon(px,py,o.vertices)));
     inspCls[i] = inside ? 'hole' : 'skip';
   });
 
@@ -2997,14 +3096,7 @@ function drawInspCanvas(highlightIdx) {
 
     // TEXT: draw the ACTUAL string at its imported anchor (position never moved).
     if(s.isText && s.text){
-      const [ax,ay]=toC(s.vertices[0][0], s.vertices[0][1]);
-      ctx.fillStyle = cls==='skip' ? 'rgba(255,255,255,0.25)' : (isHl?'#fff':'#c4b5fd');
-      const fh=Math.max(7,(s.text.h||10)*sc);
-      ctx.font=`${fh}px Segoe UI,sans-serif`;
-      ctx.textAlign = s.text.hj===1?'center' : s.text.hj===2?'right' : 'left';
-      ctx.textBaseline = s.text.vj===3?'top' : s.text.vj===2?'middle' : s.text.vj===1?'bottom' : 'alphabetic';
-      ctx.fillText(s.text.str||'', ax, ay);
-      ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+      _drawTextHole(ctx, s, toC, sc, cls==='skip' ? 'rgba(255,255,255,0.25)' : (isHl?'#fff':'#c4b5fd'));
       return;
     }
 
@@ -3053,11 +3145,22 @@ function showInspStep2() {
   const outers = inspRaw.filter((_,i)=>inspCls[i]==='outer');
   if(!outers.length){ alert(lang==='en'?'No "outer frame" pieces yet — click a badge to assign at least 1':'ยังไม่มีชิ้น "กรอบนอก" — กด badge เพื่อตั้งค่าอย่างน้อย 1 ชิ้น'); return; }
 
-  // Build holes map: for each outer, find holes
+  // Build holes map: for each outer, find holes. TEXT goes to exactly ONE piece:
+  // the one holding its box centre, else the one holding its first character.
+  const closedOuters = outers.filter(o=>!o.open);
+  const textHost = new Map();
+  inspRaw.forEach((h,i)=>{
+    if(inspCls[i]!=='hole' || !h.isText) return;
+    for(const [px,py] of _textProbes(h)){
+      const host = closedOuters.filter(o=>pointInPolygon(px,py,o.vertices))
+                               .sort((a,b)=>a.area-b.area)[0];
+      if(host){ textHost.set(h, host); break; }
+    }
+  });
   const outerWithHoles = outers.map(outer=>{
     if(outer.open) return {...outer, holes:[]};   // open arcs never carry holes
-    const cx=outer.minX+outer.w/2, cy=outer.minY+outer.h/2;
     const holes = inspRaw.filter((_,i)=>inspCls[i]==='hole').filter(h=>{
+      if(h.isText) return textHost.get(h)===outer;
       const hcx=h.minX+h.w/2, hcy=h.minY+h.h/2;
       return pointInPolygon(hcx,hcy,outer.vertices);
     });
@@ -3151,6 +3254,7 @@ function renderStep2HTML(outers) {
             <th>${t('col_w')}</th><th>${t('col_h')}</th><th>${t('col_aream2')}</th>
             <th>${t('col_holes')}</th>
             <th>${t('col_found')}</th>
+            <th>${t('col_code')}</th>
             <th>${t('col_name')}</th>
             <th>${t('qty_lbl')}</th>
           </tr></thead>
@@ -3159,6 +3263,14 @@ function renderStep2HTML(outers) {
               const s = g.shape;
               const col = COLORS[gi%COLORS.length];
               const autoQty = g.count;
+              const nHole = (s.holes||[]).filter(h=>!h.isText).length;
+              // Part code = the TEXT found inside each copy of this piece (from the file)
+              const codes = [...new Set((g.indices||[]).flatMap(idx=>
+                ((mdxfShapes[idx]||{}).holes||[]).filter(h=>h.isText&&h.text&&h.text.str)
+                  .map(h=>h.text.str.trim())).filter(Boolean))];
+              const codeHtml = codes.length
+                ? codes.map(c=>`<span style="background:#3b0764;color:#e9d5ff;border-radius:5px;padding:2px 7px;font-size:.76rem;font-weight:700;white-space:nowrap;">${c.replace(/</g,'&lt;')}</span>`).join(' ')
+                : `<span style="color:#f87171;font-size:.72rem;" title="${lang==='en'?'No text found inside this piece':'ไม่พบตัวอักษรภายในกรอบชิ้นนี้'}">⚠️ ${lang==='en'?'none':'ไม่มี'}</span>`;
               return `<tr id="mdxfRow${gi}"
                 onmouseenter="mdxfGroupHighlight(${gi},true)"
                 onmouseleave="mdxfGroupHighlight(${gi},false)">
@@ -3171,14 +3283,15 @@ function renderStep2HTML(outers) {
                 <td>${s.w.toFixed(1)}</td>
                 <td>${s.h.toFixed(1)}</td>
                 <td>${(s.area/1e6).toFixed(5)}</td>
-                <td style="color:${s.holes?.length?'#a78bfa':'var(--muted)'};">
-                  ${s.holes?.length?`🕳️ ${s.holes.length}`:'—'}
+                <td style="color:${nHole?'#a78bfa':'var(--muted)'};">
+                  ${nHole?`🕳️ ${nHole}`:'—'}
                 </td>
                 <td>
                   <span style="background:#1e3a5f;color:#60a5fa;border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700;">
                     ${autoQty} ${t('pieces_lbl')}
                   </span>
                 </td>
+                <td><div style="display:flex;flex-wrap:wrap;gap:3px;max-width:180px;">${codeHtml}</div></td>
                 <td><input style="background:var(--surface);border:1px solid var(--border);border-radius:5px;
                   color:var(--text);padding:3px 7px;font-size:.78rem;width:150px;"
                   id="mdxfName${gi}" value="${s.w.toFixed(0)}×${s.h.toFixed(0)} mm${s.type==='circle'?' ⭕':''}"></td>
@@ -3427,22 +3540,16 @@ function drawMdxfPreviewGroup(highlightGi) {
     // TEXT holes — draw the ACTUAL string at its imported anchor (position never moved)
     (s.holes||[]).forEach(hole=>{
       if(!hole.isText || !hole.text || !hole.vertices?.length) return;
-      const [ax,ay]=toC(hole.vertices[0][0], hole.vertices[0][1]);
-      ctx.fillStyle = isHl ? '#fff' : '#c4b5fd';
-      const fh=Math.max(7,(hole.text.h||10)*baseSc*z);
-      ctx.font=`${fh}px Segoe UI,sans-serif`;
-      ctx.textAlign = hole.text.hj===1?'center' : hole.text.hj===2?'right' : 'left';
-      ctx.textBaseline = hole.text.vj===3?'top' : hole.text.vj===2?'middle' : hole.text.vj===1?'bottom' : 'alphabetic';
-      ctx.fillText(hole.text.str||'', ax, ay);
+      _drawTextHole(ctx, hole, toC, baseSc*z, isHl ? '#fff' : '#c4b5fd');
     });
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 
-    // Label with group number
-    const [lx,ly]=toC(s.minX+s.w/2, s.minY+s.h/2);
+    // Group number in the top-left corner (the centre is where the part code sits)
+    const [lx,ly]=toC(s.minX, s.minY+s.h);
     ctx.fillStyle = isHl ? '#fff' : 'rgba(255,255,255,0.55)';
     ctx.font=`${isHl?'bold ':''}${isHl?9:7}px Segoe UI,sans-serif`;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(gi+1, lx, ly);
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText(gi+1, lx+2, ly+2);
   });
 }
 
@@ -3489,7 +3596,7 @@ function drawMdxfPreview(highlightIdx) {
     // Draw holes as sub-paths (evenodd will cut them out)
     if (s.holes && s.holes.length) {
       s.holes.forEach(hole=>{
-        if (!hole.vertices||!hole.vertices.length) return;
+        if (!hole.vertices||!hole.vertices.length||hole.isText) return;
         ctx.moveTo(...toC(hole.vertices[0][0], hole.vertices[0][1]));
         hole.vertices.forEach(([vx,vy],j)=>{
           if(j===0) return;
@@ -5579,13 +5686,7 @@ function drawSheetOnCanvas(canvas, sheet, sw, sh, {pad=4, maxW=null, maxH=null, 
       if(item.holes?.length){
         item.holes.forEach(hole=>{
           if(!hole.isText || !hole.vertices?.length) return;
-          const [ax,ay]=toCnv(hole.vertices[0][0], hole.vertices[0][1]);   // anchor
-          const fh=Math.max(6,(hole.text?.h||10)*scale);
-          ctx.fillStyle='#fff';
-          ctx.textAlign = hole.text?.hj===1?'center' : hole.text?.hj===2?'right' : 'left';
-          ctx.textBaseline = hole.text?.vj===3?'top' : hole.text?.vj===2?'middle' : hole.text?.vj===1?'bottom' : 'alphabetic';
-          ctx.font=`${fh}px 'Segoe UI',sans-serif`;
-          ctx.fillText(hole.text?.str||'', ax, ay);
+          _drawTextHole(ctx, hole, toCnv, scale, '#fff');
         });
       }
       if(showLabels && item.holes?.length){
@@ -8845,7 +8946,13 @@ function dxfHeader(layers){
 /** R12 TEXT, centred on a point (72=1 centre, 73=2 middle).
  *  When 72/73 are non-zero R12 reads the position from 11/21, not 10/20 —
  *  both are written to the same point so either reader lands in the same place. */
+/** R12 TEXT can't show × — / emoji (AutoCAD draws "?"). Map them to plain ASCII. */
+function _dxfStr(str){
+  return String(str==null?'':str).replace(/[×✕✖]/g,'x').replace(/[—–]/g,'-')
+    .replace(/[\u{1F000}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu,'').replace(/\s{2,}/g,' ').trim();
+}
 function _dxfCenterText(cx, cy, h, str, layer){
+  str=_dxfStr(str);
   const X=(+cx).toFixed(3), Y=(+cy).toFixed(3);
   return `0\nTEXT\n8\n${layer}\n10\n${X}\n20\n${Y}\n40\n${(+h).toFixed(3)}\n1\n${str}\n`
        + `72\n1\n73\n2\n11\n${X}\n21\n${Y}\n`;
@@ -9013,21 +9120,41 @@ function dxfItemPaths(item, offX, offY, sh){
           // Re-emit the original TEXT unchanged (string, height, angle, justification)
           // at the piece's placed position, on its own TEXT layer.
           const tx=hole.text;
-          const a=hole.vertices[0];               // real anchor point
+          const hv=hole.vertices;
+          const a=hv[0];                          // real anchor point
           const ax=(ix+a[0]).toFixed(4), ay=(iyTop-a[1]).toFixed(4);
-          const ang=(tx.angle||0)+(item.angle||0);
+          // Angle from the TRANSFORMED baseline points (Y-down → DXF Y-up). Adding
+          // item.angle used the wrong sign, so rotated parts got text rotated the
+          // opposite way and it swung out of the part.
+          let ang = tx.angle||0;
+          if(hv.length>=7){
+            const dx=hv[6][0]-hv[5][0], dy=-(hv[6][1]-hv[5][1]);
+            if(Math.hypot(dx,dy)>1e-9) ang=Math.atan2(dy,dx)*180/Math.PI;
+          } else if(item.angle) ang=(tx.angle||0)-item.angle;
+          ang=((ang%360)+360)%360; if(Math.abs(ang-360)<1e-6||Math.abs(ang)<1e-6) ang=0;
           const hj=tx.hj||0, vj=tx.vj||0;
+          if(tx.fit && hv.length>=7){             // ALIGNED / FIT: 10 = start, 11 = end
+            const p0=[(ix+hv[5][0]).toFixed(4),(iyTop-hv[5][1]).toFixed(4)];
+            const p1=[(ix+hv[6][0]).toFixed(4),(iyTop-hv[6][1]).toFixed(4)];
+            let out=`0\nTEXT\n8\nTEXT\n10\n${p0[0]}\n20\n${p0[1]}\n40\n${(+tx.h).toFixed(4)}\n1\n${_dxfStr(tx.str)}\n`;
+            if(ang) out+=`50\n${(+ang).toFixed(4)}\n`;
+            if(tx.widthF!=null) out+=`41\n${(+tx.widthF).toFixed(4)}\n`;
+            if(tx.style) out+=`7\n${tx.style}\n`;
+            out+=`72\n${hj}\n11\n${p1[0]}\n21\n${p1[1]}\n`;
+            s+=out; return;
+          }
+          const hjOut = hj;                       // 4 = Middle is valid R12 too
           // Re-emit as R12 TEXT preserving the ORIGINAL style: font (7), width
           // factor (41), oblique (51), gen flags (71). Height/angle/justification
           // and position are carried through unchanged.
-          let out=`0\nTEXT\n8\nTEXT\n10\n${ax}\n20\n${ay}\n40\n${(+tx.h).toFixed(4)}\n1\n${tx.str}\n`;
+          let out=`0\nTEXT\n8\nTEXT\n10\n${ax}\n20\n${ay}\n40\n${(+tx.h).toFixed(4)}\n1\n${_dxfStr(tx.str)}\n`;
           if(ang) out+=`50\n${(+ang).toFixed(4)}\n`;
           if(tx.widthF!=null)  out+=`41\n${(+tx.widthF).toFixed(4)}\n`;
           if(tx.oblique!=null) out+=`51\n${(+tx.oblique).toFixed(4)}\n`;
           if(tx.style)         out+=`7\n${tx.style}\n`;
           if(tx.ent!=='MTEXT' && tx.gen71!=null) out+=`71\n${tx.gen71}\n`;
-          if(hj) out+=`72\n${hj}\n`;
-          if(hj||vj) out+=`11\n${ax}\n21\n${ay}\n`;   // alignment point for justified text
+          if(hjOut) out+=`72\n${hjOut}\n`;
+          if(hjOut||vj) out+=`11\n${ax}\n21\n${ay}\n`;   // alignment point for justified text
           if(vj) out+=`73\n${vj}\n`;
           s+=out;
           return;
@@ -9055,13 +9182,13 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k5';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k7';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
   let s=`0\nTEXT\n8\nSHEET\n`;
   if(color) s+=`62\n${color}\n`;
-  s+=`10\n${(+x).toFixed(3)}\n20\n${(+y).toFixed(3)}\n40\n${h}\n1\n${str}\n`;
+  s+=`10\n${(+x).toFixed(3)}\n20\n${(+y).toFixed(3)}\n40\n${h}\n1\n${_dxfStr(str)}\n`;
   if(align){ s+=`72\n${align}\n11\n${(+x).toFixed(3)}\n21\n${(+y).toFixed(3)}\n`; }
   return s;
 }
