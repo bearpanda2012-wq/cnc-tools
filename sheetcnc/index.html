@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k13</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k14</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -349,6 +349,16 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
     </div>
   </div>
 
+  <div class="card" style="padding:10px 14px;">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <b style="font-size:.85rem;">🧰 <span data-i18n="presetLbl">ชุดค่าวัสดุ</span></b>
+      <select id="presetSel" onchange="applyMatPreset(this.value)" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:.82rem;min-width:220px;"></select>
+      <button class="btn btn-ghost btn-sm" onclick="saveMatPreset()">💾 <span data-i18n="presetSave">บันทึกค่าปัจจุบัน</span></button>
+      <button class="btn btn-ghost btn-sm" onclick="deleteMatPreset()">🗑️ <span data-i18n="presetDel">ลบ</span></button>
+      <span style="font-size:.72rem;color:var(--muted);" data-i18n="presetHint">ขนาดแผ่น · ระยะขอบ · ระยะห่าง · การหมุน · มุมเริ่ม · ราคา</span>
+    </div>
+  </div>
+
   <!-- Multi-piece Vector Import -->
   <div class="card">
     <div class="card-header">
@@ -365,9 +375,9 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
       ondragleave="this.classList.remove('dragover')"
       ondrop="handleMdxfDrop(event)">
       <div class="ico">📄</div>
-      <p>คลิกหรือลากไฟล์มาวาง</p>
+      <p>คลิกหรือลากไฟล์มาวาง — <b>เลือกได้หลายไฟล์พร้อมกัน</b> (วางรวมในแผ่นเดียวกัน)</p>
       <p style="font-size:.74rem;margin-top:4px;">รองรับ <b>.dxf &nbsp;.svg &nbsp;.eps &nbsp;.ai &nbsp;.pdf</b> &nbsp;(AutoCAD / Illustrator / Inkscape / Rhino)</p>
-      <input type="file" id="mdxfFi" accept=".dxf,.svg,.eps,.ai,.pdf" style="display:none" onchange="handleMdxfFile(this.files[0])">
+      <input type="file" id="mdxfFi" accept=".dxf,.svg,.eps,.ai,.pdf" multiple style="display:none" onchange="handleMdxfFiles(this.files); this.value='';">
     </div>
     <div id="mdxfResult" class="mdxf-result" style="display:none;"></div>
   </div>
@@ -609,7 +619,7 @@ const TR = {
     hoverHighlight:'วางเมาส์เหนือแถวเพื่อ highlight ชิ้นทั้งกลุ่ม',
     col_type:'ประเภท', col_layer:'Layer', col_cx:'Center X', col_cy:'Center Y',
     col_w:'กว้าง (mm)', col_h:'สูง (mm)', col_aream2:'พื้นที่ (m²)', col_cls:'Classify',
-    col_found:'ตรวจพบ', col_code:'รหัสชิ้นงาน', col_name:'ชื่อ (แก้ได้)', col_holes:'🕳️ รู',
+    col_found:'ตรวจพบ', col_code:'รหัสชิ้นงาน', presetLbl:'ชุดค่าวัสดุ', presetSave:'บันทึกค่าปัจจุบัน', presetDel:'ลบ', presetHint:'ขนาดแผ่น · ระยะขอบ · ระยะห่าง · การหมุน · มุมเริ่ม · ราคา', col_name:'ชื่อ (แก้ได้)', col_holes:'🕳️ รู',
     leg_outer:'กรอบนอก (คำนวน + nesting)', leg_hole:'รู/ช่อง (แสดง + export)', leg_skip:'ข้าม',
     cost_mat:'ค่าวัสดุ', cost_labor:'ค่าแรง CNC', cost_total:'รวมทั้งหมด',
     cost_unit_sheet:'แผ่น', cost_unit_labor:'บาท/m²',
@@ -678,7 +688,7 @@ const TR = {
     hoverHighlight:'Hover over a row to highlight the whole group',
     col_type:'Type', col_layer:'Layer', col_cx:'Center X', col_cy:'Center Y',
     col_w:'Width (mm)', col_h:'Height (mm)', col_aream2:'Area (m²)', col_cls:'Classify',
-    col_found:'Found', col_code:'Part code', col_name:'Name (editable)', col_holes:'🕳️ Holes',
+    col_found:'Found', col_code:'Part code', presetLbl:'Material presets', presetSave:'Save current', presetDel:'Delete', presetHint:'sheet size · edge · gap · rotation · start corner · price', col_name:'Name (editable)', col_holes:'🕳️ Holes',
     leg_outer:'Outer frame (nest + calculate)', leg_hole:'Hole/cutout (show + export)', leg_skip:'Skip',
     cost_mat:'Material cost', cost_labor:'CNC labor', cost_total:'Total',
     cost_unit_sheet:'sheets', cost_unit_labor:'THB/m²',
@@ -731,6 +741,40 @@ function updateOrientUI(){
     b.classList.toggle('btn-ghost',  o!==val);
   });
 }
+
+// ── Material presets (per browser) ───────────────────────────────────────────
+const PRESET_FIELDS=['sw','sh','kerf','pieceGap','rotMode','startCorner','priceSheet','laborRate'];
+function _presets(){ try{ return JSON.parse(lsGet('sheetcnc_presets')||'[]')||[]; }catch(e){ return []; } }
+function _presetLabel(p){ return `${p.name} — ${p.sw}×${p.sh} · ${lang==='en'?'edge':'ขอบ'} ${p.kerf} · ${lang==='en'?'gap':'ห่าง'} ${p.pieceGap}`; }
+function renderPresets(sel){
+  const el=document.getElementById('presetSel'); if(!el||!el.appendChild) return;
+  const ps=_presets();
+  el.innerHTML=`<option value="">${lang==='en'?'— choose a saved preset —':'— เลือกชุดค่าที่บันทึกไว้ —'}</option>`+
+    ps.map((p,i)=>`<option value="${i}" ${sel===i?'selected':''}>${_presetLabel(p).replace(/</g,'&lt;')}</option>`).join('');
+}
+function applyMatPreset(v){
+  if(v===''||v==null) return;
+  const p=_presets()[+v]; if(!p) return;
+  PRESET_FIELDS.forEach(k=>{ const el=document.getElementById(k); if(el && p[k]!=null) el.value=p[k]; });
+  saveSettings();
+}
+function saveMatPreset(){
+  const v=k=>document.getElementById(k)?.value;
+  const def=`${v('sw')}×${v('sh')} ${lang==='en'?'gap':'ห่าง'} ${v('pieceGap')}`;
+  const name=prompt(lang==='en'?'Preset name (e.g. MDF 2440×1220)':'ตั้งชื่อชุดค่า (เช่น MDF 2440×1220)', def);
+  if(!name) return;
+  const ps=_presets(), rec={name:name.trim()}; PRESET_FIELDS.forEach(k=>rec[k]=v(k));
+  const i=ps.findIndex(p=>p.name===rec.name); if(i>=0) ps[i]=rec; else ps.push(rec);
+  lsSet('sheetcnc_presets', JSON.stringify(ps)); renderPresets(i>=0?i:ps.length-1);
+}
+function deleteMatPreset(){
+  const el=document.getElementById('presetSel'); const i=el?el.value:''; if(i==='') return;
+  const ps=_presets(); const p=ps[+i]; if(!p) return;
+  if(!confirm((lang==='en'?'Delete preset: ':'ลบชุดค่า: ')+p.name+' ?')) return;
+  ps.splice(+i,1); lsSet('sheetcnc_presets', JSON.stringify(ps)); renderPresets();
+}
+document.addEventListener('DOMContentLoaded',()=>{ try{ renderPresets(); }catch(e){} });
+try{ renderPresets(); }catch(e){}
 
 function saveSettings(){
   histPush('settings');
@@ -1104,6 +1148,46 @@ const DXF_OPT_DEF={holes:true, frame:true, code:true, name:false, size:true, tit
 let DXF_OPT=(()=>{ try{ const v=JSON.parse(localStorage.getItem('sheetcnc_dxfopt')||'null');
   return Object.assign({}, DXF_OPT_DEF, v||{}); }catch(e){ return Object.assign({}, DXF_OPT_DEF); } })();
 function _saveDxfOpt(){ try{ localStorage.setItem('sheetcnc_dxfopt', JSON.stringify(DXF_OPT)); }catch(e){} }
+
+/** Arc geometry of a bulge segment p0→p1: centre, radius, start angle, signed sweep. */
+function _bulgeArc(x0,y0,x1,y1,b){
+  const dx=x1-x0, dy=y1-y0, d=Math.hypot(dx,dy); if(d<1e-12||Math.abs(b)<1e-12) return null;
+  const b2=b*b, r=d*(1+b2)/(4*Math.abs(b)), mx=(x0+x1)/2, my=(y0+y1)/2;
+  const lx=-dy/d, ly=dx/d, dc=r*(1-b2)/(1+b2), sg=Math.sign(b);
+  const cx=mx+sg*dc*lx, cy=my+sg*dc*ly;
+  return {cx,cy,r,a0:Math.atan2(y0-cy,x0-cx), sw:4*Math.atan(b)};
+}
+/** Points strictly between p0 and p1 for one bulge segment.
+ *  outer=false: on the arc (chords cut INSIDE the arc).
+ *  outer=true : corners of the tangent polygon (edges lie OUTSIDE / on the arc).
+ *  tol = max deviation from the true arc (mm). */
+function _bulgeSeg(x0,y0,x1,y1,b,outer,tol){
+  const A=_bulgeArc(x0,y0,x1,y1,b); if(!A) return [];
+  const {cx,cy,r,a0,sw}=A;
+  const step=2*Math.sqrt(2*tol/Math.max(r,tol));
+  const n=Math.max(4, Math.min(512, Math.ceil(Math.abs(sw)/step)));
+  const out=[];
+  if(outer){
+    const h=sw/(2*n), R=r/Math.cos(h);
+    for(let k=0;k<n;k++){ const a=a0+sw*(k+0.5)/n; out.push([cx+R*Math.cos(a), cy+R*Math.sin(a)]); }
+  } else {
+    for(let k=1;k<n;k++){ const a=a0+sw*k/n; out.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
+  }
+  return out;
+}
+/** Collision ring for a CLOSED bulged outline that CONTAINS the true shape: convex
+ *  arcs → tangent polygon (outside the arc), concave arcs → chords (inside the arc,
+ *  i.e. outside the material). The old 48-gon / inscribed chords sat INSIDE convex
+ *  arcs, so two Ø487 circles were nested 4.1 mm apart with the gap set to 5. */
+function _ringFromRawV(rawV, tol){
+  const T=tol||0.02, n=rawV.length;
+  const ins=[]; for(let k=0;k<n;k++){ const v=rawV[k], w=rawV[(k+1)%n]; ins.push([v.x,v.y]); if(Math.abs(v.b)>1e-10) _bulgeSeg(v.x,v.y,w.x,w.y,v.b,false,T).forEach(p=>ins.push(p)); }
+  let A=0; for(let k=0;k<ins.length;k++){ const p=ins[k], q=ins[(k+1)%ins.length]; A+=p[0]*q[1]-q[0]*p[1]; }
+  const out=[];
+  for(let k=0;k<n;k++){ const v=rawV[k], w=rawV[(k+1)%n]; out.push([v.x,v.y]);
+    if(Math.abs(v.b)>1e-10) _bulgeSeg(v.x,v.y,w.x,w.y,v.b, Math.sign(v.b)===Math.sign(A), T).forEach(p=>out.push(p)); }
+  return out;
+}
 /** Full DXF parser — returns array of shape objects */
 /** Build a circle shape (smooth 4-bulge rawV so it exports as a true circle). */
 function _mkCircle(cx,cy,r,layer){
@@ -1460,6 +1544,16 @@ function parseDXFFull(text) {
         area:Math.max(w+h,1), w, h, minX:Math.min(...xs), minY:Math.min(...ys), cx:Math.min(...xs)+w/2, cy:Math.min(...ys)+h/2 });
     });
   }
+  // Collision outline must CONTAIN the true curve (see _ringFromRawV).
+  for(const sh of shapes){
+    if(sh.open || sh.isText || !sh.rawV || sh.rawV.length<2) continue;
+    if(!sh.rawV.some(v=>Math.abs(v.b)>1e-10)) continue;
+    const ring=_ringFromRawV(sh.rawV);
+    if(ring.length<3) continue;
+    const st=polyStats(ring.map(p=>p[0]), ring.map(p=>p[1]));
+    const keepArea=sh.area;
+    Object.assign(sh, st); if(keepArea) sh.area=keepArea;     // true area for reports
+  }
   return shapes;
 }
 
@@ -1689,8 +1783,8 @@ const CLS_NEXT  = { outer:'hole', hole:'skip', skip:'outer' };
 function handleMdxfDrop(e) {
   e.preventDefault();
   e.currentTarget.classList.remove('dragover');
-  const f = e.dataTransfer.files[0];
-  if (f) handleMdxfFile(f);
+  const fs = e.dataTransfer.files;
+  if (fs && fs.length) handleMdxfFiles(fs);
 }
 
 // ─── Modern .AI / PDF support ──────────────────────────────────────────────
@@ -2021,6 +2115,62 @@ function parseAIEPS(text){
   return shapes;
 }
 
+/** Several files at once → one job. Each file's drawing is shifted to the right of
+ *  the previous one (500 mm apart, bottoms aligned) so nothing overlaps; geometry
+ *  inside a file is untouched. Everything then goes through the normal inspector. */
+function _readFileShapes(file){
+  return new Promise((res,rej)=>{
+    const ext=file.name.split('.').pop().toLowerCase();
+    if(ext==='ai'||ext==='pdf'||ext==='eps'){
+      const rb=new FileReader();
+      rb.onload=async ev=>{ try{
+        let bytes=new Uint8Array(ev.target.result); const dec=new TextDecoder('latin1');
+        if(bytes.length>30&&bytes[0]===0xC5&&bytes[1]===0xD0&&bytes[2]===0xD3&&bytes[3]===0xC6){
+          const dv=new DataView(ev.target.result); bytes=bytes.subarray(dv.getUint32(4,true), dv.getUint32(4,true)+dv.getUint32(8,true)); }
+        if(dec.decode(bytes.subarray(0,5)).startsWith('%PDF')) res(await parsePDFShapes(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.length)));
+        else { const txt=dec.decode(bytes); let all=parseAIEPS(txt); if(!all.length) all=parseEPSShapes(txt); res(all); }
+      }catch(e){ rej(e); } };
+      rb.onerror=()=>rej(new Error('read failed')); rb.readAsArrayBuffer(file); return;
+    }
+    const r=new FileReader();
+    r.onload=ev=>{ try{
+      if(ext==='dxf') res(parseDXFFull(ev.target.result));
+      else if(ext==='svg') res(parseSVGShapes(ev.target.result));
+      else rej(new Error(`.${ext}`));
+    }catch(e){ rej(e); } };
+    r.onerror=()=>rej(new Error('read failed')); r.readAsText(file);
+  });
+}
+function _shiftShape(s,dx,dy){
+  const o={...s};
+  if(s.vertices) o.vertices=s.vertices.map(([x,y])=>[x+dx,y+dy]);
+  if(s.rawV) o.rawV=s.rawV.map(v=>({...v,x:v.x+dx,y:v.y+dy}));
+  if(o.minX!=null) o.minX+=dx; if(o.minY!=null) o.minY+=dy;
+  if(o.cx!=null) o.cx+=dx; if(o.cy!=null) o.cy+=dy;
+  return o;
+}
+async function handleMdxfFiles(files){
+  const list=[...(files||[])]; if(!list.length) return;
+  if(list.length===1) return handleMdxfFile(list[0]);
+  const exts=list.map(f=>f.name.split('.').pop().toLowerCase());
+  try{
+    let all=[], right=null, base=null;
+    for(const f of list){
+      const sh=(await _readFileShapes(f)).filter(z=>z&&z.vertices&&z.vertices.length);
+      if(!sh.length) continue;
+      const xs=sh.flatMap(z=>z.vertices.map(v=>v[0])), ys=sh.flatMap(z=>z.vertices.map(v=>v[1]));
+      const mnX=Math.min(...xs), mxX=Math.max(...xs), mnY=Math.min(...ys);
+      const dx = right===null ? 0 : right+500-mnX, dy = base===null ? 0 : base-mnY;
+      if(base===null) base=mnY;
+      all=all.concat(dx||dy ? sh.map(z=>_shiftShape(z,dx,dy)) : sh);
+      right=mxX+dx;
+    }
+    // name ends with .dxf only when every file was DXF (keeps arc data exactly)
+    const tail = exts.every(e=>e==='dxf') ? '.dxf' : '.svg';
+    inspFileName = list.map(f=>f.name).join(' + ').replace(/\.[a-z0-9]+$/i,'')+tail;
+    _finishInspImport(all);
+  }catch(err){ showInspErr((lang==='en'?'Cannot read file: ':'อ่านไฟล์ไม่ได้: ')+err.message); }
+}
 function handleMdxfFile(file) {
   if (!file) return;
   inspFileName = file.name;
@@ -5183,11 +5333,16 @@ function _runNestingSync() {
     sheets = best;
     if(autoInfo){ autoInfo.tried=tried; autoInfo.ms=Date.now()-t0; }
   } else {
-    sheets = runPass(rotMode,'area');
+    if(rotMode==='free1'){
+      // 1° on toothed parts ran 40 s with the page frozen. Cap it; if it can't finish,
+      // fall back to 15° steps and say so.
+      sheets = runPass('free1','area', Date.now()+8000);
+      if(!sheets){ sheets = runPass('free','area'); autoInfo={capped:true, rot:'free', sort:'area', tried:1, ms:Date.now()-t0}; }
+    } else sheets = runPass(rotMode,'area');
     // Same "empty the weakest sheet" search for a fixed rotation mode, short budget.
     const sc=scoreOf(sheets);
     if(sheets.length>1){
-      const r=improve(sheets,sc,rotMode,Date.now()+3500);
+      const r=improve(sheets,sc,(autoInfo&&autoInfo.capped)?'free':rotMode,Date.now()+3500);
       sheets=r.best;
     }
   }
@@ -5711,7 +5866,11 @@ function renderResults(){
     <div class="stat"><div class="sv">${eff.toFixed(1)}%</div><div class="sl">${t('stat_eff')}</div></div>
     <div class="stat"><div class="sv">${pieces.reduce((s,p)=>s+p.qty,0)}</div><div class="sl">${t('stat_pieces')}</div></div>
     <div class="stat"><div class="sv">${((sw/1000)*(sh/1000)).toFixed(3)}</div><div class="sl">${t('stat_sheetSz')}</div></div>
-    ${(()=>{ const a=nestResult.autoInfo; if(!a) return '';
+    ${(()=>{ const a=nestResult.autoInfo; if(!a||!a.capped) return '';
+      return `<div class="stat" style="border:1px solid #f59e0b88;">
+        <div class="sv" style="color:#fbbf24;font-size:.95rem">⏱️ ${lang==='en'?'1° too slow → 15°':'1° ช้าเกิน → ใช้ 15°'}</div>
+        <div class="sl">${lang==='en'?'stopped after 8 s to keep the page responsive':'หยุดที่ 8 วินาที เพื่อไม่ให้หน้าค้าง'}</div></div>`; })()}
+    ${(()=>{ const a=nestResult.autoInfo; if(!a||a.capped) return '';
       const rotName={none:'ไม่หมุน',rot90:'90°',rot45:'45°/90°',free:'อิสระ 15°',free1:'อิสระ 1°'}[a.rot]||a.rot;
       const sortName={area:'ใหญ่→เล็ก',long:'ด้านยาวสุด',tall:'สูงสุด',wide:'กว้างสุด',perim:'เส้นรอบรูป'}[a.sort]||a.sort;
       return `<div class="stat" style="border:1px solid #a78bfa55;">
@@ -9174,7 +9333,161 @@ function _dxfPreset(k){
 function _dxfDialogGo(mode){
   Object.keys(DXF_OPT_DEF).forEach(n=>{ const el=document.getElementById('dxo_'+n); if(el) DXF_OPT[n]=!!el.checked; });
   _saveDxfOpt(); closeEditPopup();
-  if(mode==='current') _doExportDXFCurrent(); else if(mode==='each') _doExportDXFAll(); else _doExportDXF();
+  const jobs=_dxfBuildJobs(mode);
+  if(!jobs.length) return;
+  _showVerifyPopup(jobs);
+}
+/** Build the files for an export. With "original pieces" ticked you ALWAYS get two:
+ *  the machine file (no blocks, no originals) and the _check file. */
+function _dxfBuildJobs(mode){
+  if(!nestResult) return [];
+  const {sheetGroups,sw,sh}=nestResult;
+  const GAP=150, jobs=[];
+  const groupsFor = mode==='current' ? [[(typeof activeSheet==='number')?activeSheet:0]]
+                  : mode==='each' ? sheetGroups.map((_,i)=>[i]) : [null];
+  const wantCheck=!!DXF_OPT.source;
+  for(const sel of groupsFor){
+    const variants = wantCheck ? [false,true] : [false];
+    for(const chk of variants){
+      const keep=DXF_OPT.source; DXF_OPT.source=chk;
+      let text, file, rects, items;
+      try{
+        if(sel===null){
+          text=buildDXF(); file=`all_layouts_${sheetGroups.length}x${_dxfOptTag()}_${BUILD_TAG}.dxf`;
+          rects=sheetGroups.map((g,li)=>({x0:li*(sw+GAP),y0:0,x1:li*(sw+GAP)+sw,y1:sh}));
+          items=sheetGroups.map(g=>g.sheet.items);
+        } else {
+          const g=sheetGroups[sel[0]];
+          text=buildDXFSingle(sel[0]); file=`layout_${g.label}${_dxfOptTag()}_${BUILD_TAG}.dxf`;
+          rects=[{x0:0,y0:0,x1:sw,y1:sh}]; items=[g.sheet.items];
+        }
+      } finally { DXF_OPT.source=keep; }
+      if(!text) continue;
+      jobs.push({file, text, kind:chk?'check':'cut', rects, items});
+    }
+  }
+  return jobs;
+}
+/** Read the EXPORTED BYTES back and measure them — independent of the engine's own
+ *  numbers (they have been wrong while the file was right, and the other way round). */
+function _verifyDXF(text, rects, itemsPerSheet){
+  const L=text.replace(/\r\n/g,'\n').split('\n'), P=[];
+  for(let i=0;i+1<L.length;i+=2) P.push([L[i].trim(), L[i+1]]);
+  const polys=[], texts=[];
+  let inBlocks=false;
+  for(let i=0;i<P.length;i++){
+    const [c,v]=P[i];
+    if(c==='2'&&v==='BLOCKS') inBlocks=true;
+    if(c==='0'&&v==='ENDSEC') inBlocks=false;
+    if(inBlocks || c!=='0') continue;
+    if(v==='POLYLINE'){
+      let layer='', flag=0, j=i+1;
+      for(;j<P.length&&P[j][0]!=='0';j++){ if(P[j][0]==='8') layer=P[j][1].trim(); if(P[j][0]==='70') flag=+P[j][1]; }
+      const vs=[];
+      while(j<P.length && P[j][0]==='0' && P[j][1].trim()==='VERTEX'){
+        let x=0,y=0,b=0; j++;
+        for(;j<P.length&&P[j][0]!=='0';j++){ const k=P[j][0]; if(k==='10')x=+P[j][1]; if(k==='20')y=+P[j][1]; if(k==='42')b=+P[j][1]; }
+        vs.push({x,y,b});
+      }
+      if(layer==='CUT' && vs.length>=2){
+        const closed=(flag&1)===1;
+        let pts;
+        if(closed) pts=_ringFromRawV(vs, 0.0002);            // contains the true curve, ≤0.0002 mm off
+        else { pts=[]; for(let k=0;k<vs.length;k++){ const a=vs[k], n=vs[k+1]; pts.push([a.x,a.y]);
+          if(n && Math.abs(a.b)>1e-12) _bulgeSeg(a.x,a.y,n.x,n.y,a.b,false,0.0002).forEach(q=>pts.push(q)); } }
+        pts.closed=closed;
+        polys.push(pts);
+      }
+      i=j-1; continue;
+    }
+    if(v==='TEXT'){
+      let layer='',str=''; for(let j=i+1;j<P.length&&P[j][0]!=='0';j++){ if(P[j][0]==='8') layer=P[j][1].trim(); if(P[j][0]==='1') str=P[j][1]; }
+      if(layer==='TEXT') texts.push(str.trim());
+    }
+  }
+  const box=p=>{ let a=1e18,b=1e18,c=-1e18,d=-1e18; for(const [x,y] of p){ if(x<a)a=x; if(y<b)b=y; if(x>c)c=x; if(y>d)d=y; } return [a,b,c,d]; };
+  // Internal line work (open lines / inner loops written on CUT) belongs to the piece
+  // that encloses it — it is not a separate piece and its distance to its own outline
+  // is not a piece gap. Inside-or-on (0.5 mm) the outline of a bigger closed CUT loop.
+  const area=p=>{ let a=0; for(let i=0;i<p.length;i++){ const q=p[i], r=p[(i+1)%p.length]; a+=q[0]*r[1]-r[0]*q[1]; } return Math.abs(a/2); };
+  const segD=(x,y,a,b)=>{ const vx=b[0]-a[0], vy=b[1]-a[1], L=vx*vx+vy*vy; let t=L?((x-a[0])*vx+(y-a[1])*vy)/L:0; t=t<0?0:t>1?1:t; return Math.hypot(a[0]+t*vx-x, a[1]+t*vy-y); };
+  const ringD=(x,y,R)=>{ let m=Infinity; for(let i=0;i<R.length;i++){ const d=segD(x,y,R[i],R[(i+1)%R.length]); if(d<m) m=d; if(m<0.5) break; } return m; };
+  const BB=polys.map(box), AR=polys.map(p=>p.closed?area(p):0);
+  let overN=0, overMax=0;
+  const internal=polys.map((p,k)=>{
+    if(p.closed) return polys.some((q,j)=>{
+      if(j===k || !q.closed || AR[j]<=AR[k]) return false;
+      const a=BB[k], b=BB[j]; if(a[0]<b[0]-0.5||a[1]<b[1]-0.5||a[2]>b[2]+0.5||a[3]>b[3]+0.5) return false;
+      return p.every(([x,y])=>pointInPolygon(x,y,q) || ringD(x,y,q)<=0.5);
+    });
+    // open line work: belongs to the smallest closed loop holding most of it
+    const sm=[]; for(let i=0;i+1<p.length;i++){ for(let t=0.05;t<1;t+=0.1) sm.push([p[i][0]+(p[i+1][0]-p[i][0])*t, p[i][1]+(p[i+1][1]-p[i][1])*t]); } if(!sm.length) sm.push(p[0]);
+    let host=-1;
+    polys.forEach((q,j)=>{ if(j===k||!q.closed) return;
+      const b=BB[j], a=BB[k]; if(a[2]<b[0]||a[0]>b[2]||a[3]<b[1]||a[1]>b[3]) return;
+      const inN=sm.filter(([x,y])=>pointInPolygon(x,y,q)).length;
+      if(inN*2>=sm.length && (host<0||AR[j]<AR[host])) host=j; });
+    if(host<0) return false;
+    // how far does it run past its piece's outline? (by design in some drawings — warn)
+    let o=0; for(const [x,y] of p) if(!pointInPolygon(x,y,polys[host])) o=Math.max(o, ringD(x,y,polys[host]));
+    if(o>0.05){ overN++; overMax=Math.max(overMax,o); }
+    return true;
+  });
+  const keepIdx=polys.map((_,k)=>k).filter(k=>!internal[k]);
+  const polysTop=keepIdx.map(k=>polys[k]);
+  polys.length=0; polysTop.forEach(p=>polys.push(p));
+  const B=polys.map(box);
+  const gap=+nestResult.pieceGap, edge=+nestResult.edgeMargin;
+  let minGap=Infinity, minEdge=Infinity, under=0, outside=0;
+  const perSheet=rects.map(()=>[]);
+  B.forEach((b,k)=>{ const si=rects.findIndex(r=>b[0]>=r.x0-0.01&&b[2]<=r.x1+0.01&&b[1]>=r.y0-0.01&&b[3]<=r.y1+0.01);
+    if(si<0){ outside++; return; } perSheet[si].push(k);
+    const r=rects[si]; minEdge=Math.min(minEdge, b[0]-r.x0, b[1]-r.y0, r.x1-b[2], r.y1-b[3]); });
+  perSheet.forEach(ks=>{ for(let a=0;a<ks.length;a++) for(let c=a+1;c<ks.length;c++){
+    const p=B[ks[a]], q=B[ks[c]];
+    const bx=Math.max(p[0]-q[2], q[0]-p[2], 0), by=Math.max(p[1]-q[3], q[1]-p[3], 0);
+    if(Math.hypot(bx,by) > gap+5) continue;
+    const d=_polyClear(polys[ks[a]], polys[ks[c]], gap+5);
+    if(d<minGap) minGap=d; if(d<gap-1e-3) under++;
+  }});
+  const expectN=itemsPerSheet.reduce((a,its)=>a+its.length,0);
+  const expectCodes=itemsPerSheet.flatMap(its=>its.flatMap(it=>_codesOf(it.holes).map(_dxfStr))).sort();
+  const got=texts.map(_dxfStr).sort();
+  const missing=expectCodes.filter((c,i,arr)=>{ const n=arr.filter(x=>x===c).length, m=got.filter(x=>x===c).length; return m<n && arr.indexOf(c)===i; });
+  const codesChecked = DXF_OPT.code && expectCodes.length>0;
+  const ok = under===0 && outside===0 && polys.length===expectN && (minEdge===Infinity || minEdge>=edge-1e-3) && (!codesChecked || missing.length===0);
+  return {ok, minGap, minEdge, under, outside, pieces:polys.length, expectN, codesChecked, codes:got.length, expectCodes:expectCodes.length, missing, gap, edge, overN, overMax};
+}
+function _showVerifyPopup(jobs){
+  const en=lang==='en';
+  window.__dxfJobs=jobs;
+  const f=v=>isFinite(v)?(Math.abs(v)<0.0005?0:v).toFixed(3):'—';
+  const rows=jobs.map(j=>{
+    if(j.kind==='check') return `<div style="padding:8px 10px;border:1px solid #64748b55;border-radius:8px;margin-bottom:6px;">
+      🔍 <b>${j.file}</b><div style="font-size:.74rem;color:#fbbf24;margin-top:2px;">${en?'CHECK file — pieces are blocks with their originals. Do NOT send to the machine.':'ไฟล์ตรวจสอบ — ชิ้นงานเป็น block รวมกับต้นฉบับ ห้ามส่งเข้าเครื่อง / ArtCAM'}</div></div>`;
+    const r=_verifyDXF(j.text, j.rects, j.items); j.verify=r;
+    const line=(okk,txt)=>`<div style="font-size:.8rem;margin:2px 0;color:${okk?'#86efac':'#fca5a5'};">${okk?'✅':'❌'} ${txt}</div>`;
+    return `<div style="padding:8px 10px;border:1px solid ${r.ok?'#22c55e88':'#ef4444'};border-radius:8px;margin-bottom:6px;background:${r.ok?'#14532d22':'#7f1d1d33'};">
+      ${r.ok?'✅':'⛔'} <b>${j.file}</b> <span style="font-size:.72rem;color:var(--muted);">${en?'(machine file)':'(ไฟล์ส่งเครื่อง)'}</span>
+      ${line(r.under===0, `${en?'Min piece gap':'ระยะห่างชิ้นงานต่ำสุด'} <b>${f(r.minGap)}</b> mm (${en?'set':'ตั้ง'} ${r.gap})${r.under?` — <b>${r.under}</b> ${en?'pair(s) too close':'คู่ชิดเกิน'}`:''}`)}
+      ${line(!(r.minEdge<r.edge-1e-3) && r.outside===0, `${en?'Min edge margin':'ระยะขอบต่ำสุด'} <b>${f(r.minEdge)}</b> mm (${en?'set':'ตั้ง'} ${r.edge})${r.outside?` — <b>${r.outside}</b> ${en?'outside the sheet':'ชิ้นหลุดนอกแผ่น'}`:''}`)}
+      ${line(r.pieces===r.expectN, `${en?'Pieces in file':'ชิ้นงานในไฟล์'} <b>${r.pieces}/${r.expectN}</b>`)}
+      ${r.overN?`<div style="font-size:.8rem;margin:2px 0;color:#fcd34d;">⚠️ ${en?`${r.overN} inner line(s) run past their piece outline by up to <b>${r.overMax.toFixed(2)}</b> mm (as drawn in the source file)`:`เส้นภายใน ${r.overN} เส้น ยื่นเลยขอบชิ้นงานสูงสุด <b>${r.overMax.toFixed(2)}</b> mm (ตามที่วาดในไฟล์ต้นฉบับ)`}</div>`:''}
+      ${r.codesChecked?line(r.missing.length===0, `${en?'Part codes':'รหัสชิ้นงาน'} <b>${r.codes}/${r.expectCodes}</b>${r.missing.length?` — ${en?'missing':'ขาด'}: ${r.missing.join(', ')}`:''}`):''}
+    </div>`;
+  }).join('');
+  const allOk=jobs.every(j=>j.kind==='check'||(j.verify&&j.verify.ok));
+  const body=`<div style="font-size:.78rem;color:var(--muted);margin-bottom:8px;">${en?'The exported file was read back and measured:':'อ่านไฟล์ที่ export กลับมาวัดจริงแล้ว:'}</div>${rows}
+    ${allOk?'':`<div style="color:#fca5a5;font-size:.8rem;margin:6px 0;">⚠️ ${en?'Something failed — check before cutting.':'มีรายการไม่ผ่าน — ตรวจสอบก่อนตัดจริง'}</div>`}
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
+      <button class="btn btn-ghost btn-sm" onclick="closeEditPopup()">${en?'Cancel':'ยกเลิก'}</button>
+      <button class="btn ${allOk?'btn-success':'btn-danger'} btn-sm" onclick="_dlDxfJobs()">⬇️ ${en?'Download':'ดาวน์โหลด'} ${jobs.length} ${en?'file(s)':'ไฟล์'}${allOk?'':(en?' anyway':' ทั้งที่ไม่ผ่าน')}</button>
+    </div>`;
+  showEditPopup(allOk?(en?'✅ DXF verified':'✅ ตรวจไฟล์ DXF ผ่าน'):(en?'⛔ DXF check failed':'⛔ ตรวจไฟล์ DXF ไม่ผ่าน'), body);
+}
+function _dlDxfJobs(){
+  const jobs=window.__dxfJobs||[]; closeEditPopup();
+  jobs.forEach((j,k)=>setTimeout(()=>dlText(j.text,j.file), k*400));   // spaced so the browser keeps them all
 }
 /** Filename tag for a non-default selection, so two different exports never share a name. */
 function _dxfOptTag(){
@@ -9501,7 +9814,7 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k13';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k14';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
