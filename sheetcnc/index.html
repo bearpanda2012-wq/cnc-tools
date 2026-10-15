@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k11</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k12</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -9501,7 +9501,7 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k11';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k12';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
@@ -9532,44 +9532,68 @@ function _sheetTitle(offX, sw, sh, g){
  *  the source file (no rotation, original text), sorted by part code and framed as one
  *  group per sheet. Layers SOURCE / SOURCE_TEXT only — never CUT, so nothing here is
  *  machined. Lets the user tick off "this sheet really has 36-5, 37-6 …". */
+let _DXF_BLK=null;   // block definitions collected during one build: [{name, body}]
+function _blkName(base){
+  const clean=String(base).replace(/[^A-Za-z0-9_\-$]/g,'_').slice(0,60)||'P';
+  let n=clean, k=2; const used=new Set((_DXF_BLK||[]).map(b=>b.name));
+  while(used.has(n)) n=`${clean}_${k++}`;
+  return n;
+}
+function _dxfBlocksSection(){
+  if(!_DXF_BLK||!_DXF_BLK.length) return '';
+  let o='0\nSECTION\n2\nBLOCKS\n';
+  for(const b of _DXF_BLK)
+    o+=`0\nBLOCK\n8\n0\n2\n${b.name}\n70\n0\n10\n0.0\n20\n0.0\n30\n0.0\n3\n${b.name}\n`+b.body+'0\nENDBLK\n8\n0\n';
+  return o+'0\nENDSEC\n';
+}
+function _dxfInsert(name, x, y, layer){
+  return `0\nINSERT\n8\n${layer}\n2\n${name}\n10\n${(+x).toFixed(4)}\n20\n${(+y).toFixed(4)}\n30\n0.0\n`;
+}
 function _dxfSourceGroup(g, offX, sw, sh){
-  if(!DXF_OPT.source) return '';
-  const items=g.sheet.items.slice().sort((a,b)=>_natCmp(_codesOf(srcOf(a).holes).join(',')||'~'+a.name,_codesOf(srcOf(b).holes).join(',')||'~'+b.name));
+  if(!DXF_OPT.source || !_DXF_BLK) return '';
   function srcOf(it){
     if(it.__src) return it.__src;                       // the exact item that was placed (own text)
     const p=pieces.find(q=>q.id===it.pieceId)||{};
     const holes=(p.textSets&&p.textSets.length)?[...(p.holes||[]).filter(h=>!h.isText),...p.textSets[0]]:(p.holes||[]);
     return {w:p.w??it.w, h:p.h??it.h, vertices:p.vertices||null, rawV:p.rawV||null, holes, open:p.open, name:p.name||it.name};
   }
+  const key=it=>_codesOf(srcOf(it).holes).join(',')||'~'+it.name;
+  const items=g.sheet.items.slice().sort((a,b)=>_natCmp(key(a),key(b)));
   const GAPX=60, GAPY=80, TOP0=-260;                    // below the sheet titles / TOTAL line
-  // shelf layout inside this sheet's column width
   let x=0, y=0, rowH=0; const pos=[];
   for(const it of items){
-    const s=srcOf(it), w=+s.w, h=+s.h;
+    const sr=srcOf(it), w=+sr.w, h=+sr.h;
     if(x>0 && x+w>sw){ x=0; y+=rowH+GAPY; rowH=0; }
-    pos.push({s,x,y}); x+=w+GAPX; rowH=Math.max(rowH,h);
+    pos.push({it,sr,x,y}); x+=w+GAPX; rowH=Math.max(rowH,h);
   }
   const totalH=y+rowH;
-  // Draw with the normal piece writer, then move everything onto SOURCE layers.
+  const toSrc=t=>t.replace(/\n8\n(CUT|CUT_HOLE)\n/g,'\n8\nSOURCE\n').replace(/\n8\nTEXT\n/g,'\n8\nSOURCE_TEXT\n');
+  // 1) one BLOCK per piece: the original geometry, base point = bottom-left, unrotated
   const keep={...DXF_OPT};
   DXF_OPT.holes=true; DXF_OPT.code=true; DXF_OPT.name=false; DXF_OPT.size=false;
-  let o='';
+  const pieceBlk=[];
   try{
-    for(const {s:src,x:px,y:py} of pos){
-      const fake={x:px, y:0, w:+src.w, h:+src.h, angle:0, rotatedVerts:null,
-                  vertices:src.vertices||null, rawV:src.rawV||null, holes:src.holes||null, open:src.open, name:src.name};
-      const T=TOP0-py;                                    // DXF y of this piece's top edge
-      o+=dxfItemPaths(fake, offX, sh-T, sh);
+    for(const P of pos){
+      const sr=P.sr, H=+sr.h;
+      const fake={x:0, y:0, w:+sr.w, h:H, angle:0, rotatedVerts:null,
+                  vertices:sr.vertices||null, rawV:sr.rawV||null, holes:sr.holes||null, open:sr.open, name:sr.name};
+      const code=_codesOf(sr.holes).join('_');
+      const name=_blkName('SRC_'+(code||_dxfStr(P.it.name)));
+      _DXF_BLK.push({name, body:toSrc(dxfItemPaths(fake, 0, 0, H))});
+      pieceBlk.push(name);
     }
   } finally { Object.assign(DXF_OPT, keep); }
-  o=o.replace(/\n8\n(CUT|CUT_HOLE)\n/g,'\n8\nSOURCE\n').replace(/\n8\nTEXT\n/g,'\n8\nSOURCE_TEXT\n')
-     .replace(/^0\n/,'0\n');
-  // frame + caption for the whole group
-  const fx=offX-20, fy=TOP0-totalH-20, fw=Math.min(sw, Math.max(...pos.map(p=>p.x+(+p.s.w)),0))+40, fh=totalH+40;
-  o+=dxfRectShape(fx, fy, fw, fh, 'SOURCE');
+  // 2) one BLOCK per sheet: INSERTs of its piece blocks + frame + caption
+  //    (block coords: origin = top-left of the group, y up → contents go negative)
+  let body='';
+  pos.forEach((P,k)=>{ body+=_dxfInsert(pieceBlk[k], P.x, -P.y-(+P.sr.h), 'SOURCE'); });
+  const fw=Math.min(sw, Math.max(0,...pos.map(P=>P.x+(+P.sr.w))))+40, fh=totalH+40;
+  body+=dxfRectShape(-20, -totalH-20, fw, fh, 'SOURCE');
   const cap=`SOURCE (original) - Layout ${g.label} - ${items.length} pcs: ${items.map(it=>_codesOf(srcOf(it).holes).join('/')||_dxfStr(it.name)).join(', ')}`;
-  o+=`0\nTEXT\n8\nSOURCE_TEXT\n10\n${(fx).toFixed(3)}\n20\n${(fy-40).toFixed(3)}\n40\n24\n1\n${_dxfStr(cap)}\n`;
-  return o;
+  body+=`0\nTEXT\n8\nSOURCE_TEXT\n10\n-20.000\n20\n${(-totalH-60).toFixed(3)}\n40\n24\n1\n${_dxfStr(cap)}\n`;
+  const sheetBlk=_blkName('SRC_LAYOUT_'+g.label);
+  _DXF_BLK.push({name:sheetBlk, body});
+  return _dxfInsert(sheetBlk, offX, TOP0, 'SOURCE');
 }
 /** Offcut outlines on their own REMNANT layer (never CUT) — only when ticked. */
 function _dxfRemnants(sheet, offX, sw, sh){
@@ -9589,7 +9613,7 @@ function buildDXFSingle(groupIdx){
   const g=sheetGroups[groupIdx]; if(!g) return null;
   const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30, REMNANT:8, SOURCE:8, SOURCE_TEXT:9};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
-  let entities='';
+  let entities=''; _DXF_BLK=[];
   if(DXF_OPT.frame) entities+=dxfRectShape(0,0,sw,sh,'SHEET');
   entities+=_sheetTitle(0, sw, sh, g);
   // Summary line (left-aligned, further below so it never overlaps the titles)
@@ -9597,7 +9621,7 @@ function buildDXFSingle(groupIdx){
   _cutOrder(g.sheet.items).forEach(item=>{ entities+=dxfItemPaths(item,0,0,sh); });
   entities+=_dxfRemnants(g.sheet,0,sw,sh);
   entities+=_dxfSourceGroup(g, 0, sw, sh);
-  return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
+  return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+_dxfBlocksSection()+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
 }
 function buildDXF(){
   if(!nestResult){ alert(lang==='en'?'Please run nesting first':'กรุณาจัดวาง CNC ก่อน'); return null; }
@@ -9605,7 +9629,7 @@ function buildDXF(){
   const GAP=150;
   const LAYERS={SHEET:3, CUT:1, CUT_HOLE:6, TEXT:2, LABEL:4, LABEL_SIZE:30, REMNANT:8, SOURCE:8, SOURCE_TEXT:9};
   const totalSheets=sheetGroups.reduce((s,x)=>s+x.count,0);
-  let entities='';
+  let entities=''; _DXF_BLK=[];
   sheetGroups.forEach((g,li)=>{
     const offX=li*(sw+GAP), offY=0;
     if(DXF_OPT.frame) entities+=dxfRectShape(offX,offY,sw,sh,'SHEET');
@@ -9620,7 +9644,7 @@ function buildDXF(){
   const brk=sheetGroups.map(g=>`${g.label} x${g.count}`).join(', ');
   entities+=_lbl(20, -150, 40,
     `TOTAL: ${totalSheets} sheet${totalSheets>1?'s':''}  |  ${sheetGroups.length} layout${sheetGroups.length>1?'s':''}  (${brk})`, 0);
-  return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
+  return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+_dxfBlocksSection()+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
 }
 function exportDXF(){ openDxfExportDialog('all'); }
 function exportDXFCurrent(){ openDxfExportDialog('current'); }
