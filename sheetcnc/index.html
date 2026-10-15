@@ -231,7 +231,7 @@ hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
 
 <div class="header">
   <div class="logo">Sheet<span>CNC</span></div>
-  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k12</span>
+  <span id="buildBadge" title="เวอร์ชันบิลด์ — ใช้ยืนยันว่าโหลดโค้ดล่าสุด" style="background:#16a34a;color:#fff;font-size:.66rem;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;">build 25Jul-k13</span>
   <input class="proj-input" id="projName" value="โปรเจกต์ CNC" placeholder="ชื่อโปรเจกต์">
   <button class="btn btn-ghost btn-sm" onclick="saveProject()" title="บันทึกโปรเจกต์เป็นไฟล์ (Ctrl+S)">💾 <span data-i18n="saveBtn">บันทึก</span></button>
   <button class="btn btn-ghost btn-sm" onclick="openProjectPick()" title="เปิดไฟล์โปรเจกต์ที่บันทึกไว้">📂 <span data-i18n="openBtn">เปิดงาน</span></button>
@@ -9153,7 +9153,7 @@ function openDxfExportDialog(mode){
     ${row('name', en?'Piece name':'ชื่อชิ้นงาน', en?'Name from the list (skipped when it equals the code)':'ชื่อจากรายการ (ไม่ใส่ซ้ำถ้าเหมือนรหัส)', 'LABEL')}
     ${row('size', en?'Piece size':'ขนาดชิ้นงาน', en?'e.g. 740 x 1340 — placed clear of the code':'เช่น 740 x 1340 — วางไม่ทับรหัส', 'LABEL_SIZE')}
     ${row('remnant', en?'Usable offcuts':'เศษที่ใช้ต่อได้', en?'Outline + size of leftover areas (not for cutting)':'กรอบ + ขนาดพื้นที่เหลือ (ไม่ใช่เส้นตัด)', 'REMNANT')}
-    ${row('source', en?'Original pieces (for checking)':'ชิ้นงานต้นฉบับ (สำหรับตรวจสอบ)', en?'Under each sheet: its pieces exactly as in the source file (not rotated), grouped per sheet — not cut':'ใต้แต่ละแผ่น: ชิ้นงานของแผ่นนั้นตามไฟล์ต้นฉบับ (ไม่หมุน) จัดเป็นกลุ่มต่อแผ่น — ไม่ใช่เส้นตัด', 'SOURCE')}
+    ${row('source', en?'Original pieces (for checking)':'ชิ้นงานต้นฉบับ (สำหรับตรวจสอบ)', en?'Original copy under each sheet; each sheet piece + its original = one block (click one → both selected). Check file only — pieces become blocks':'วางชิ้นต้นฉบับใต้แต่ละแผ่น และรวมชิ้นบนแผ่นกับต้นฉบับเป็น block เดียวกันทีละชิ้น (คลิกชิ้นหนึ่ง เลือกได้ทั้งคู่) — ใช้เป็นไฟล์ตรวจสอบ ไม่ใช่ไฟล์ส่งเครื่อง', 'SOURCE')}
     ${row('titles', en?'Sheet titles & total':'หัวข้อแผ่น และสรุปจำนวน', en?'"Layout A | 2440 x 1220 | x1 sheet", TOTAL line':'"Layout A | 2440 x 1220 | x1 sheet" และบรรทัด TOTAL', 'SHEET')}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
       <button class="btn btn-ghost btn-sm" onclick="_dxfPreset('cut')">✂️ ${en?'Cut lines only':'เฉพาะเส้นตัด'}</button>
@@ -9501,7 +9501,7 @@ function dxfItemPaths(item, offX, offY, sh){
   s+=_pieceLabel(item, ix, iyTop);
   return s;
 }
-const BUILD_TAG='25Jul-k12';   // embedded in exports so a file's origin build is verifiable
+const BUILD_TAG='25Jul-k13';   // embedded in exports so a file's origin build is verifiable
 /** R12 TEXT label. align: 0=left, 1=center, 2=right (uses 72 + 11/21).
  *  color: optional AutoCAD color index (1=red, 3=green, …) via code 62. */
 function _lbl(x, y, h, str, align, color){
@@ -9549,8 +9549,12 @@ function _dxfBlocksSection(){
 function _dxfInsert(name, x, y, layer){
   return `0\nINSERT\n8\n${layer}\n2\n${name}\n10\n${(+x).toFixed(4)}\n20\n${(+y).toFixed(4)}\n30\n0.0\n`;
 }
+/** CHECK MODE: for every piece on a sheet, its original copy (exactly as in the source
+ *  file: unrotated, original text) is drawn below the sheet, sorted by code. The caller
+ *  puts each placed piece AND its original copy into ONE block (P_<code>), so clicking
+ *  either selects both — check the sheet piece by piece. Original copies use layers
+ *  SOURCE / SOURCE_TEXT (never CUT). Returns {src: Map(item → DXF string), frame}. */
 function _dxfSourceGroup(g, offX, sw, sh){
-  if(!DXF_OPT.source || !_DXF_BLK) return '';
   function srcOf(it){
     if(it.__src) return it.__src;                       // the exact item that was placed (own text)
     const p=pieces.find(q=>q.id===it.pieceId)||{};
@@ -9568,32 +9572,39 @@ function _dxfSourceGroup(g, offX, sw, sh){
   }
   const totalH=y+rowH;
   const toSrc=t=>t.replace(/\n8\n(CUT|CUT_HOLE)\n/g,'\n8\nSOURCE\n').replace(/\n8\nTEXT\n/g,'\n8\nSOURCE_TEXT\n');
-  // 1) one BLOCK per piece: the original geometry, base point = bottom-left, unrotated
   const keep={...DXF_OPT};
   DXF_OPT.holes=true; DXF_OPT.code=true; DXF_OPT.name=false; DXF_OPT.size=false;
-  const pieceBlk=[];
+  const src=new Map();
   try{
     for(const P of pos){
-      const sr=P.sr, H=+sr.h;
-      const fake={x:0, y:0, w:+sr.w, h:H, angle:0, rotatedVerts:null,
+      const sr=P.sr;
+      const fake={x:P.x, y:0, w:+sr.w, h:+sr.h, angle:0, rotatedVerts:null,
                   vertices:sr.vertices||null, rawV:sr.rawV||null, holes:sr.holes||null, open:sr.open, name:sr.name};
-      const code=_codesOf(sr.holes).join('_');
-      const name=_blkName('SRC_'+(code||_dxfStr(P.it.name)));
-      _DXF_BLK.push({name, body:toSrc(dxfItemPaths(fake, 0, 0, H))});
-      pieceBlk.push(name);
+      const T=TOP0-P.y;                                   // DXF y of this copy's top edge
+      src.set(P.it, toSrc(dxfItemPaths(fake, offX, sh-T, sh)));
     }
   } finally { Object.assign(DXF_OPT, keep); }
-  // 2) one BLOCK per sheet: INSERTs of its piece blocks + frame + caption
-  //    (block coords: origin = top-left of the group, y up → contents go negative)
-  let body='';
-  pos.forEach((P,k)=>{ body+=_dxfInsert(pieceBlk[k], P.x, -P.y-(+P.sr.h), 'SOURCE'); });
   const fw=Math.min(sw, Math.max(0,...pos.map(P=>P.x+(+P.sr.w))))+40, fh=totalH+40;
-  body+=dxfRectShape(-20, -totalH-20, fw, fh, 'SOURCE');
+  let frame=dxfRectShape(offX-20, TOP0-totalH-20, fw, fh, 'SOURCE');
   const cap=`SOURCE (original) - Layout ${g.label} - ${items.length} pcs: ${items.map(it=>_codesOf(srcOf(it).holes).join('/')||_dxfStr(it.name)).join(', ')}`;
-  body+=`0\nTEXT\n8\nSOURCE_TEXT\n10\n-20.000\n20\n${(-totalH-60).toFixed(3)}\n40\n24\n1\n${_dxfStr(cap)}\n`;
-  const sheetBlk=_blkName('SRC_LAYOUT_'+g.label);
-  _DXF_BLK.push({name:sheetBlk, body});
-  return _dxfInsert(sheetBlk, offX, TOP0, 'SOURCE');
+  frame+=`0\nTEXT\n8\nSOURCE_TEXT\n10\n${(offX-20).toFixed(3)}\n20\n${(TOP0-totalH-60).toFixed(3)}\n40\n24\n1\n${_dxfStr(cap)}\n`;
+  const codeOf=it=>_codesOf(srcOf(it).holes).join('_');
+  return {src, frame, codeOf};
+}
+/** Write one sheet's pieces. Normal: plain entities. Check mode: each piece + its
+ *  original copy → one BLOCK "P_<code>" inserted at 0,0 (world coords inside). */
+function _dxfSheetPieces(g, offX, offY, sw, sh){
+  const SG = (DXF_OPT.source && _DXF_BLK) ? _dxfSourceGroup(g, offX, sw, sh) : null;
+  let e='';
+  _cutOrder(g.sheet.items).forEach(item=>{
+    const t=dxfItemPaths(item,offX,offY,sh);
+    if(!SG){ e+=t; return; }
+    const name=_blkName('P_'+(SG.codeOf(item)||_dxfStr(item.name)));
+    _DXF_BLK.push({name, body:t+(SG.src.get(item)||'')});
+    e+=_dxfInsert(name, 0, 0, '0');
+  });
+  if(SG) e+=SG.frame;
+  return e;
 }
 /** Offcut outlines on their own REMNANT layer (never CUT) — only when ticked. */
 function _dxfRemnants(sheet, offX, sw, sh){
@@ -9618,9 +9629,8 @@ function buildDXFSingle(groupIdx){
   entities+=_sheetTitle(0, sw, sh, g);
   // Summary line (left-aligned, further below so it never overlaps the titles)
   entities+=_lbl(20, -150, 40, `TOTAL: ${totalSheets} sheet${totalSheets>1?'s':''}`, 0);
-  _cutOrder(g.sheet.items).forEach(item=>{ entities+=dxfItemPaths(item,0,0,sh); });
+  entities+=_dxfSheetPieces(g, 0, 0, sw, sh);
   entities+=_dxfRemnants(g.sheet,0,sw,sh);
-  entities+=_dxfSourceGroup(g, 0, sw, sh);
   return '999\nSheetCNC '+BUILD_TAG+'\n'+dxfHeader(LAYERS)+_dxfBlocksSection()+'0\nSECTION\n2\nENTITIES\n'+entities+'0\nENDSEC\n0\nEOF\n';
 }
 function buildDXF(){
@@ -9634,9 +9644,8 @@ function buildDXF(){
     const offX=li*(sw+GAP), offY=0;
     if(DXF_OPT.frame) entities+=dxfRectShape(offX,offY,sw,sh,'SHEET');
     entities+=_sheetTitle(offX, sw, sh, g);
-    _cutOrder(g.sheet.items).forEach(item=>{ entities+=dxfItemPaths(item,offX,offY,sh); });
+    entities+=_dxfSheetPieces(g, offX, offY, sw, sh);
     entities+=_dxfRemnants(g.sheet,offX,sw,sh);
-    entities+=_dxfSourceGroup(g, offX, sw, sh);
   });
   // One overall summary, left-aligned below the first sheet. Spelling out every
   // layout makes it obvious at a glance whether the file is the combined export
