@@ -4,108 +4,124 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relief Studio – แปลงรูปเป็นงานแกะนูน CNC</title>
-<meta name="description" content="แปลงรูปภาพเป็นลายนูน (bas-relief) สำหรับ CNC Router ด้วย AI ในเบราว์เซอร์ ส่งออก STL และ heightmap 16-bit">
+<meta name="description" content="แปลงรูปภาพเป็นลายนูน (bas-relief) สำหรับ CNC Router ด้วย AI ในเบราว์เซอร์ ปั้นแก้ใน 3D ส่งออก STL, OBJ และ heightmap 16-bit">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/style.css">
 <script>
-// cross-origin isolation (multi-thread AI) via service worker; one reload at most
 if (!self.crossOriginIsolated && 'serviceWorker' in navigator && location.protocol === 'https:' && !sessionStorage.getItem('rs_coi')) {
-  navigator.serviceWorker.register('sw.js').then(r => { if (!navigator.serviceWorker.controller) { sessionStorage.setItem('rs_coi', '1'); location.reload(); } }).catch(() => {});
+  navigator.serviceWorker.register('sw.js').then(() => { if (!navigator.serviceWorker.controller) { sessionStorage.setItem('rs_coi', '1'); location.reload(); } }).catch(() => {});
 }
 </script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
 <header class="top">
-  <div class="brand"><span class="logo">◆</span> <b>Relief Studio</b> <span class="tag">รูป → งานแกะนูน CNC</span></div>
+  <div class="brand"><span class="logo">◆</span> <b>Relief Studio</b> <span class="tag">รูป → งานแกะนูน CNC</span> <span id="licBadge" class="badge">ทดลองใช้</span></div>
   <div class="status"><div class="bar"><i id="pbar"></i></div><span id="ptext">พร้อมใช้งาน</span></div>
   <div class="topbtn"><button id="btnHelp" class="ghost">วิธีใช้</button></div>
 </header>
 
 <main class="layout">
 <aside class="panel" id="panel">
-  <section>
-    <h3><span class="n">1</span> รูปภาพ</h3>
-    <label class="file"><input type="file" id="fileMain" accept="image/*"><span>เลือกรูปต้นฉบับ…</span></label>
-    <label class="file small"><input type="file" id="fileDetail" accept="image/*"><span>ภาพรายละเอียดเสริม (ไม่บังคับ)</span></label>
-    <div class="hint" id="detailInfo">ภาพเส้นขอบ/ภาพเรนเดอร์ที่ตรงกับรูปหลัก ช่วยให้ลายคมขึ้น</div>
-    <div class="row2">
-      <button id="btnCrop" class="ghost">ลากเลือกพื้นที่</button>
-      <button id="btnFull" class="ghost">ใช้ทั้งภาพ</button>
-    </div>
-  </section>
 
-  <section>
-    <h3><span class="n">2</span> ขนาดงาน (mm)</h3>
-    <div class="grid2">
-      <label>กว้างทั้งแผ่น<input type="number" id="W" value="400" min="20" step="1"></label>
-      <label>สูงทั้งแผ่น<input type="number" id="H" value="1670" min="20" step="1"></label>
-      <label>ความหนาแผ่น<input type="number" id="T" value="40" min="2" step="0.5"></label>
-      <label>ความลึกลาย<input type="number" id="depth" value="20" min="0.5" step="0.5"></label>
-      <label>กรอบ (0 = ไม่มี)<input type="number" id="F" value="20" min="0" step="1"></label>
-      <label>ความละเอียด<select id="res"><option value="0.5">0.5 mm (ละเอียด)</option><option value="0.75">0.75 mm</option><option value="1">1.0 mm (เร็ว)</option></select></label>
-    </div>
-    <label class="chk"><input type="checkbox" id="lock" checked> ล็อกสัดส่วนตามพื้นที่ที่เลือก</label>
-    <label class="chk"><input type="checkbox" id="mirror"> กลับซ้าย–ขวา (ทำบานคู่)</label>
-    <div class="hint" id="gridInfo"></div>
-  </section>
+<details open><summary><span class="n">1</span> รูปภาพ</summary>
+  <label class="file"><input type="file" id="fileMain" accept="image/*"><span>เลือกรูปต้นฉบับ…</span></label>
+  <label class="file small"><input type="file" id="fileDetail" accept="image/*"><span>ภาพรายละเอียดเสริม (ไม่บังคับ)</span></label>
+  <div class="hint" id="detailInfo">ภาพเส้นขอบ/ภาพเรนเดอร์ที่ตรงกับรูปหลัก ช่วยให้ลายคมขึ้น</div>
+  <div class="row2"><button id="btnCrop" class="ghost">ลากเลือกพื้นที่</button><button id="btnFull" class="ghost">ใช้ทั้งภาพ</button></div>
+  <div class="row2"><button id="btnUpscale" class="ghost" title="ใช้ AI ขยายพื้นที่ที่เลือก 2 เท่าให้คมขึ้น">AI ขยายรูป ×2</button><button id="btnRot" class="ghost">หมุน 90°</button></div>
+</details>
 
-  <section>
-    <h3><span class="n">3</span> วิเคราะห์ความลึกด้วย AI</h3>
-    <div class="grid2">
-      <label>คุณภาพ<select id="quality"><option value="fast">เร็ว</option><option value="high" selected>ละเอียด</option><option value="ultra">ละเอียดมาก</option></select></label>
-      <label>ประมวลผลด้วย<select id="device"><option value="auto">อัตโนมัติ (GPU)</option><option value="wasm">CPU</option></select></label>
-    </div>
-    <button id="btnRun" class="primary">วิเคราะห์ + สร้างลายนูน</button>
-    <div class="hint">ครั้งแรกจะดาวน์โหลดโมเดล AI (~50–100 MB) แล้วเก็บไว้ในเครื่อง</div>
-  </section>
+<details open><summary><span class="n">2</span> ขนาดงาน (mm)</summary>
+  <div class="grid2">
+    <label>กว้างทั้งแผ่น<input type="number" id="W" value="400" min="20" step="1"></label>
+    <label>สูงทั้งแผ่น<input type="number" id="H" value="1670" min="20" step="1"></label>
+    <label>ความหนาแผ่น<input type="number" id="T" value="40" min="2" step="0.5"></label>
+    <label>ความลึกลาย<input type="number" id="depth" value="20" min="0.5" step="0.5"></label>
+    <label>กรอบ (0 = ไม่มี)<input type="number" id="F" value="20" min="0" step="1"></label>
+    <label>ความละเอียด<select id="res"><option value="0.5">0.5 mm (ละเอียด)</option><option value="0.75">0.75 mm</option><option value="1">1.0 mm (เร็ว)</option><option value="0.3">0.3 mm (ละเอียดมาก)</option></select></label>
+  </div>
+  <label class="chk"><input type="checkbox" id="lock" checked> ล็อกสัดส่วนตามพื้นที่ที่เลือก</label>
+  <label class="chk"><input type="checkbox" id="mirror"> กลับซ้าย–ขวา (ทำบานคู่)</label>
+  <div class="hint" id="gridInfo"></div>
+</details>
 
-  <section>
-    <h3><span class="n">4</span> บริเวณปั้นละเอียด <small>(หน้า มือ ฯลฯ)</small></h3>
-    <button id="btnPoly" class="ghost wide">+ วาดรอบบริเวณ (คลิกทีละจุด, ดับเบิลคลิกจบ)</button>
-    <ul id="polyList" class="plist"></ul>
-    <div class="hint">AI จะซูมปั้นบริเวณนี้แยก ได้ตา จมูก ปาก ที่เป็นธรรมชาติ</div>
-  </section>
+<details open><summary><span class="n">3</span> AI วิเคราะห์ความลึก</summary>
+  <div class="grid2">
+    <label>โมเดล AI<select id="model"><option value="small">Small (เร็ว · ใช้เชิงพาณิชย์ได้)</option><option value="base">Base (ละเอียดกว่า · ห้ามใช้เชิงพาณิชย์)</option></select></label>
+    <label>คุณภาพ<select id="quality"><option value="fast">เร็ว</option><option value="high" selected>ละเอียด</option><option value="ultra">ละเอียดมาก</option></select></label>
+    <label>ประมวลผลด้วย<select id="device"><option value="auto">อัตโนมัติ (GPU)</option><option value="wasm">CPU</option></select></label>
+  </div>
+  <button id="btnRun" class="primary">วิเคราะห์ + สร้างลายนูน</button>
+  <button id="btnCutout" class="ghost wide" disabled>AI แยกตัวลายออกจากพื้นหลัง</button>
+  <div class="hint" id="aiInfo">ครั้งแรกจะดาวน์โหลดโมเดล AI แล้วเก็บไว้ในเครื่อง</div>
+</details>
 
-  <section>
-    <h3><span class="n">5</span> ปรับแต่ง</h3>
-    <div class="presets" id="presets"></div>
-    <div id="sliders"></div>
-    <button id="btnReset" class="ghost wide">คืนค่าเริ่มต้น</button>
-  </section>
+<details open><summary><span class="n">4</span> บริเวณปั้นละเอียด <small>หน้า มือ ฯลฯ</small></summary>
+  <button id="btnPoly" class="ghost wide">+ วาดรอบบริเวณ (คลิกทีละจุด, ดับเบิลคลิกจบ)</button>
+  <ul id="polyList" class="plist"></ul>
+  <div class="hint">AI จะซูมปั้นบริเวณนี้แยก ได้ตา จมูก ปาก ที่เป็นธรรมชาติ</div>
+</details>
 
-  <section>
-    <h3><span class="n">6</span> ด้านหลัง <small>(ตัวเลือกเสริม)</small></h3>
-    <label>รูปแบบด้านหลัง<select id="backMode">
-      <option value="flat">หลังเรียบ (ปกติ)</option>
-      <option value="auto">โค้งมนอัตโนมัติ (ลอยตัว)</option>
-      <option value="mirror">สองหน้าเหมือนกัน</option>
-    </select></label>
-    <div id="backOpts" hidden>
-      <div class="grid2" style="margin-top:8px">
-        <label>ความลึกด้านหลัง<input type="number" id="backDepth" value="15" min="0.5" step="0.5"></label>
-        <label>แกนกลางหนา<input type="number" id="core" value="4" min="0" step="0.5"></label>
-      </div>
-      <label class="chk"><input type="checkbox" id="cutout"> ตัดเฉพาะตัวลาย (ไม่มีพื้นหลัง)</label>
-      <div class="sl"><div class="lab"><span>ระดับตัดพื้น</span><b id="v_cutThr"></b></div><input type="range" id="cutThr" min="0.1" max="8" step="0.1" value="1.5"></div>
-      <div class="hint">ด้านหลังคำนวณจากรูปทรงด้านหน้าและเส้นรอบรูป · กรอบจะไม่ถูกใช้ในโหมดนี้ · งานสองหน้าต้องกลับชิ้นงานกัดอีกด้าน</div>
-    </div>
-  </section>
+<details open><summary><span class="n">5</span> ปรับแต่งลายนูน</summary>
+  <div class="presets" id="presets"></div>
+  <div id="sliders"></div>
+  <button id="btnReset" class="ghost wide">คืนค่าเริ่มต้น</button>
+</details>
 
-  <section>
-    <h3><span class="n">7</span> ส่งออก</h3>
-    <div class="row2">
-      <button id="btnSTL" class="primary" disabled>STL</button>
-      <button id="btnPNG" class="ghost" disabled>Heightmap 16-bit</button>
+<details><summary><span class="n">6</span> รูปทรง &amp; เอฟเฟกต์</summary>
+  <div class="sub">เส้นโค้งระดับความสูง (Curves)</div>
+  <canvas id="curve" width="300" height="160"></canvas>
+  <div class="row2"><button id="curveReset" class="ghost">รีเซ็ตเส้นโค้ง</button><select id="curvePreset"><option value="">พรีเซ็ต…</option><option value="soft">นุ่ม (กดยอด)</option><option value="punch">เด่น (ดันกลาง)</option><option value="low">ยกพื้น</option><option value="s">S-curve</option></select></div>
+  <div id="fxCtl"></div>
+  <div class="sub">เลเยอร์ (รวมลายจากภาพ heightmap อื่น)</div>
+  <label class="file small"><input type="file" id="fileLayer" accept="image/*"><span>+ เพิ่มเลเยอร์จากภาพขาวดำ</span></label>
+  <ul id="layerList" class="plist"></ul>
+</details>
+
+<details><summary><span class="n">7</span> กรอบ &amp; ขอบ</summary>
+  <div id="frameCtl"></div>
+</details>
+
+<details><summary><span class="n">8</span> ด้านหลัง <small>ตัวเลือกเสริม</small></summary>
+  <label>รูปแบบด้านหลัง<select id="backMode"><option value="flat">หลังเรียบ (ปกติ)</option><option value="auto">โค้งมนอัตโนมัติ (ลอยตัว)</option><option value="mirror">สองหน้าเหมือนกัน</option></select></label>
+  <div id="backOpts" hidden>
+    <div class="grid2" style="margin-top:8px">
+      <label>ความลึกด้านหลัง<input type="number" id="backDepth" value="15" min="0.5" step="0.5"></label>
+      <label>แกนกลางหนา<input type="number" id="core" value="4" min="0" step="0.5"></label>
     </div>
-    <div class="row2">
-      <button id="btnSaveP" class="ghost">บันทึกค่า (.json)</button>
-      <label class="file inline ghost"><input type="file" id="fileP" accept=".json"><span>โหลดค่า</span></label>
-    </div>
-    <div class="hint" id="expInfo"></div>
-  </section>
-  <footer class="credits">AI ความลึก: Depth Anything V2 Small (Apache-2.0) · onnxruntime-web (MIT) · three.js (MIT)</footer>
+    <label class="chk"><input type="checkbox" id="cutout"> ตัดเฉพาะตัวลาย (ไม่มีพื้นหลัง)</label>
+    <label class="chk"><input type="checkbox" id="cutAI"> ใช้ขอบจาก AI แยกตัวลาย</label>
+    <div class="sl"><div class="lab"><span>ระดับตัดพื้น</span><b id="v_cutThr"></b></div><input type="range" id="cutThr" min="0.1" max="8" step="0.1" value="1.5"></div>
+    <div class="hint">ด้านหลังคำนวณจากรูปทรงด้านหน้าและเส้นรอบรูป · ไม่ใช้กรอบในโหมดนี้ · งานสองหน้าต้องกลับชิ้นงานกัดอีกด้าน</div>
+  </div>
+</details>
+
+<details><summary><span class="n">9</span> งานผลิต CNC</summary>
+  <div id="cncCtl"></div>
+  <button id="btnSim" class="ghost wide" disabled>จำลองดอกบอล + หาจุดที่ดอกเข้าไม่ถึง</button>
+  <div class="hint" id="simInfo"></div>
+  <button id="btnTime" class="ghost wide" disabled>ประเมินเวลากัด</button>
+  <div class="hint" id="timeInfo"></div>
+</details>
+
+<details open><summary><span class="n">10</span> ส่งออก &amp; โปรเจกต์</summary>
+  <div class="row2"><button id="btnSTL" class="primary" disabled>STL</button><button id="btnOBJ" class="ghost" disabled>OBJ</button></div>
+  <div class="row2"><button id="btnPNG" class="ghost" disabled>Heightmap ทั้งแผ่น</button><button id="btnPNGr" class="ghost" disabled>Heightmap ลาย</button></div>
+  <div class="row2"><button id="btnTiles" class="ghost" disabled>แบ่งท่อน STL (.zip)</button></div>
+  <div class="row2"><button id="btnSaveProj" class="ghost" disabled>บันทึกโปรเจกต์</button><label class="file inline ghost"><input type="file" id="fileProj" accept=".rsproj,.zip"><span>เปิดโปรเจกต์</span></label></div>
+  <div class="row2"><button id="btnSaveP" class="ghost">บันทึกค่า (.json)</button><label class="file inline ghost"><input type="file" id="fileP" accept=".json"><span>โหลดค่า</span></label></div>
+  <div class="hint" id="expInfo"></div>
+</details>
+
+<details><summary><span class="n">11</span> ใบอนุญาต</summary>
+  <div id="licInfo" class="hint">โหมดทดลอง: ไฟล์ที่ส่งออกจะมีลายน้ำ</div>
+  <input type="text" id="licKey" placeholder="วางรหัสใบอนุญาต RS1-…" class="txt">
+  <div class="row2"><button id="btnLic" class="primary">เปิดใช้งาน</button><button id="btnLicOff" class="ghost">ลบรหัส</button></div>
+</details>
+
+<footer class="credits">AI: Depth Anything V2 (Small: Apache-2.0 · Base: CC-BY-NC) · BiRefNet (MIT) · Swin2SR (Apache-2.0) · onnxruntime-web, three.js (MIT)</footer>
 </aside>
 
 <section class="view">
@@ -114,27 +130,39 @@ if (!self.crossOriginIsolated && 'serviceWorker' in navigator && location.protoc
     <button data-tab="hm">Heightmap</button>
     <button data-tab="3d">3D</button>
     <span class="spacer"></span>
-    <label class="chk mini" id="hmMode" hidden><input type="checkbox" id="hmGray"> แสดงเป็นค่าความสูง</label>
+    <span id="hmMode" hidden>
+      <label class="chk mini"><input type="checkbox" id="hmGray"> ค่าความสูง</label>
+      <label class="chk mini"><input type="checkbox" id="hmSim"> จุดที่ดอกเข้าไม่ถึง</label>
+      <label class="chk mini"><input type="checkbox" id="hmMask"> แสดงมาสก์ AI</label>
+    </span>
   </nav>
   <div class="stage">
     <canvas id="cvImg" class="pane on"></canvas>
     <canvas id="cvHm" class="pane"></canvas>
     <div id="v3d" class="pane"></div>
+    <div id="drop" class="drop"><div><b>ลากรูปมาวางที่นี่</b><br>หรือกด “เลือกรูปต้นฉบับ”</div></div>
     <div id="sculptBar" class="sculpt" hidden>
       <div class="tools">
         <button data-tool="orbit" class="on" title="หมุน/ซูมมุมมอง">หมุนดู</button>
         <button data-tool="raise" title="ยกผิวขึ้น">ยก</button>
         <button data-tool="lower" title="กดผิวลง">กด</button>
+        <button data-tool="sharp" title="ยกแบบสันคม">ยกคม</button>
+        <button data-tool="crease" title="ขีดร่อง V">ร่อง V</button>
         <button data-tool="smooth" title="เกลี่ยให้เนียน">เกลี่ย</button>
         <button data-tool="flatten" title="ปาดให้เรียบเท่าจุดเริ่ม">ปาดเรียบ</button>
+        <button data-tool="smudge" title="ดึงเนื้อตามทิศลาก">ดึงเนื้อ</button>
+        <button data-tool="texture" title="ระบายพื้นผิวตามที่ตั้งในหัวข้อ 6">พื้นผิว</button>
         <button data-tool="erase" title="ลบการแก้กลับเป็นเดิม">ลบการแก้</button>
+        <button data-tool="mask" title="ทาป้องกันไม่ให้แปรงอื่นแก้">ทามาสก์</button>
+        <button data-tool="unmask" title="ลบมาสก์">ลบมาสก์</button>
       </div>
       <label>ขนาดแปรง <b id="v_brushR"></b><input type="range" id="brushR" min="1" max="60" step="0.5" value="8"></label>
       <label>แรง <b id="v_brushS"></b><input type="range" id="brushS" min="0.02" max="1" step="0.01" value="0.25"></label>
-      <div class="row2"><button id="btnUndo" class="ghost">ย้อน</button><button id="btnClearEd" class="ghost">ล้างการแก้ทั้งหมด</button></div>
-      <div class="hint">ใช้แปรง: คลิกซ้ายลากบนชิ้นงาน · หมุนมุมมอง: คลิกขวาลาก · ซูม: ล้อเมาส์</div>
+      <label class="chk"><input type="checkbox" id="symX"> สมมาตรซ้าย–ขวา</label>
+      <div class="row2"><button id="btnUndo" class="ghost">ย้อน</button><button id="btnRedo" class="ghost">ทำซ้ำ</button></div>
+      <div class="row2"><button id="btnClearEd" class="ghost">ล้างการแก้</button><button id="btnClearMask" class="ghost">ล้างมาสก์</button></div>
+      <div class="hint">แปรง: คลิกซ้ายลาก · หมุน: คลิกขวาลาก · ซูม: ล้อเมาส์ · [ ] ปรับขนาด · Ctrl+Z ย้อน</div>
     </div>
-    <div id="drop" class="drop"><div><b>ลากรูปมาวางที่นี่</b><br>หรือกด “เลือกรูปต้นฉบับ”</div></div>
   </div>
 </section>
 </main>
@@ -142,18 +170,20 @@ if (!self.crossOriginIsolated && 'serviceWorker' in navigator && location.protoc
 <dialog id="help">
   <h2>วิธีใช้ Relief Studio</h2>
   <ol>
-    <li>เลือกรูปต้นฉบับ แล้วลากเลือกพื้นที่ของลาย (ไม่รวมกรอบในรูป)</li>
-    <li>ใส่ขนาดแผ่นงาน ความหนา ความลึกลาย และความกว้างกรอบ (mm)</li>
-    <li>กด <b>วิเคราะห์ + สร้างลายนูน</b> รอ AI วิเคราะห์ความลึก</li>
-    <li>วาดรอบหน้าหรือจุดสำคัญในขั้นที่ 4 เพื่อให้ AI ปั้นละเอียดแยก</li>
-    <li>ปรับแถบเลื่อน ดูผลในแท็บ Heightmap / 3D</li>
-    <li>ส่งออก STL หรือ Heightmap 16-bit ไปใช้ใน Aspire, Carveco, ArtCAM, Rhino</li>
+    <li>เลือกรูปต้นฉบับ ลากเลือกพื้นที่ลาย (ไม่รวมกรอบในรูป) · รูปเล็ก/เบลอ กด <b>AI ขยายรูป ×2</b></li>
+    <li>ใส่ขนาดแผ่น ความหนา ความลึกลาย และกรอบ (mm)</li>
+    <li>กด <b>วิเคราะห์ + สร้างลายนูน</b></li>
+    <li>วาดรอบหน้า/มือในขั้นที่ 4 ให้ AI ปั้นละเอียดแยก</li>
+    <li>ปรับแถบเลื่อน พรีเซ็ต เส้นโค้ง เอฟเฟกต์ กรอบ และขอบ</li>
+    <li>แท็บ 3D: ใช้แปรงปั้นแก้เฉพาะจุด ทามาสก์ป้องกันส่วนที่ไม่ต้องการแก้</li>
+    <li>จำลองดอกบอลเพื่อดูจุดที่กัดไม่ถึง แล้วส่งออก STL / OBJ / Heightmap หรือแบ่งท่อน</li>
   </ol>
-  <p class="hint">เคล็ดลับ: รูปยิ่งละเอียด งานยิ่งคม · แสงสม่ำเสมอดีกว่าแสงแรง · ภาพไม่มีลายไม้ช่วยให้ผิวเนียน</p>
+  <p class="hint">เคล็ดลับ: รูปยิ่งละเอียด งานยิ่งคม · แสงสม่ำเสมอดีกว่าแสงแรง · ภาพไม่มีลายไม้ช่วยให้ผิวเนียน · บันทึกโปรเจกต์เพื่อกลับมาแก้ต่อโดยไม่ต้องวิเคราะห์ใหม่</p>
   <form method="dialog"><button class="primary">ปิด</button></form>
 </dialog>
 
 <script src="js/relief.js"></script>
+<script src="js/ops.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

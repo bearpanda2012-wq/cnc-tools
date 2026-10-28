@@ -3,7 +3,7 @@
 const ORT_VER = '1.20.1';
 const ORT_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VER}/dist/`;
 let ORT_LOADED = false;
-importScripts('relief.js');
+importScripts('relief.js', 'ops.js');
 
 const S = { session: null, backend: null, inputName: 'pixel_values', fp16in: false,
   grid: null, w: 0, h: 0, res: 0.5, gray: null, detail: null, full: null, coarse: null, fine: null, focus: new Map() };
@@ -75,6 +75,91 @@ async function runTensor(chw, tw, th) {
   const data = o.type === 'float16' ? (o.data instanceof Uint16Array ? f16toF32(o.data) : Float32Array.from(o.data)) : o.data;
   if (t.dispose) t.dispose();
   return { data, h: o.dims[o.dims.length - 2], w: o.dims[o.dims.length - 1] };
+}
+
+// ---- extra models (background cutout, upscaler) ----
+const M = {};
+async function openModel(key, urlGpu, urlCpu, device) {
+  if (M[key]) return M[key];
+  await loadOrt();
+  let order = device === 'wasm' || !('gpu' in navigator) ? ['wasm'] : ['webgpu', 'wasm'], err = null;
+  for (const ep of order) {
+    try {
+      const bytes = await fetchModel(ep === 'webgpu' ? urlGpu : urlCpu);
+      prog('model', 1, 'เตรียมโมเดล ' + key + ' (' + ep + ')');
+      const sess = await ort.InferenceSession.create(bytes, { executionProviders: [ep], graphOptimizationLevel: 'all' });
+      const meta = sess.inputMetadata && sess.inputMetadata[0];
+      const fp16 = /float16/.test((meta && meta.type) || '') || (ep === 'webgpu' && /fp16/.test(urlGpu));
+      return (M[key] = { sess, ep, fp16, inName: sess.inputNames[0] });
+    } catch (e) { err = e; }
+  }
+  throw err;
+}
+async function runOn(m, chw, dims) {
+  let t = m.fp16 ? new ort.Tensor('float16', f32toF16(chw), dims) : new ort.Tensor('float32', chw, dims);
+  let out;
+  try { out = await m.sess.run({ [m.inName]: t }); }
+  catch (e) { if (m.fp16) throw e; m.fp16 = true; t = new ort.Tensor('float16', f32toF16(chw), dims); out = await m.sess.run({ [m.inName]: t }); }
+  const o = out[m.sess.outputNames[m.sess.outputNames.length - 1]];
+  const data = o.type === 'float16' ? (o.data instanceof Uint16Array ? f16toF32(o.data) : Float32Array.from(o.data)) : o.data;
+  return { data, dims: o.dims };
+}
+function rgbCHW(bmp, sx, sy, sw, sh, tw, th, norm) {
+  canvas.width = tw; canvas.height = th; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.clearRect(0, 0, tw, th); ctx.drawImage(bmp, sx, sy, sw, sh, 0, 0, tw, th);
+  const px = ctx.getImageData(0, 0, tw, th).data, n = tw * th, chw = new Float32Array(3 * n);
+  const mean = norm ? [0.485, 0.456, 0.406] : [0, 0, 0], std = norm ? [0.229, 0.224, 0.225] : [1, 1, 1];
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) chw[c * n + i] = (px[i * 4 + c] / 255 - mean[c]) / std[c];
+  return chw;
+}
+// BiRefNet cutout on the current grid image, square tiles along the long side, max-blended
+async function cutout(msg) {
+  const m = await openModel('cutout', msg.urlGpu, msg.urlCpu, msg.device);
+  const w = S.w, h = S.h, src = S.hires || S.grid, k = S.hires ? S.k : 1, T = Math.min(w, h), st = Math.round(T * 0.6);
+  const xs = Relief.tileGrid(w, T, st), ys = Relief.tileGrid(h, T, st), acc = new Float32Array(w * h); let n = 0;
+  for (const y of ys) for (const x of xs) {
+    const r = await runOn(m, rgbCHW(src, x * k, y * k, T * k, T * k, 1024, 1024, true), [1, 3, 1024, 1024]);
+    const d = Relief.resize(r.data, r.dims[r.dims.length - 1], r.dims[r.dims.length - 2], T, T);
+    for (let j = 0; j < T; j++) for (let i = 0; i < T; i++) { const v = 1 / (1 + Math.exp(-d[j * T + i])), q = (y + j) * w + x + i; if (v > acc[q]) acc[q] = v; }
+    n++; prog('cutout', n / (xs.length * ys.length), `AI ตัดพื้นหลัง ${n}/${xs.length * ys.length}`);
+  }
+  post('cutoutDone', { mask: acc }, [acc.buffer]);
+}
+// Swin2SR x2 upscaler on an ImageBitmap, tiled with overlap
+async function upscale(msg) {
+  const m = await openModel('upscale', msg.urlGpu, msg.urlCpu, msg.device);
+  const bmp = msg.bitmap, W = bmp.width, H = bmp.height, T = 160, ov = 16, st = T - 2 * ov;
+  const out = new OffscreenCanvas(W * 2, H * 2), oc = out.getContext('2d');
+  const xs = Relief.tileGrid(W, Math.min(T, W), st), ys = Relief.tileGrid(H, Math.min(T, H), st); let n = 0;
+  for (const y of ys) for (const x of xs) {
+    const tw = Math.min(T, W), th = Math.min(T, H), pw = Math.ceil(tw / 8) * 8, ph = Math.ceil(th / 8) * 8;
+    const chw = rgbCHW(bmp, x, y, tw, th, tw, th, false), pad = new Float32Array(3 * pw * ph);
+    for (let c = 0; c < 3; c++) for (let j = 0; j < ph; j++) for (let i = 0; i < pw; i++) pad[c * pw * ph + j * pw + i] = chw[c * tw * th + Math.min(j, th - 1) * tw + Math.min(i, tw - 1)];
+    const r = await runOn(m, pad, [1, 3, ph, pw]), ow = r.dims[3], oh = r.dims[2], img = new ImageData(tw * 2, th * 2);
+    for (let j = 0; j < th * 2; j++) for (let i = 0; i < tw * 2; i++) for (let c = 0; c < 3; c++) img.data[(j * tw * 2 + i) * 4 + c] = Math.max(0, Math.min(255, r.data[c * ow * oh + j * ow + i] * 255));
+    for (let i = 0; i < tw * 2 * th * 2; i++) img.data[i * 4 + 3] = 255;
+    const l = x ? ov : 0, t = y ? ov : 0;   // drop overlap margins except at image borders
+    const tmp = new OffscreenCanvas(tw * 2, th * 2); tmp.getContext('2d').putImageData(img, 0, 0);
+    oc.drawImage(tmp, l * 2, t * 2, (tw - l) * 2, (th - t) * 2, (x + l) * 2, (y + t) * 2, (tw - l) * 2, (th - t) * 2);
+    n++; prog('upscale', n / (xs.length * ys.length), `AI ขยายรูป ${n}/${xs.length * ys.length}`);
+  }
+  const res = out.transferToImageBitmap(); post('upscaleDone', { bitmap: res }, [res]);
+}
+function cutsim(msg) {
+  const P = new Float32Array(msg.P), C = ReliefOps.ballCut(P, msg.pw, msg.ph, msg.res, msg.radius), D = new Float32Array(P.length);
+  let miss = 0, maxd = 0; for (let i = 0; i < P.length; i++) { D[i] = C[i] - P[i]; if (D[i] > 0.1) miss++; if (D[i] > maxd) maxd = D[i]; }
+  post('cutsimDone', { C, D, missPct: miss / P.length * 100, maxd }, [C.buffer, D.buffer]);
+}
+function getState() {
+  const o = { w: S.w, h: S.h, res: S.res, full: S.full, coarse: S.coarse, fine: S.fine, focus: [...S.focus].map(([id, f]) => ({ id, mask: f.mask, depth: f.depth })) };
+  post('state', o);
+}
+function setState(m) {
+  S.w = m.w; S.h = m.h; S.res = m.res; S.full = m.full; S.coarse = m.coarse; S.fine = m.fine; S.gray = m.gray; S.focus.clear();
+  for (const f of m.focus || []) S.focus.set(f.id, { mask: f.mask, depth: f.depth });
+  if (m.rgba) { const px = new Uint8ClampedArray(m.rgba), n = m.w * m.h; S.gray = new Float32Array(n); for (let i = 0; i < n; i++) S.gray[i] = (0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) / 255; }
+  if (m.rgba) createImageBitmap(new ImageData(new Uint8ClampedArray(m.rgba), m.w, m.h)).then(b => { S.grid = b; S.hires = null; post('stateSet', {}); });
+  else post('stateSet', {});
 }
 
 // draw region (sx,sy,sw,sh) of the grid bitmap into (tw,th), optionally mirrored; return CHW normalised tensor data
@@ -177,5 +262,10 @@ self.onmessage = async (e) => {
     else if (m.type === 'depth') await depth(m);
     else if (m.type === 'focus') await focus(m);
     else if (m.type === 'compose') compose(m);
+    else if (m.type === 'cutout') await cutout(m);
+    else if (m.type === 'upscale') await upscale(m);
+    else if (m.type === 'cutsim') cutsim(m);
+    else if (m.type === 'getState') getState();
+    else if (m.type === 'setState') setState(m);
   } catch (err) { post('error', { message: (err && err.message) || String(err), during: m.type }); }
 };

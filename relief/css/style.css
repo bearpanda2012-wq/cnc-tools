@@ -85,3 +85,22 @@ dialog ol{padding-left:20px}
 .sculpt[hidden],[hidden]{display:none !important}
 .grid2 label{min-width:0}
 input[type=number],select{width:100%;min-width:0}
+details{border-bottom:1px solid var(--line);padding:4px 0}
+details>summary{list-style:none;cursor:pointer;padding:10px 0;font-weight:600;display:flex;align-items:center;gap:8px}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:'▸';margin-left:auto;color:var(--mut);transition:transform .15s}
+details[open]>summary::after{transform:rotate(90deg)}
+details>summary small{color:var(--mut);font-weight:400}
+details>*:not(summary){margin-bottom:8px}
+.sub{font-size:12.5px;font-weight:600;margin:12px 0 6px;color:var(--ink)}
+#curve{width:100%;height:auto;border:1px solid var(--line);border-radius:6px;background:var(--bg);touch-action:none;cursor:pointer}
+.ctl{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.ctl .full{grid-column:1/-1}
+.txt{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font-family:ui-monospace,monospace;font-size:12px}
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;background:#c0392b;color:#fff;margin-left:6px;vertical-align:middle}
+.badge.ok{background:var(--ok)}
+.plist li select,.plist li input[type=number]{width:auto;padding:2px 4px}
+.plist li.layer{flex-wrap:wrap}
+.sculpt{max-height:calc(100% - 20px);overflow:auto}
+#hmMode{display:flex;gap:12px}
+#hmMode[hidden]{display:none}

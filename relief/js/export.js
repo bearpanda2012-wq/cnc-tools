@@ -140,3 +140,41 @@ export function buildSolid(top, bot, w, h, res, inc, mirror) {
   }
   return new Blob([buf], { type: 'model/stl' });
 }
+
+// ---- OBJ (closed heightfield solid, ASCII) ----
+export function buildOBJ(P, w, h, res, mirror) {
+  const Hm = (h - 1) * res, parts = ['# Relief Studio OBJ\n'], col = i => mirror ? w - 1 - i : i;
+  let buf = '';
+  const flush = () => { parts.push(buf); buf = ''; };
+  for (let j = 0; j < h; j++) { for (let i = 0; i < w; i++) buf += `v ${(i * res).toFixed(3)} ${(Hm - j * res).toFixed(3)} ${P[j * w + col(i)].toFixed(3)}\n`; if (buf.length > 4e6) flush(); }
+  const nb = w * h;  // bottom corner vertices
+  buf += `v 0 0 0\nv ${((w - 1) * res).toFixed(3)} 0 0\nv ${((w - 1) * res).toFixed(3)} ${Hm.toFixed(3)} 0\nv 0 ${Hm.toFixed(3)} 0\n`;
+  const V = (i, j) => j * w + i + 1;
+  for (let j = 0; j < h - 1; j++) { for (let i = 0; i < w - 1; i++) buf += `f ${V(i, j + 1)} ${V(i + 1, j + 1)} ${V(i + 1, j)} ${V(i, j)}\n`; if (buf.length > 4e6) flush(); }
+  const b0 = nb + 1, b1 = nb + 2, b2 = nb + 3, b3 = nb + 4;
+  // side walls as fans to the bottom corners
+  for (let i = 0; i < w - 1; i++) buf += `f ${V(i, h - 1)} ${b0 + 0 * 0} ${V(i + 1, h - 1)}\n`;
+  buf += `f ${V(w - 1, h - 1)} ${b0} ${b1}\n`;
+  for (let j = h - 1; j > 0; j--) buf += `f ${V(w - 1, j)} ${b1} ${V(w - 1, j - 1)}\n`;
+  buf += `f ${V(w - 1, 0)} ${b1} ${b2}\n`;
+  for (let i = w - 1; i > 0; i--) buf += `f ${V(i, 0)} ${b2} ${V(i - 1, 0)}\n`;
+  buf += `f ${V(0, 0)} ${b2} ${b3}\n`;
+  for (let j = 0; j < h - 1; j++) buf += `f ${V(0, j)} ${b3} ${V(0, j + 1)}\n`;
+  buf += `f ${V(0, h - 1)} ${b3} ${b0}\n`;
+  buf += `f ${b0} ${b3} ${b2} ${b1}\n`;
+  flush();
+  return new Blob(parts, { type: 'text/plain' });
+}
+
+// ---- trial watermark: raised diagonal text added to a field ----
+export function watermark(F, w, h, res, amt, maxZ) {
+  const c = new OffscreenCanvas(w, h), g = c.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#fff';
+  const fs = Math.max(10, Math.round(18 / res)); g.font = `bold ${fs}px sans-serif`; g.textAlign = 'center';
+  g.translate(w / 2, h / 2); g.rotate(-Math.PI / 6);
+  const L = Math.hypot(w, h);
+  for (let y = -L; y < L; y += fs * 4) for (let x = -L; x < L; x += fs * 14) g.fillText('RELIEF STUDIO · TRIAL', x + ((y / (fs * 4)) & 1) * fs * 7, y);
+  const d = g.getImageData(0, 0, w, h).data, out = new Float32Array(F);
+  for (let i = 0; i < w * h; i++) out[i] = Math.min(maxZ, out[i] + amt * d[i * 4] / 255);
+  return out;
+}
