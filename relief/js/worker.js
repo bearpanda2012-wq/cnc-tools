@@ -69,7 +69,7 @@ function f16toF32(a) {
   return out;
 }
 async function runTensor(chw, tw, th) {
-  const t = S.fp16in ? new ort.Tensor('float16', f32toF16(chw), [1, 3, th, tw]) : new ort.Tensor('float32', chw, [1, 3, th, tw]);
+  const t = S.fp16in ? new ort.Tensor('float16', half(chw), [1, 3, th, tw]) : new ort.Tensor('float32', chw, [1, 3, th, tw]);
   const out = await S.session.run({ [S.inputName]: t });
   const o = out[S.session.outputNames[0]];
   const data = o.type === 'float16' ? (o.data instanceof Uint16Array ? f16toF32(o.data) : Float32Array.from(o.data)) : o.data;
@@ -95,11 +95,12 @@ async function openModel(key, urlGpu, urlCpu, device) {
   }
   throw err;
 }
+const half = a => typeof Float16Array !== 'undefined' ? new Float16Array(a) : f32toF16(a);
 async function runOn(m, chw, dims) {
-  let t = m.fp16 ? new ort.Tensor('float16', f32toF16(chw), dims) : new ort.Tensor('float32', chw, dims);
+  let t = m.fp16 ? new ort.Tensor('float16', half(chw), dims) : new ort.Tensor('float32', chw, dims);
   let out;
   try { out = await m.sess.run({ [m.inName]: t }); }
-  catch (e) { if (m.fp16) throw e; m.fp16 = true; t = new ort.Tensor('float16', f32toF16(chw), dims); out = await m.sess.run({ [m.inName]: t }); }
+  catch (e) { if (m.fp16 || !/float16|type/i.test(e.message)) throw e; m.fp16 = true; t = new ort.Tensor('float16', half(chw), dims); out = await m.sess.run({ [m.inName]: t }); }
   const o = out[m.sess.outputNames[m.sess.outputNames.length - 1]];
   const data = o.type === 'float16' ? (o.data instanceof Uint16Array ? f16toF32(o.data) : Float32Array.from(o.data)) : o.data;
   return { data, dims: o.dims };
@@ -118,7 +119,8 @@ async function cutout(msg) {
   const w = S.w, h = S.h, src = S.hires || S.grid, k = S.hires ? S.k : 1, T = Math.min(w, h), st = Math.round(T * 0.6);
   const xs = Relief.tileGrid(w, T, st), ys = Relief.tileGrid(h, T, st), acc = new Float32Array(w * h); let n = 0;
   for (const y of ys) for (const x of xs) {
-    const r = await runOn(m, rgbCHW(src, x * k, y * k, T * k, T * k, 1024, 1024, true), [1, 3, 1024, 1024]);
+    const R = 1024;   // BiRefNet has a fixed 1024x1024 input
+    const r = await runOn(m, rgbCHW(src, x * k, y * k, T * k, T * k, R, R, true), [1, 3, R, R]);
     const d = Relief.resize(r.data, r.dims[r.dims.length - 1], r.dims[r.dims.length - 2], T, T);
     for (let j = 0; j < T; j++) for (let i = 0; i < T; i++) { const v = 1 / (1 + Math.exp(-d[j * T + i])), q = (y + j) * w + x + i; if (v > acc[q]) acc[q] = v; }
     n++; prog('cutout', n / (xs.length * ys.length), `AI ตัดพื้นหลัง ${n}/${xs.length * ys.length}`);

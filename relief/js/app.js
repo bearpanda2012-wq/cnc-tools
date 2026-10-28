@@ -11,7 +11,7 @@ const MODELS = {
   small: { gpu: HF + 'onnx-community/depth-anything-v2-small/resolve/main/onnx/model_fp16.onnx', cpu: HF + 'onnx-community/depth-anything-v2-small/resolve/main/onnx/model.onnx' },
   base: { gpu: HF + 'onnx-community/depth-anything-v2-base/resolve/main/onnx/model_fp16.onnx', cpu: HF + 'onnx-community/depth-anything-v2-base/resolve/main/onnx/model_quantized.onnx' },
 };
-const CUTOUT = { gpu: HF + 'onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model_fp16.onnx', cpu: HF + 'onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx' };
+const CUTOUT = { gpu: HF + 'onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model_fp16.onnx', cpu: HF + 'onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model_fp16.onnx' };  // fp16 also on CPU: fp32 exceeds WASM memory
 const UPSCALE = { gpu: HF + 'Xenova/swin2SR-classical-sr-x2-64/resolve/main/onnx/model.onnx', cpu: HF + 'Xenova/swin2SR-classical-sr-x2-64/resolve/main/onnx/model.onnx' };
 const qs = new URLSearchParams(location.search);
 if (qs.get('model')) MODELS.custom = { gpu: qs.get('model'), cpu: qs.get('modelcpu') || qs.get('model') };
@@ -375,7 +375,12 @@ $('btnCutout').onclick = async () => { if (st.busy || !st.depthKey) return; st.b
   try { const r = await wcall('cutout', { urlGpu: CUTOUT.gpu, urlCpu: CUTOUT.cpu, device: $('device').value }, null, 'cutoutDone');
     st.cutMask = new Uint8Array(r.mask.length); let c = 0; for (let i = 0; i < r.mask.length; i++) { st.cutMask[i] = r.mask[i] > 0.5 ? 1 : 0; c += st.cutMask[i]; }
     setProg(1, `แยกตัวลายแล้ว (${(c / r.mask.length * 100).toFixed(0)}% เป็นตัวลาย) — เปิดใช้ได้ในหัวข้อ 6 และ 8`); $('hmMask').checked = true; recompute(true); showTab('hm');
-  } catch (e) { setProg(0, 'AI แยกพื้นหลังไม่สำเร็จ: ' + e.message, true); } st.busy = false; };
+  } catch (e) {
+    // fallback (no GPU / not enough memory): separate by relief height + cleanup
+    const Z = st.Zc, n = Z.length, thr = Relief.percentile(Z, 30), m = new Uint8Array(n); for (let i = 0; i < n; i++) m[i] = Z[i] > thr ? 1 : 0;
+    st.cutMask = Relief.removeSmall(m, st.w, st.h, Math.round(25 / (st.res * st.res)));
+    setProg(1, 'ใช้วิธีแยกจากความสูงแทน (เครื่องนี้หน่วยความจำ/GPU ไม่พอสำหรับ AI แยกพื้นหลัง)'); $('hmMask').checked = true; recompute(true); showTab('hm');
+  } st.busy = false; };
 
 // ================= back side =================
 function backOn() { return $('backMode').value !== 'flat'; }
