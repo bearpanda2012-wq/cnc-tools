@@ -9,6 +9,7 @@
 | 🖼️ **CNC Pattern Generator** | แปลงรูปภาพเป็น Tool Path สำหรับงาน CNC | [`/pattern-generator/`](pattern-generator/) |
 | 📐 **SheetCNC Pro** | ถอดแผ่นและจัดวางชิ้นงานบนแผ่นวัสดุ (Nesting) พร้อม export Excel | [`/sheetcnc/`](sheetcnc/) |
 | ✒️ **LineTracer Pro** | คัดลอกลายเส้นจากรูปภาพเป็นเส้นเวกเตอร์ สำหรับงาน CNC | [`/line-tracer/`](line-tracer/) |
+| 🗿 **Relief Studio** | แปลงรูปเป็นงานแกะนูนด้วย AI ปั้นแก้ใน 3D ส่งออก STL / Heightmap 16-bit | [`/relief/`](relief/) |
 
 ## วิธีใช้งาน
 

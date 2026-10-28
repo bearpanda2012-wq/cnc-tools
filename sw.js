@@ -22,7 +22,9 @@ const TOOLS = [
   './pattern-generator/',
   './pattern-generator/index.html',
   './line-tracer/',
-  './line-tracer/index.html'
+  './line-tracer/index.html',
+  './relief/',
+  './relief/index.html'
 ];
 
 async function addAll(cache, list){
