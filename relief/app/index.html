@@ -31,6 +31,7 @@ if (!self.crossOriginIsolated && 'serviceWorker' in navigator && location.protoc
   <div class="hint" id="detailInfo">ภาพเส้นขอบ/ภาพเรนเดอร์ที่ตรงกับรูปหลัก ช่วยให้ลายคมขึ้น</div>
   <div class="row2"><button id="btnCrop" class="ghost">ลากเลือกพื้นที่</button><button id="btnFull" class="ghost">ใช้ทั้งภาพ</button></div>
   <div class="row2"><button id="btnUpscale" class="ghost" title="ใช้ AI ขยายพื้นที่ที่เลือก 2 เท่าให้คมขึ้น">AI ขยายรูป ×2</button><button id="btnRot" class="ghost">หมุน 90°</button></div>
+  <div class="hint imginfo" id="imgInfo"></div>
 </details>
 
 <details open><summary><span class="n">2</span> ขนาดงาน (mm)</summary>
@@ -42,6 +43,7 @@ if (!self.crossOriginIsolated && 'serviceWorker' in navigator && location.protoc
     <label>กรอบ (0 = ไม่มี)<input type="number" id="F" value="20" min="0" step="1"></label>
     <label>ความละเอียด<select id="res"><option value="0.5">0.5 mm (ละเอียด)</option><option value="0.75">0.75 mm</option><option value="1">1.0 mm (เร็ว)</option><option value="0.3">0.3 mm (ละเอียดมาก)</option></select></label>
   </div>
+  <label class="chk"><input type="checkbox" id="realSize" disabled> ขนาดตามรูปจริง (จาก dpi ของไฟล์ + กรอบ)</label>
   <label class="chk"><input type="checkbox" id="lock" checked> ล็อกสัดส่วนตามพื้นที่ที่เลือก</label>
   <label class="chk"><input type="checkbox" id="mirror"> กลับซ้าย–ขวา (ทำบานคู่)</label>
   <div class="hint" id="gridInfo"></div>

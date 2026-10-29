@@ -217,11 +217,67 @@ function syncAspect(from) {
   if (from === 'H') $('W').value = Math.round((+$('H').value - 2 * F) / a + 2 * F); else $('H').value = Math.round((+$('W').value - 2 * F) * a + 2 * F);
 }
 for (const id of sizeIds) $(id).addEventListener('change', () => {
+  if ((id === 'W' || id === 'H') && $('realSize').checked) $('realSize').checked = false;
+  if (id === 'F' && $('realSize').checked) { applyImageSize(); return; }
   if (id === 'W' || id === 'F') syncAspect('W'); if (id === 'H') syncAspect('H'); saveSize(); updateInfo();
   if (['depth', 'T', 'F'].includes(id) && st.Zc) scheduleCompose(true);
 });
 $('lock').onchange = () => { syncAspect('W'); saveSize(); updateInfo(); };
 $('mirror').onchange = () => { saveSize(); refreshViews(); };
+
+// ================= image DPI / real size =================
+/* Reads the print resolution stored in the file (PNG pHYs, JPEG JFIF or EXIF). Returns dpi or null. */
+async function readDPI(file) {
+  try {
+    const b = new DataView(await file.slice(0, 512 * 1024).arrayBuffer()), n = b.byteLength;
+    if (n > 24 && b.getUint32(0) === 0x89504E47) {                       // PNG
+      for (let o = 8; o + 12 <= n;) { const len = b.getUint32(o), type = b.getUint32(o + 4);
+        if (type === 0x70485973 && o + 17 <= n) { const x = b.getUint32(o + 8), unit = b.getUint8(o + 16); return unit === 1 && x ? x * 0.0254 : null; }
+        if (type === 0x49444154) return null; o += 12 + len; }
+      return null;
+    }
+    if (n > 4 && b.getUint16(0) === 0xFFD8) {                             // JPEG
+      let jfif = null, exif = null;
+      for (let o = 2; o + 4 <= n;) {
+        if (b.getUint8(o) !== 0xFF) break; const m = b.getUint8(o + 1), len = b.getUint16(o + 2);
+        if (m === 0xDA || m === 0xD9) break;
+        if (m === 0xE0 && o + 18 <= n && b.getUint32(o + 4) === 0x4A464946) {   // 'JFIF'
+          const u = b.getUint8(o + 11), x = b.getUint16(o + 12); if (x) jfif = u === 1 ? x : u === 2 ? x * 2.54 : null; }
+        if (m === 0xE1 && o + 10 <= n && b.getUint32(o + 4) === 0x45786966) exif = exifDPI(b, o + 10, Math.min(n, o + 2 + len));
+        o += 2 + len;
+      }
+      return exif || jfif;
+    }
+  } catch (e) {}
+  return null;
+}
+function exifDPI(b, t, end) {
+  const le = b.getUint16(t) === 0x4949, u16 = o => b.getUint16(o, le), u32 = o => b.getUint32(o, le);
+  const ifd = t + u32(t + 4); if (ifd + 2 > end) return null; let xr = null, unit = 2;
+  for (let i = 0, cnt = u16(ifd); i < cnt; i++) { const e = ifd + 2 + i * 12; if (e + 12 > end) break; const tag = u16(e);
+    if (tag === 0x011A) { const v = t + u32(e + 8); if (v + 8 <= end && u32(v + 4)) xr = u32(v) / u32(v + 4); }
+    if (tag === 0x0128) unit = u16(e + 8); }
+  return xr ? (unit === 3 ? xr * 2.54 : xr) : null;
+}
+const realDPI = () => st.dpi && st.dpi > 96 ? st.dpi : null;        // 72/96 are camera/screen defaults, not a print size
+const pxToMm = px => px / realDPI() * 25.4;
+function updateImgInfo() {
+  const el = $('imgInfo'); if (!st.img) { el.textContent = ''; $('realSize').disabled = true; return; }
+  const c = st.crop, full = c.w === st.img.width && c.h === st.img.height, d = realDPI();
+  let t = `รูป ${st.img.width} × ${st.img.height} px` + (full ? '' : ` · เลือก ${Math.round(c.w)} × ${Math.round(c.h)} px`);
+  if (d) t += ` · ${Math.round(d)} dpi = ${pxToMm(c.w).toFixed(1)} × ${pxToMm(c.h).toFixed(1)} mm`;
+  else t += st.dpi ? ` · ${Math.round(st.dpi)} dpi (ค่าเริ่มต้นของกล้อง/จอ ไม่ใช่ขนาดจริง)` : ' · ไฟล์ไม่มีข้อมูล dpi';
+  el.textContent = t; $('realSize').disabled = !d; if (!d) $('realSize').checked = false;
+}
+/* Sets the plate size from the selection: real mm when the file has a dpi and "ขนาดตามรูปจริง" is on, otherwise keeps the width and follows the aspect. */
+function applyImageSize() {
+  if (!st.img) return; const F = +$('F').value;
+  if ($('realSize').checked && realDPI()) { $('W').value = Math.round(pxToMm(st.crop.w) + 2 * F); $('H').value = Math.round(pxToMm(st.crop.h) + 2 * F); }
+  else if ($('lock').checked || +$('H').value < 20 || +$('W').value < 20) {
+    if (+$('W').value < 20) $('W').value = 400; const a = st.crop.h / st.crop.w; $('H').value = Math.round((+$('W').value - 2 * F) * a + 2 * F); }
+  saveSize(); updateInfo(); updateImgInfo();
+}
+$('realSize').onchange = () => applyImageSize();
 
 // ================= image loading =================
 async function decode(file) {
@@ -232,15 +288,16 @@ async function decode(file) {
 }
 async function loadFile(file, isDetail) {
   let r; try { r = await decode(file); } catch (e) { r = { bmp: await createImageBitmap(file), k: 1 }; }
-  const bmp = r.bmp;
+  const bmp = r.bmp, dpi = isDetail ? null : await readDPI(file);
   if (isDetail) { st.detailImg = bmp; $('detailInfo').textContent = `ภาพเสริม ${bmp.width}×${bmp.height} px` + (st.img && Math.abs(bmp.width / bmp.height - st.img.width / st.img.height) > 0.02 ? ' — สัดส่วนไม่ตรงกับรูปหลัก!' : ''); if (st.Zc) scheduleCompose(true, true); return; }
-  setImage(bmp, true);
+  st.dpi = dpi ? dpi * (r.k || 1) : null; $('realSize').checked = !!realDPI();
+  setImage(bmp, true); applyImageSize();
   setProg(0, r.k < 1 ? `รูปใหญ่มาก (${r.mp.toFixed(0)} MP) ย่อเหลือ ${bmp.width}×${bmp.height} px อัตโนมัติ` : `โหลดรูป ${bmp.width}×${bmp.height} px — ลากเลือกพื้นที่ลาย แล้วกดวิเคราะห์`);
 }
 function setImage(bmp, reset) {
   st.img = bmp; st.crop = { x: 0, y: 0, w: bmp.width, h: bmp.height };
   if (reset) { st.polys = []; st.Zc = null; st.E = null; st.Mk = null; st.cutMask = null; st.sim = null; }
-  st.depthKey = null; $('drop').classList.add('hide'); renderPolys(); syncAspect('W'); updateInfo(); showTab('img'); drawImg();
+  st.depthKey = null; $('drop').classList.add('hide'); renderPolys(); syncAspect('W'); updateInfo(); updateImgInfo(); showTab('img'); drawImg();
 }
 $('fileMain').onchange = e => e.target.files[0] && loadFile(e.target.files[0], false);
 $('fileDetail').onchange = e => e.target.files[0] && loadFile(e.target.files[0], true);
@@ -257,7 +314,7 @@ $('btnUpscale').onclick = async () => {
   st.busy = true; lockUI(true);
   try { const crop = await createImageBitmap(st.img, Math.round(st.crop.x), Math.round(st.crop.y), Math.round(st.crop.w), Math.round(st.crop.h));
     const r = await wcall('upscale', { bitmap: crop, urlGpu: UPSCALE.gpu, urlCpu: UPSCALE.cpu, device: $('device').value }, [crop], 'upscaleDone');
-    const polys = st.polys; setImage(r.bitmap, false); st.polys = polys; renderPolys(); drawImg(); setProg(1, `ขยายรูปแล้ว ${r.bitmap.width}×${r.bitmap.height} px`);
+    const polys = st.polys; if (st.dpi) st.dpi *= r.bitmap.width / st.crop.w; setImage(r.bitmap, false); st.polys = polys; renderPolys(); drawImg(); setProg(1, `ขยายรูปแล้ว ${r.bitmap.width}×${r.bitmap.height} px`);
   } catch (e) { setProg(0, 'ขยายรูปไม่สำเร็จ: ' + e.message, true); }
   st.busy = false; lockUI(false);
 };
@@ -290,13 +347,13 @@ cv.addEventListener('pointerdown', e => { if (!st.img) return; const p = evtImg(
 cv.addEventListener('pointermove', e => { if (!drag) return; const p = evtImg(e), W = st.img.width, H = st.img.height;
   const x0 = Math.max(0, Math.min(drag.x0, p[0])), y0 = Math.max(0, Math.min(drag.y0, p[1])), x1 = Math.min(W, Math.max(drag.x0, p[0])), y1 = Math.min(H, Math.max(drag.y0, p[1]));
   if (x1 - x0 > 8 && y1 - y0 > 8) { st.crop = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }; drawImg(); } });
-cv.addEventListener('pointerup', () => { if (drag) { drag = null; st.polys = []; renderPolys(); syncAspect('W'); updateInfo(); st.depthKey = null; } });
+cv.addEventListener('pointerup', () => { if (drag) { drag = null; st.polys = []; renderPolys(); st.depthKey = null; if ($('realSize').checked) applyImageSize(); else { syncAspect('W'); updateInfo(); updateImgInfo(); } } });
 cv.addEventListener('dblclick', () => { if (st.mode === 'poly') finishPoly(); });
 function finishPoly() { if (st.drawing && st.drawing.length >= 3) st.polys.push({ id: 'p' + Date.now(), pts: st.drawing.slice() });
   st.drawing = null; setMode('crop'); renderPolys(); drawImg(); if (st.depthKey) runFocusAndCompose(); }
 function setMode(m) { st.mode = m; $('btnPoly').classList.toggle('on', m === 'poly'); $('btnCrop').classList.toggle('on', m === 'crop'); cv.style.cursor = m === 'poly' ? 'copy' : 'crosshair'; }
 $('btnCrop').onclick = () => { setMode('crop'); showTab('img'); };
-$('btnFull').onclick = () => { if (!st.img) return; st.crop = { x: 0, y: 0, w: st.img.width, h: st.img.height }; st.polys = []; st.depthKey = null; renderPolys(); syncAspect('W'); updateInfo(); drawImg(); };
+$('btnFull').onclick = () => { if (!st.img) return; st.crop = { x: 0, y: 0, w: st.img.width, h: st.img.height }; st.polys = []; st.depthKey = null; renderPolys(); if ($('realSize').checked) applyImageSize(); else { syncAspect('W'); updateInfo(); updateImgInfo(); } drawImg(); };
 $('btnPoly').onclick = () => { if (!st.img) return; showTab('img'); st.drawing = []; setMode('poly'); setProg(0, 'คลิกรอบบริเวณทีละจุด · ดับเบิลคลิก หรือ Enter เพื่อจบ · Esc ยกเลิก'); };
 function renderPolys() { const ul = $('polyList'); ul.innerHTML = '';
   st.polys.forEach((p, i) => { const li = document.createElement('li');
@@ -652,7 +709,7 @@ async function bmpPNG(b) { const c = new OffscreenCanvas(b.width, b.height); c.g
 $('btnSaveProj').onclick = async () => {
   if (!st.depthKey || st.busy) return; st.busy = true; setProg(0.2, 'บันทึกโปรเจกต์…');
   try { const S = await wcall('getState', {}, null, 'state'), files = [];
-    const meta = { v: 1, crop: st.crop, polys: st.polys, params: st.params, ops: st.ops, frame: st.frame, cnc: st.cnc, size: {}, w: S.w, h: S.h, res: S.res, depthKey: st.depthKey,
+    const meta = { v: 1, dpi: st.dpi || null, crop: st.crop, polys: st.polys, params: st.params, ops: st.ops, frame: st.frame, cnc: st.cnc, size: {}, w: S.w, h: S.h, res: S.res, depthKey: st.depthKey,
       layers: st.layers.map(L => ({ id: L.id, name: L.name, mode: L.mode, height: L.height, invert: L.invert, enabled: L.enabled })), focus: S.focus.map(f => f.id), hasCut: !!st.cutMask };
     for (const id of sizeIds) meta.size[id] = $(id).value; for (const id of ['lock', 'mirror', 'cutout', 'cutAI']) meta.size[id] = $(id).checked;
     files.push({ name: 'project.json', data: JSON.stringify(meta) }, { name: 'image.png', data: await bmpPNG(st.img) }, { name: 'grid.rgba', data: st.rgba });
@@ -667,7 +724,7 @@ $('fileProj').onchange = e => { const f = e.target.files[0]; if (f) openProject(
 async function openProject(file) {
   if (st.busy) return; st.busy = true; setProg(0.1, 'เปิดโปรเจกต์…');
   try { const Z = await unzip(file), meta = JSON.parse(new TextDecoder().decode(Z.get('project.json')));
-    const img = await createImageBitmap(new Blob([Z.get('image.png')])); setImage(img, true); st.crop = meta.crop; st.polys = meta.polys || [];
+    const img = await createImageBitmap(new Blob([Z.get('image.png')])); st.dpi = meta.dpi || null; $('realSize').checked = false; setImage(img, true); st.crop = meta.crop; st.polys = meta.polys || []; updateImgInfo();
     if (Z.has('detail.png')) st.detailImg = await createImageBitmap(new Blob([Z.get('detail.png')]));
     applySettings({ params: meta.params, ops: meta.ops, frame: meta.frame, cnc: meta.cnc, size: meta.size }); clearTimeout(ctimer);
     for (const id of ['lock', 'mirror', 'cutout', 'cutAI']) if (meta.size[id] !== undefined) $(id).checked = meta.size[id];
