@@ -1,5 +1,5 @@
 /* CNC Tools — Service Worker */
-const VER   = 'cnc-tools-v1';
+const VER   = 'cnc-tools-v2';
 const SHELL = VER + '-shell';
 const RUN   = VER + '-run';
 const CDN   = VER + '-cdn';
@@ -24,7 +24,9 @@ const TOOLS = [
   './line-tracer/',
   './line-tracer/index.html',
   './relief/',
-  './relief/index.html'
+  './relief/index.html',
+  './relief/app/',
+  './relief/app/index.html'
 ];
 
 async function addAll(cache, list){

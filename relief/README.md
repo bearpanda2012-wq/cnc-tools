@@ -24,22 +24,13 @@
 - **ไฟล์:** STL, OBJ, Heightmap 16-bit (ทั้งแผ่น/เฉพาะลาย), บันทึก/เปิดโปรเจกต์ .rsproj
 - **ขาย:** ระบบใบอนุญาต (ลายเซ็นดิจิทัล ECDSA) โหมดทดลองมีลายน้ำ
 
-## ติดตั้งบน GitHub Pages
-1. อัปโหลดทั้งโฟลเดอร์นี้ (index.html, sw.js, css/, js/) ไปที่ repo เช่น `cnc-tools/relief/`
-2. เปิด Settings → Pages (ถ้ายังไม่เปิด)
-3. เข้าใช้ที่ `https://<user>.github.io/cnc-tools/relief/`
+## โครงไฟล์
+- `index.html`, `shop.css`, `shop.js` — หน้าขาย (`/relief/`)
+- `shop-config.js` — ราคาและช่องทางชำระเงิน แก้ไฟล์นี้ไฟล์เดียว ช่องที่เว้นว่างจะถูกซ่อน
+- `vendor/qrcode.js` — สร้าง PromptPay QR (MIT)
+- `tools/order-apps-script.gs` — Apps Script รับฟอร์มสั่งซื้อลง Google Sheet (วิธีติดตั้งอยู่หัวไฟล์)
+- `app/` — ตัวโปรแกรม (`/relief/app/`)
 
-`sw.js` ทำให้ AI ใช้หลายเธรดบน GitHub Pages ได้ (เร็วขึ้นหลายเท่าในโหมด CPU) ต้องเปิดผ่าน https
-
-## ทดสอบในเครื่อง
-เปิดผ่าน local server (ไม่ใช่ดับเบิลคลิกไฟล์) เช่น `python -m http.server 8000` แล้วเข้า `http://localhost:8000`
-
-ใช้โมเดลของตัวเองได้ด้วย `?model=<url ไฟล์ .onnx>`
-
-## ความต้องการเครื่อง
-- Chrome / Edge รุ่นใหม่ (WebGPU เร็วที่สุด) · Firefox/Safari ใช้โหมด CPU
-- RAM 8 GB ขึ้นไป แนะนำ 16 GB สำหรับงาน 0.5 mm ขนาดใหญ่
-- ครั้งแรกดาวน์โหลดโมเดล ~50 MB (GPU) หรือ ~100 MB (CPU) แล้วเก็บแคชไว้
-
-## ใบอนุญาตส่วนประกอบ (ใช้เชิงพาณิชย์ได้)
-ดู `THIRD_PARTY_NOTICES.md`
+## ใช้งาน
+- หน้าขาย: `https://bearpanda2012-wq.github.io/cnc-tools/relief/`
+- โปรแกรม: `https://bearpanda2012-wq.github.io/cnc-tools/relief/app/`

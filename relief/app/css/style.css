@@ -104,3 +104,6 @@ details>*:not(summary){margin-bottom:8px}
 .sculpt{max-height:calc(100% - 20px);overflow:auto}
 #hmMode{display:flex;gap:12px}
 #hmMode[hidden]{display:none}
+
+.btnlink{display:inline-block;padding:6px 12px;border:1px solid var(--line);border-radius:7px;color:var(--ink);text-decoration:none;font-size:13px}.btnlink:hover{border-color:var(--acc)}
+.hint a{color:var(--acc2)}

@@ -3,187 +3,187 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relief Studio – แปลงรูปเป็นงานแกะนูน CNC</title>
-<meta name="description" content="แปลงรูปภาพเป็นลายนูน (bas-relief) สำหรับ CNC Router ด้วย AI ในเบราว์เซอร์ ปั้นแก้ใน 3D ส่งออก STL, OBJ และ heightmap 16-bit">
+<title>Relief Studio – แปลงรูปเป็นงานแกะนูน CNC ด้วย AI</title>
+<meta name="description" content="แปลงรูปภาพเป็นงานแกะนูน (bas-relief) สำหรับ CNC Router ด้วย AI ในเบราว์เซอร์ ปั้นแก้ใน 3D ได้ ส่งออก STL, OBJ และ Heightmap 16-bit ไม่ต้องติดตั้งโปรแกรม">
+<meta property="og:title" content="Relief Studio – แปลงรูปเป็นงานแกะนูน CNC ด้วย AI">
+<meta property="og:description" content="จากรูปถ่ายสู่ไฟล์ STL พร้อมกัด ในเบราว์เซอร์ ไม่ต้องติดตั้ง">
+<meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/style.css">
-<script>
-if (!self.crossOriginIsolated && 'serviceWorker' in navigator && location.protocol === 'https:' && !sessionStorage.getItem('rs_coi')) {
-  navigator.serviceWorker.register('sw.js').then(() => { if (!navigator.serviceWorker.controller) { sessionStorage.setItem('rs_coi', '1'); location.reload(); } }).catch(() => {});
-}
-</script>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&family=Noto+Serif+Thai:wght@600;700&display=swap">
+<link rel="stylesheet" href="shop.css">
 </head>
 <body>
-<header class="top">
-  <div class="brand"><span class="logo">◆</span> <b>Relief Studio</b> <span class="tag">รูป → งานแกะนูน CNC</span> <span id="licBadge" class="badge">ทดลองใช้</span></div>
-  <div class="status"><div class="bar"><i id="pbar"></i></div><span id="ptext">พร้อมใช้งาน</span></div>
-  <div class="topbtn"><button id="btnHelp" class="ghost">วิธีใช้</button></div>
+
+<header class="nav">
+  <a class="brand" href="./"><span class="logo">◆</span> Relief Studio</a>
+  <nav>
+    <a href="#features">ความสามารถ</a>
+    <a href="#how">ขั้นตอน</a>
+    <a href="#pricing">ราคา</a>
+    <a href="#faq">คำถาม</a>
+  </nav>
+  <a class="btn sm" href="app/">เปิดโปรแกรม</a>
 </header>
 
-<main class="layout">
-<aside class="panel" id="panel">
+<main>
 
-<details open><summary><span class="n">1</span> รูปภาพ</summary>
-  <label class="file"><input type="file" id="fileMain" accept="image/*"><span>เลือกรูปต้นฉบับ…</span></label>
-  <label class="file small"><input type="file" id="fileDetail" accept="image/*"><span>ภาพรายละเอียดเสริม (ไม่บังคับ)</span></label>
-  <div class="hint" id="detailInfo">ภาพเส้นขอบ/ภาพเรนเดอร์ที่ตรงกับรูปหลัก ช่วยให้ลายคมขึ้น</div>
-  <div class="row2"><button id="btnCrop" class="ghost">ลากเลือกพื้นที่</button><button id="btnFull" class="ghost">ใช้ทั้งภาพ</button></div>
-  <div class="row2"><button id="btnUpscale" class="ghost" title="ใช้ AI ขยายพื้นที่ที่เลือก 2 เท่าให้คมขึ้น">AI ขยายรูป ×2</button><button id="btnRot" class="ghost">หมุน 90°</button></div>
-</details>
-
-<details open><summary><span class="n">2</span> ขนาดงาน (mm)</summary>
-  <div class="grid2">
-    <label>กว้างทั้งแผ่น<input type="number" id="W" value="400" min="20" step="1"></label>
-    <label>สูงทั้งแผ่น<input type="number" id="H" value="1670" min="20" step="1"></label>
-    <label>ความหนาแผ่น<input type="number" id="T" value="40" min="2" step="0.5"></label>
-    <label>ความลึกลาย<input type="number" id="depth" value="20" min="0.5" step="0.5"></label>
-    <label>กรอบ (0 = ไม่มี)<input type="number" id="F" value="20" min="0" step="1"></label>
-    <label>ความละเอียด<select id="res"><option value="0.5">0.5 mm (ละเอียด)</option><option value="0.75">0.75 mm</option><option value="1">1.0 mm (เร็ว)</option><option value="0.3">0.3 mm (ละเอียดมาก)</option></select></label>
-  </div>
-  <label class="chk"><input type="checkbox" id="lock" checked> ล็อกสัดส่วนตามพื้นที่ที่เลือก</label>
-  <label class="chk"><input type="checkbox" id="mirror"> กลับซ้าย–ขวา (ทำบานคู่)</label>
-  <div class="hint" id="gridInfo"></div>
-</details>
-
-<details open><summary><span class="n">3</span> AI วิเคราะห์ความลึก</summary>
-  <div class="grid2">
-    <label>โมเดล AI<select id="model"><option value="small">Small (เร็ว · ใช้เชิงพาณิชย์ได้)</option><option value="base">Base (ละเอียดกว่า · ห้ามใช้เชิงพาณิชย์)</option></select></label>
-    <label>คุณภาพ<select id="quality"><option value="fast">เร็ว</option><option value="high" selected>ละเอียด</option><option value="ultra">ละเอียดมาก</option></select></label>
-    <label>ประมวลผลด้วย<select id="device"><option value="auto">อัตโนมัติ (GPU)</option><option value="wasm">CPU</option></select></label>
-  </div>
-  <button id="btnRun" class="primary">วิเคราะห์ + สร้างลายนูน</button>
-  <button id="btnCutout" class="ghost wide" disabled>AI แยกตัวลายออกจากพื้นหลัง</button>
-  <div class="hint" id="aiInfo">ครั้งแรกจะดาวน์โหลดโมเดล AI แล้วเก็บไว้ในเครื่อง</div>
-</details>
-
-<details open><summary><span class="n">4</span> บริเวณปั้นละเอียด <small>หน้า มือ ฯลฯ</small></summary>
-  <button id="btnPoly" class="ghost wide">+ วาดรอบบริเวณ (คลิกทีละจุด, ดับเบิลคลิกจบ)</button>
-  <ul id="polyList" class="plist"></ul>
-  <div class="hint">AI จะซูมปั้นบริเวณนี้แยก ได้ตา จมูก ปาก ที่เป็นธรรมชาติ</div>
-</details>
-
-<details open><summary><span class="n">5</span> ปรับแต่งลายนูน</summary>
-  <div class="presets" id="presets"></div>
-  <div id="sliders"></div>
-  <button id="btnReset" class="ghost wide">คืนค่าเริ่มต้น</button>
-</details>
-
-<details><summary><span class="n">6</span> รูปทรง &amp; เอฟเฟกต์</summary>
-  <div class="sub">เส้นโค้งระดับความสูง (Curves)</div>
-  <canvas id="curve" width="300" height="160"></canvas>
-  <div class="row2"><button id="curveReset" class="ghost">รีเซ็ตเส้นโค้ง</button><select id="curvePreset"><option value="">พรีเซ็ต…</option><option value="soft">นุ่ม (กดยอด)</option><option value="punch">เด่น (ดันกลาง)</option><option value="low">ยกพื้น</option><option value="s">S-curve</option></select></div>
-  <div id="fxCtl"></div>
-  <div class="sub">เลเยอร์ (รวมลายจากภาพ heightmap อื่น)</div>
-  <label class="file small"><input type="file" id="fileLayer" accept="image/*"><span>+ เพิ่มเลเยอร์จากภาพขาวดำ</span></label>
-  <ul id="layerList" class="plist"></ul>
-</details>
-
-<details><summary><span class="n">7</span> กรอบ &amp; ขอบ</summary>
-  <div id="frameCtl"></div>
-</details>
-
-<details><summary><span class="n">8</span> ด้านหลัง <small>ตัวเลือกเสริม</small></summary>
-  <label>รูปแบบด้านหลัง<select id="backMode"><option value="flat">หลังเรียบ (ปกติ)</option><option value="auto">โค้งมนอัตโนมัติ (ลอยตัว)</option><option value="mirror">สองหน้าเหมือนกัน</option></select></label>
-  <div id="backOpts" hidden>
-    <div class="grid2" style="margin-top:8px">
-      <label>ความลึกด้านหลัง<input type="number" id="backDepth" value="15" min="0.5" step="0.5"></label>
-      <label>แกนกลางหนา<input type="number" id="core" value="4" min="0" step="0.5"></label>
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="hero-txt">
+    <p class="eyebrow">สำหรับช่างไม้ ช่างแกะสลัก และร้านงาน CNC Router</p>
+    <h1>จากรูปภาพ<br>สู่ <em>งานแกะนูน</em> พร้อมกัด</h1>
+    <p class="lead">อัปโหลดรูป ให้ AI วัดความลึก แล้วได้ไฟล์ STL หรือ Heightmap สำหรับ CNC ในไม่กี่นาที ปั้นแก้ต่อใน 3D ได้ ทำงานในเบราว์เซอร์ ไม่ต้องติดตั้งโปรแกรม</p>
+    <div class="cta">
+      <a class="btn" href="app/">ทดลองใช้ฟรี</a>
+      <a class="btn ghost" href="#pricing">ดูราคา</a>
     </div>
-    <label class="chk"><input type="checkbox" id="cutout"> ตัดเฉพาะตัวลาย (ไม่มีพื้นหลัง)</label>
-    <label class="chk"><input type="checkbox" id="cutAI"> ใช้ขอบจาก AI แยกตัวลาย</label>
-    <div class="sl"><div class="lab"><span>ระดับตัดพื้น</span><b id="v_cutThr"></b></div><input type="range" id="cutThr" min="0.1" max="8" step="0.1" value="1.5"></div>
-    <div class="hint">ด้านหลังคำนวณจากรูปทรงด้านหน้าและเส้นรอบรูป · ไม่ใช้กรอบในโหมดนี้ · งานสองหน้าต้องกลับชิ้นงานกัดอีกด้าน</div>
+    <p class="note">ทดลองได้ทุกเครื่องมือ ไฟล์ที่ส่งออกในโหมดทดลองจะมีลายน้ำ</p>
   </div>
-</details>
-
-<details><summary><span class="n">9</span> งานผลิต CNC</summary>
-  <div id="cncCtl"></div>
-  <button id="btnSim" class="ghost wide" disabled>จำลองดอกบอล + หาจุดที่ดอกเข้าไม่ถึง</button>
-  <div class="hint" id="simInfo"></div>
-  <button id="btnTime" class="ghost wide" disabled>ประเมินเวลากัด</button>
-  <div class="hint" id="timeInfo"></div>
-</details>
-
-<details open><summary><span class="n">10</span> ส่งออก &amp; โปรเจกต์</summary>
-  <div class="row2"><button id="btnSTL" class="primary" disabled>STL</button><button id="btnOBJ" class="ghost" disabled>OBJ</button></div>
-  <div class="row2"><button id="btnPNG" class="ghost" disabled>Heightmap ทั้งแผ่น</button><button id="btnPNGr" class="ghost" disabled>Heightmap ลาย</button></div>
-  <div class="row2"><button id="btnTiles" class="ghost" disabled>แบ่งท่อน STL (.zip)</button></div>
-  <div class="row2"><button id="btnSaveProj" class="ghost" disabled>บันทึกโปรเจกต์</button><label class="file inline ghost"><input type="file" id="fileProj" accept=".rsproj,.zip"><span>เปิดโปรเจกต์</span></label></div>
-  <div class="row2"><button id="btnSaveP" class="ghost">บันทึกค่า (.json)</button><label class="file inline ghost"><input type="file" id="fileP" accept=".json"><span>โหลดค่า</span></label></div>
-  <div class="hint" id="expInfo"></div>
-</details>
-
-<details><summary><span class="n">11</span> ใบอนุญาต</summary>
-  <div id="licInfo" class="hint">โหมดทดลอง: ไฟล์ที่ส่งออกจะมีลายน้ำ</div>
-  <input type="text" id="licKey" placeholder="วางรหัสใบอนุญาต RS1-…" class="txt">
-  <div class="row2"><button id="btnLic" class="primary">เปิดใช้งาน</button><button id="btnLicOff" class="ghost">ลบรหัส</button></div>
-</details>
-
-<footer class="credits">AI: Depth Anything V2 (Small: Apache-2.0 · Base: CC-BY-NC) · BiRefNet (MIT) · Swin2SR (Apache-2.0) · onnxruntime-web, three.js (MIT)</footer>
-</aside>
-
-<section class="view">
-  <nav class="tabs">
-    <button data-tab="img" class="on">ภาพ &amp; พื้นที่</button>
-    <button data-tab="hm">Heightmap</button>
-    <button data-tab="3d">3D</button>
-    <span class="spacer"></span>
-    <span id="hmMode" hidden>
-      <label class="chk mini"><input type="checkbox" id="hmGray"> ค่าความสูง</label>
-      <label class="chk mini"><input type="checkbox" id="hmSim"> จุดที่ดอกเข้าไม่ถึง</label>
-      <label class="chk mini"><input type="checkbox" id="hmMask"> แสดงมาสก์ AI</label>
-    </span>
-  </nav>
-  <div class="stage">
-    <canvas id="cvImg" class="pane on"></canvas>
-    <canvas id="cvHm" class="pane"></canvas>
-    <div id="v3d" class="pane"></div>
-    <div id="drop" class="drop"><div><b>ลากรูปมาวางที่นี่</b><br>หรือกด “เลือกรูปต้นฉบับ”</div></div>
-    <div id="sculptBar" class="sculpt" hidden>
-      <div class="tools">
-        <button data-tool="orbit" class="on" title="หมุน/ซูมมุมมอง">หมุนดู</button>
-        <button data-tool="raise" title="ยกผิวขึ้น">ยก</button>
-        <button data-tool="lower" title="กดผิวลง">กด</button>
-        <button data-tool="sharp" title="ยกแบบสันคม">ยกคม</button>
-        <button data-tool="crease" title="ขีดร่อง V">ร่อง V</button>
-        <button data-tool="smooth" title="เกลี่ยให้เนียน">เกลี่ย</button>
-        <button data-tool="flatten" title="ปาดให้เรียบเท่าจุดเริ่ม">ปาดเรียบ</button>
-        <button data-tool="smudge" title="ดึงเนื้อตามทิศลาก">ดึงเนื้อ</button>
-        <button data-tool="texture" title="ระบายพื้นผิวตามที่ตั้งในหัวข้อ 6">พื้นผิว</button>
-        <button data-tool="erase" title="ลบการแก้กลับเป็นเดิม">ลบการแก้</button>
-        <button data-tool="mask" title="ทาป้องกันไม่ให้แปรงอื่นแก้">ทามาสก์</button>
-        <button data-tool="unmask" title="ลบมาสก์">ลบมาสก์</button>
-      </div>
-      <label>ขนาดแปรง <b id="v_brushR"></b><input type="range" id="brushR" min="1" max="60" step="0.5" value="8"></label>
-      <label>แรง <b id="v_brushS"></b><input type="range" id="brushS" min="0.02" max="1" step="0.01" value="0.25"></label>
-      <label class="chk"><input type="checkbox" id="symX"> สมมาตรซ้าย–ขวา</label>
-      <div class="row2"><button id="btnUndo" class="ghost">ย้อน</button><button id="btnRedo" class="ghost">ทำซ้ำ</button></div>
-      <div class="row2"><button id="btnClearEd" class="ghost">ล้างการแก้</button><button id="btnClearMask" class="ghost">ล้างมาสก์</button></div>
-      <div class="hint">แปรง: คลิกซ้ายลาก · หมุน: คลิกขวาลาก · ซูม: ล้อเมาส์ · [ ] ปรับขนาด · Ctrl+Z ย้อน</div>
-    </div>
+  <div class="hero-art" aria-hidden="true">
+    <svg viewBox="0 0 400 460" class="panel-svg">
+      <defs>
+        <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#d9a066"/><stop offset="1" stop-color="#9c5f2c"/>
+        </linearGradient>
+        <linearGradient id="hl" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/>
+        </linearGradient>
+        <filter id="emboss" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="b"/>
+          <feSpecularLighting in="b" surfaceScale="4" specularConstant=".9" specularExponent="18" lighting-color="#fff4e6" result="s">
+            <fePointLight x="-120" y="-160" z="220"/>
+          </feSpecularLighting>
+          <feComposite in="s" in2="SourceAlpha" operator="in" result="s2"/>
+          <feComposite in="SourceGraphic" in2="s2" operator="arithmetic" k1="0" k2="1" k3=".8" k4="0"/>
+        </filter>
+      </defs>
+      <rect x="10" y="10" width="380" height="440" rx="10" fill="url(#wood)"/>
+      <rect x="34" y="34" width="332" height="392" rx="6" fill="#a8642a" opacity=".55"/>
+      <g filter="url(#emboss)" fill="#c98a50">
+        <path d="M200 70c40 0 70 34 70 78 0 30-14 52-34 64 34 8 62 36 72 80 10 44-6 92-36 120H128c-30-28-46-76-36-120 10-44 38-72 72-80-20-12-34-34-34-64 0-44 30-78 70-78z"/>
+        <path d="M70 400c30-40 60-50 90-40s50 30 80 30 60-30 90-20c14 5 22 14 28 30v20H70z"/>
+        <circle cx="90" cy="90" r="22"/><circle cx="310" cy="90" r="22"/>
+        <path d="M56 230c20-30 40-40 54-34-6 20-24 40-54 34zM344 230c-20-30-40-40-54-34 6 20 24 40 54 34z"/>
+      </g>
+      <rect x="10" y="10" width="380" height="440" rx="10" fill="url(#hl)"/>
+    </svg>
+    <div class="chip c1">AI วัดความลึก</div>
+    <div class="chip c2">STL ปิดสนิท</div>
+    <div class="chip c3">ปั้นแก้ 3D</div>
   </div>
 </section>
+
+<!-- ============ FEATURES ============ -->
+<section id="features" class="sec">
+  <h2>ครบตั้งแต่รูปภาพจนถึงหน้าเครื่อง CNC</h2>
+  <p class="sub">เครื่องมือที่ปกติต้องใช้หลายโปรแกรม รวมไว้ในหน้าเดียว</p>
+  <div class="grid">
+    <article class="f"><h3>AI วัดความลึก</h3><p>Depth Anything V2 วิเคราะห์ภาพหลายระดับ วงรอบใบหน้าหรือมือให้ AI ซูมปั้นละเอียดแยกได้ มีขยายรูป ×2 และแยกตัวลายออกจากพื้นหลัง</p></article>
+    <article class="f"><h3>ปรับลายนูนละเอียด</h3><p>15 แถบเลื่อน 7 พรีเซ็ต เส้นโค้งระดับความสูง Fade, Tilt, โดม ทรงกระบอก อานม้า พื้นผิว 7 แบบ และเลเยอร์รวมลายจากภาพอื่น</p></article>
+    <article class="f"><h3>แปรงปั้น 3D</h3><p>12 แปรง ยก กด ยกคม ร่อง V เกลี่ย ปาดเรียบ ดึงเนื้อ ทามาสก์ป้องกัน ปั้นสมมาตรซ้าย–ขวา ย้อนและทำซ้ำได้</p></article>
+    <article class="f"><h3>กรอบและคิ้วบัว</h3><p>ช่องลาย 6 รูปทรง คิ้วบัว 6 แบบ ขอบช่องลาย 4 แบบ ลบมุมขอบนอก ทำบานคู่ด้วยการกลับซ้าย–ขวา</p></article>
+    <article class="f"><h3>เช็กก่อนกัดจริง</h3><p>จำลองดอกบอลหาจุดที่ดอกเข้าไม่ถึง ประเมินเวลากัดหยาบและเก็บละเอียด แบ่งท่อน STL ตามความยาวโต๊ะเครื่อง</p></article>
+    <article class="f"><h3>ไฟล์พร้อมใช้</h3><p>STL และ OBJ ปิดสนิท Heightmap 16-bit ทั้งแผ่นหรือเฉพาะลาย ทำงานลอยตัวสองหน้าได้ บันทึกโปรเจกต์ไว้แก้ต่อทีหลัง</p></article>
+  </div>
+  <div class="privacy">
+    <b>รูปของคุณไม่ออกจากเครื่อง</b>
+    <span>AI ทำงานในเบราว์เซอร์ของคุณเอง ไม่มีการอัปโหลดรูปขึ้นเซิร์ฟเวอร์ เหมาะกับงานแบบของลูกค้าที่ต้องเก็บเป็นความลับ</span>
+  </div>
+</section>
+
+<!-- ============ HOW ============ -->
+<section id="how" class="sec alt">
+  <h2>3 ขั้นตอน</h2>
+  <ol class="steps">
+    <li><span>1</span><h3>ใส่รูปและขนาดงาน</h3><p>เลือกรูป ลากเลือกพื้นที่ลาย ใส่กว้าง สูง ความหนา และความลึกลายเป็นมิลลิเมตร</p></li>
+    <li><span>2</span><h3>ให้ AI สร้างลายนูน</h3><p>กดวิเคราะห์ แล้วปรับแถบเลื่อน เส้นโค้ง กรอบ และปั้นแก้เฉพาะจุดในมุมมอง 3D</p></li>
+    <li><span>3</span><h3>ส่งออกไปกัด</h3><p>เช็กจุดที่ดอกเข้าไม่ถึง แล้วส่งออก STL หรือ Heightmap ไปเข้าโปรแกรม CAM ที่ใช้อยู่</p></li>
+  </ol>
+</section>
+
+<!-- ============ PRICING ============ -->
+<section id="pricing" class="sec">
+  <h2>ราคา</h2>
+  <p class="sub">ทุกแพ็กเกจได้เครื่องมือครบเหมือนกัน ต่างกันที่ระยะเวลาใช้งาน</p>
+
+  <div class="plans" id="plans"></div>
+
+  <div class="compare">
+    <div><h4>ทดลองใช้ฟรี</h4><ul><li>ใช้ได้ทุกเครื่องมือ</li><li>ไฟล์ STL / OBJ / Heightmap มีลายน้ำ TRIAL</li><li>ไม่ต้องสมัคร</li></ul></div>
+    <div class="pro"><h4>Pro</h4><ul><li>ใช้ได้ทุกเครื่องมือ</li><li>ไฟล์ส่งออกไม่มีลายน้ำ ใช้งานเชิงพาณิชย์ได้ (เมื่อใช้โมเดล AI Small)</li><li>ได้รับอัปเดตเครื่องมือใหม่ตลอดอายุรหัส</li></ul></div>
+  </div>
+
+  <!-- ขั้นตอนการซื้อ -->
+  <div class="buy" id="buy">
+    <h3>สั่งซื้อ <span id="buyPlan" class="pill"></span></h3>
+    <div class="tabs" id="payTabs" role="tablist"></div>
+
+    <!-- โอน / PromptPay -->
+    <div class="pane" id="pane-pp" hidden>
+      <div class="pp">
+        <div class="qrbox"><div id="qr"></div><div class="amt" id="ppAmt"></div></div>
+        <div class="ppinfo">
+          <p><b>1.</b> สแกน QR ด้วยแอปธนาคาร ยอดเงินใส่ให้แล้ว</p>
+          <p class="mut" id="ppName"></p>
+          <p class="mut" id="ppBank"></p>
+          <p><b>2.</b> ส่งสลิปให้เราช่องทางใดช่องทางหนึ่ง</p>
+          <div class="send">
+            <a class="btn line" id="btnLine" target="_blank" rel="noopener" hidden>ส่งสลิปทาง LINE</a>
+            <button class="btn ghost" id="btnShowForm" type="button" hidden>กรอกฟอร์มแนบสลิป</button>
+          </div>
+          <p><b>3.</b> รับรหัสใบอนุญาตภายใน 24 ชั่วโมง วางในหัวข้อ 11 ของโปรแกรม</p>
+        </div>
+      </div>
+
+      <form class="order" id="orderForm" hidden>
+        <h4>ฟอร์มสั่งซื้อ</h4>
+        <div class="fg">
+          <label>ชื่อ–นามสกุล หรือชื่อร้าน *<input name="name" required maxlength="120" autocomplete="name"></label>
+          <label>อีเมล (สำหรับส่งรหัส) *<input name="email" type="email" required maxlength="160" autocomplete="email"></label>
+          <label>เบอร์โทร / LINE ID<input name="contact" maxlength="80"></label>
+          <label>แพ็กเกจ<select name="plan" id="formPlan"></select></label>
+          <label class="full">สลิปการโอน *<input name="slip" type="file" accept="image/*" required></label>
+          <label class="full">หมายเหตุ<textarea name="note" rows="2" maxlength="500"></textarea></label>
+          <input name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+        </div>
+        <button class="btn" type="submit" id="btnSubmit">ส่งคำสั่งซื้อ</button>
+        <p class="formmsg" id="formMsg" role="status"></p>
+      </form>
+    </div>
+
+    <!-- บัตร -->
+    <div class="pane" id="pane-card" hidden>
+      <p>จ่ายด้วยบัตรเครดิต/เดบิต ผ่าน <b class="cardName"></b> รับได้ทั้งบัตรไทยและต่างประเทศ เมื่อชำระแล้วเราจะส่งรหัสใบอนุญาตไปที่อีเมลที่ใช้ชำระเงิน ภายใน 24 ชั่วโมง</p>
+      <a class="btn" id="btnCard" target="_blank" rel="noopener">ชำระด้วยบัตรผ่าน <span class="cardName"></span></a>
+    </div>
+
+    <p class="soon" id="paySoon" hidden>ช่องทางชำระเงินกำลังจะเปิดเร็ว ๆ นี้ ระหว่างนี้ทดลองใช้ได้ฟรี</p>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section id="faq" class="sec alt">
+  <h2>คำถามที่พบบ่อย</h2>
+  <div class="faq">
+    <details><summary>ต้องใช้คอมพิวเตอร์แบบไหน</summary><p>แนะนำ Chrome หรือ Edge บนคอมที่มีการ์ดจอ AI จะทำงานเร็วมาก ถ้าไม่มีการ์ดจอก็ใช้ได้แต่วิเคราะห์ช้าลง ใช้แรมอย่างน้อย 8 GB สำหรับงานแผ่นใหญ่ครั้งแรกที่ใช้ โปรแกรมจะดาวน์โหลดโมเดล AI แล้วเก็บไว้ในเครื่อง</p></details>
+    <details><summary>ไฟล์ที่ได้ใช้กับโปรแกรมไหนได้บ้าง</summary><p>STL และ OBJ เปิดได้ในโปรแกรม CAM ทั่วไป เช่น Aspire, Carveco, ArtCAM, Fusion 360 และ Rhino ส่วน Heightmap 16-bit ใช้กับโปรแกรมที่นำเข้าภาพความสูงได้</p></details>
+    <details><summary>รูปของฉันถูกส่งไปที่ไหนไหม</summary><p>ไม่ AI ทำงานในเบราว์เซอร์ของคุณทั้งหมด รูปและงานไม่ได้ถูกอัปโหลดขึ้นเซิร์ฟเวอร์</p></details>
+    <details><summary>รหัสหมดอายุแล้วเกิดอะไรขึ้น</summary><p>โปรแกรมยังเปิดใช้และเปิดโปรเจกต์เดิมได้ตามปกติ แต่ไฟล์ที่ส่งออกจะกลับมามีลายน้ำ ต่ออายุเมื่อไรก็ได้รหัสใหม่ไปวางแทน</p></details>
+    <details><summary>1 รหัสใช้ได้กี่เครื่อง</summary><p>1 รหัสสำหรับผู้ซื้อ 1 คน ใช้บนคอมของคุณเองได้หลายเครื่อง ถ้าต้องการใช้หลายคนในร้าน ติดต่อเราเพื่อขอราคาแบบทีม</p></details>
+    <details><summary>ทดลองก่อนซื้อได้ไหม</summary><p>ได้ เปิดโปรแกรมใช้ได้ทันทีโดยไม่ต้องสมัคร ทุกเครื่องมือใช้ได้ครบ ต่างกันแค่ไฟล์ส่งออกมีลายน้ำ</p></details>
+  </div>
+</section>
+
 </main>
 
-<dialog id="help">
-  <h2>วิธีใช้ Relief Studio</h2>
-  <ol>
-    <li>เลือกรูปต้นฉบับ ลากเลือกพื้นที่ลาย (ไม่รวมกรอบในรูป) · รูปเล็ก/เบลอ กด <b>AI ขยายรูป ×2</b></li>
-    <li>ใส่ขนาดแผ่น ความหนา ความลึกลาย และกรอบ (mm)</li>
-    <li>กด <b>วิเคราะห์ + สร้างลายนูน</b></li>
-    <li>วาดรอบหน้า/มือในขั้นที่ 4 ให้ AI ปั้นละเอียดแยก</li>
-    <li>ปรับแถบเลื่อน พรีเซ็ต เส้นโค้ง เอฟเฟกต์ กรอบ และขอบ</li>
-    <li>แท็บ 3D: ใช้แปรงปั้นแก้เฉพาะจุด ทามาสก์ป้องกันส่วนที่ไม่ต้องการแก้</li>
-    <li>จำลองดอกบอลเพื่อดูจุดที่กัดไม่ถึง แล้วส่งออก STL / OBJ / Heightmap หรือแบ่งท่อน</li>
-  </ol>
-  <p class="hint">เคล็ดลับ: รูปยิ่งละเอียด งานยิ่งคม · แสงสม่ำเสมอดีกว่าแสงแรง · ภาพไม่มีลายไม้ช่วยให้ผิวเนียน · บันทึกโปรเจกต์เพื่อกลับมาแก้ต่อโดยไม่ต้องวิเคราะห์ใหม่</p>
-  <form method="dialog"><button class="primary">ปิด</button></form>
-</dialog>
+<footer class="foot">
+  <div><b>Relief Studio</b> · ส่วนหนึ่งของ <a href="../">CNC Tools</a></div>
+  <div id="footContact"></div>
+  <div class="mut small">AI: Depth Anything V2 Small (Apache-2.0), BiRefNet (MIT), Swin2SR (Apache-2.0) · three.js, onnxruntime-web (MIT)</div>
+</footer>
 
-<script src="js/relief.js"></script>
-<script src="js/ops.js"></script>
-<script type="module" src="js/app.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="shop-config.js"></script>
+<script src="shop.js"></script>
 </body>
 </html>
