@@ -1,0 +1,7 @@
+node_modules/
+.tools/
+artcam-classic/data/
+artcam-classic/dist/
+artcam-classic/mcp-config.json
+research/
+*.log

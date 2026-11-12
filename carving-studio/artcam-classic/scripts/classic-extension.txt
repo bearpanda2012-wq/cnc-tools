@@ -1,0 +1,67 @@
+
+function drawRulers(ctx,p,s,ox,oy){
+ ctx.fillStyle='#d1d1d1';ctx.fillRect(0,0,canvas.width,21);ctx.fillRect(0,0,23,canvas.height);ctx.fillStyle='#333';ctx.font='11px Segoe UI';const step=Math.max(5,10**Math.floor(Math.log10(Math.max(p.width,p.height)/10)));
+ for(let x=0;x<=p.width;x+=step){const px=ox+x*s;if(px<24||px>canvas.width)continue;ctx.fillText(x.toFixed(0),px+2,12);ctx.fillRect(px,16,1,5);}for(let y=0;y<=p.height;y+=step){const py=oy-y*s;if(py<24||py>canvas.height)continue;ctx.fillText(y.toFixed(0),2,py-2);ctx.fillRect(17,py,6,1);}
+ ctx.strokeStyle='#ef301c';ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox+25,oy);ctx.stroke();ctx.strokeStyle='#26df32';ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox,oy-25);ctx.stroke();
+}
+let bridgeRevision=-1,bridgeApplying=false,bridgeBusy=false,bridgePending=false,lastLocal='',editorKey='',machiningMeta=null,cameraMode='top',show3DPaths=true;
+function serialise(){return {version:1,params:params(),shapes,notes:$('notes').value,machining:machiningMeta,relief:mesh?{mode:mesh.mode||$('reliefMode').value,n:mesh.n,heights:Array.from(mesh.heights)}:null};}
+function payload(){return {project:serialise(),paths,pathKind,view};}
+function publish(){
+ window.dispatchEvent(new CustomEvent('classic-change',{detail:{shapes:shapes.map(s=>({type:s.type})),selected,paths:paths.length,mesh:!!mesh,depth:params().depth,operations:(machiningMeta?.operations||[]).map(({paths,...op})=>({...op,rows:paths.length})),activeOperation:machiningMeta?.active}}));
+ if(bridgeApplying)return;
+ const value=JSON.stringify(payload());if(value!==lastLocal){lastLocal=value;bridgePending=true;}
+}
+function updateEditor(){const host=$('selection-editor');if(!host)return;const sh=shapes[selected],key=JSON.stringify([selected,sh]);if(key===editorKey)return;editorKey=key;host.replaceChildren();if(!sh||sh.type==='polyline')return;
+ for(const [key,label]of Object.entries(sh.type==='rect'?{x:'Position X',y:'Position Y',w:'Width',h:'Height'}:{x:'Position X',y:'Position Y',r:'Radius'})){const row=document.createElement('label');row.className='field';const title=document.createElement('span');title.textContent=label;const input=document.createElement('input');input.type='number';input.step='0.1';input.value=Number(sh[key].toFixed(3));input.onchange=guarded(()=>{const next={...sh,[key]:Number(input.value)};validateShapes([next],params());snapshot();shapes[selected]=next;invalidate();draw();});row.append(title,input);host.append(row);}
+}
+function applyRemote(state){
+ const project=state.project;validate(project.params);validateShapes(project.shapes,project.params);machiningMeta=project.machining||null;
+ bridgeApplying=true;snapshot();for(const k of keys)$(k).value=project.params[k];shapes=project.shapes;$('notes').value=String(project.notes||'');selected=-1;image=null;draft=[];drag=null;
+ mesh=project.relief?{mode:project.relief.mode,width:project.params.width,height:project.params.height,amplitude:project.params.depth,n:project.relief.n,heights:Float64Array.from(project.relief.heights)}:null;
+ paths=state.paths||[];pathKind=state.pathKind||'';bridgeRevision=state.revision;bridgePending=false;setView(state.view||'2d');lastLocal=JSON.stringify(payload());bridgeApplying=false;
+ if(state.source==='mcp')window.dispatchEvent(new Event('classic-open'));
+ message(state.source==='mcp'?'MCP: model updated by AI':'Model synchronised');
+}
+async function bridgeTick(){
+ if(bridgeBusy)return;bridgeBusy=true;
+ try{
+  if(bridgePending&&bridgeRevision>=0){
+   const sent=lastLocal,response=await fetch('/api/model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({baseRevision:bridgeRevision,...JSON.parse(sent)})});
+   const state=await response.json();if(!response.ok){if(response.status===409){bridgePending=false;applyRemote(state);message('Concurrent AI update received; previous local model is available with Undo');}else throw Error(state.error||'Sync failed');}
+   else{bridgeRevision=state.revision;if(lastLocal===sent)bridgePending=false;}
+  }else{const response=await fetch('/api/model?after='+bridgeRevision);if(response.status===204)return;if(!response.ok)throw Error('MCP bridge unavailable');const state=await response.json();if(state.revision!==bridgeRevision){if(bridgeRevision<0&&state.revision===0){bridgeRevision=0;lastLocal='';publish();}else applyRemote(state);}}
+ }catch(e){message(e.message);}finally{bridgeBusy=false;}
+}
+window.classicCore={
+ pathOverlay(){show3DPaths=!show3DPaths;draw();},
+ camera(mode){cameraMode=mode;setView('3d');},
+ operation(mode){const op=machiningMeta?.operations.find(o=>o.mode===mode);if(!op)return;for(const k of keys)$(k).value=op.parameters[k];paths=op.paths;pathKind=op.mode;machiningMeta.active=mode;setView('path');stats();message(`${mode}: ${op.tool.type} diameter ${op.tool.diameter} mm — experimental raster`);},
+ chooseTool(t){tool=t;draft=[];drag=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));setView('2d');message(t==='polyline'?'Create polyline: click points, Enter to finish':'Create '+t+': drag inside the model area');},
+ tool(t){document.querySelector(`[data-tool="${t}"]`)?.click();},
+ select(i){selected=i;setView('2d');},
+ colour(c){vectorColour=c;if(selected>=0){snapshot();shapes[selected].color=c;}draw();},
+ zoom(f){zoom=Math.max(.2,Math.min(6,zoom*f));$('zoom-level').textContent=Math.round(zoom*100)+'%';draw();},
+ fit(){zoom=1;$('zoom-level').textContent='100%';draw();},
+ grid(){gridVisible=!gridVisible;draw();},
+ duplicate:guarded(()=>{if(selected<0)throw Error('Select a vector first');const sh=structuredClone(shapes[selected]);if(sh.type==='polyline')sh.points=sh.points.map(([x,y])=>[x+5,y+5]);else{sh.x+=5;sh.y+=5;}validateShapes([sh],params());snapshot();shapes.push(sh);selected=shapes.length-1;invalidate();draw();}),
+ newModel(){const next={...params(),width:Number($('new-width').value),height:Number($('new-height').value),thickness:Number($('new-thickness').value)};validate(next);snapshot();for(const k of keys)$(k).value=next[k];shapes=[];selected=-1;mesh=null;paths=[];pathKind='';draft=[];image=null;drag=null;$('notes').value='';zoom=1;setView('2d');message('New model created');}
+};
+const resizeHandler=()=>{const r=canvas.parentElement.getBoundingClientRect();if(r.width>0&&r.height>0){canvas.width=Math.round(r.width);canvas.height=Math.round(r.height);draw();}};
+window.addEventListener('resize',resizeHandler);
+$('notes').addEventListener('input',publish);
+const bridgeTimer=setInterval(bridgeTick,650);resizeHandler();draw();
+return ()=>{clearInterval(bridgeTimer);window.removeEventListener('resize',resizeHandler);$('notes')?.removeEventListener('input',publish);};
+
+function reliefShade(mesh,i,j){const {n,heights:z,width,height}=mesh,k=j*(n+1)+i,v=z[k];if(v<.01)return '#605b51';const gx=(z[j*(n+1)+Math.min(n,i+1)]-z[j*(n+1)+Math.max(0,i-1)])/(2*width/n),gy=(z[Math.min(n,j+1)*(n+1)+i]-z[Math.max(0,j-1)*(n+1)+i])/(2*height/n),norm=Math.hypot(gx,gy,1),light=Math.max(0,(-gx*-.45-gy*.6+.8)/norm/1.1);return `hsl(43 72% ${22+light*49}%)`;}
+function draw3DToolpaths(ctx,sc){if(!paths.length)return;ctx.strokeStyle=pathKind==='roughing'?'#58b9ff66':'#efad454d';ctx.lineWidth=.55;const p=params();for(const path of paths){ctx.beginPath();path.forEach(([x,y,z],i)=>{const px=canvas.width/2+(x-y)*sc,py=100+(x+y)*sc*.4-(z+p.depth)*sc*2;ctx[i?'lineTo':'moveTo'](px,py);});ctx.stroke();}}
+function renderReliefScene(ctx,mesh){
+ const {n,width:w,height:h,heights:z}=mesh,top=cameraMode==='top',sc=(top?Math.min((canvas.width-70)/w,(canvas.height-70)/(h*.82+mesh.amplitude*1.4)):Math.min((canvas.width-60)/(w+h),(canvas.height-80)/((w+h)*.42+mesh.amplitude*1.8)))*zoom;
+ const ox=(canvas.width-w*sc)/2,oy=(canvas.height+h*sc*.82)/2;
+ const project=(x,y,height)=>top?[ox+x*sc,oy-y*sc*.82-height*sc*1.4]:[canvas.width/2+(x-y)*sc,60+(x+y)*sc*.42-height*sc*1.8];
+ const base=[project(0,0,0),project(w,0,0),project(w,h,0),project(0,h,0)];ctx.beginPath();base.forEach(([x,y],k)=>ctx[k?'lineTo':'moveTo'](x,y));ctx.closePath();ctx.fillStyle='#605b51';ctx.fill();
+ const cell=(i,j)=>project(i*w/n,j*h/n,z[j*(n+1)+i]);
+ const drawCell=(i,j)=>{if(z[j*(n+1)+i]<.001&&z[j*(n+1)+i+1]<.001&&z[(j+1)*(n+1)+i]<.001&&z[(j+1)*(n+1)+i+1]<.001)return;const pts=[cell(i,j),cell(i+1,j),cell(i+1,j+1),cell(i,j+1)];ctx.beginPath();pts.forEach(([x,y],k)=>ctx[k?'lineTo':'moveTo'](x,y));ctx.closePath();ctx.fillStyle=reliefShade(mesh,i,j);ctx.fill();ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=.4;ctx.stroke();};
+ if(top){for(let j=n-1;j>=0;j--)for(let i=0;i<n;i++)drawCell(i,j);}else for(let j=0;j<n;j++)for(let i=0;i<n;i++)drawCell(i,j);
+ if(paths.length&&show3DPaths){ctx.strokeStyle=pathKind==='roughing'?'#69bbff70':'#ffb74645';ctx.lineWidth=.45;for(const path of paths){ctx.beginPath();path.forEach(([x,y,height],k)=>{const [px,py]=project(x,y,height+mesh.amplitude);ctx[k?'lineTo':'moveTo'](px,py);});ctx.stroke();}}
+}

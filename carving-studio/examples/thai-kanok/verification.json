@@ -1,0 +1,34 @@
+{
+  "passed": true,
+  "vectors": 9,
+  "samples": 37249,
+  "stlTriangles": 148992,
+  "stlVolumeMm3": 93818.13198739677,
+  "operations": [
+    {
+      "mode": "roughing",
+      "diameter": 6,
+      "tool": "flat",
+      "rows": 273,
+      "points": 51324,
+      "lengthMetres": 55.19728055704426,
+      "minZ": -5.5,
+      "maxZ": 0,
+      "cutOnlyMinutes": 45.99773379753688,
+      "allowance": 0.5
+    },
+    {
+      "mode": "finishing",
+      "diameter": 3,
+      "tool": "ballnose",
+      "rows": 363,
+      "points": 71874,
+      "lengthMetres": 76.17317176047723,
+      "minZ": -6,
+      "maxZ": 0,
+      "cutOnlyMinutes": 76.17317176047723,
+      "allowance": 0
+    }
+  ],
+  "limitations": "Experimental discrete raster envelopes, not a machine-ready collision or material-removal simulation."
+}

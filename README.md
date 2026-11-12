@@ -44,3 +44,8 @@ cnc-tools/
 ---
 
 สร้างด้วย [Claude](https://claude.ai) 🤖
+
+
+## Carving Studio Classic + MCP
+
+เพิ่ม [Carving Studio](carving-studio/) — โปรแกรมแนว ArtCAM พร้อม MCP stdio, ลายนูนไทย และพรีวิวดอกกัดหยาบ/เก็บผิว มีทั้งรุ่น Classic และ Original ต้องติดตั้ง Node.js และรันในเครื่อง ดู [วิธีติดตั้ง](carving-studio/README.md)

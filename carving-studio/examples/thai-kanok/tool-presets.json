@@ -1,0 +1,54 @@
+[
+  {
+    "mode": "roughing",
+    "tool": {
+      "type": "flat",
+      "diameter": 6
+    },
+    "allowance": 0.5,
+    "parameters": {
+      "width": 200,
+      "height": 220,
+      "thickness": 20,
+      "depth": 6,
+      "diameter": 6,
+      "stepdown": 2,
+      "feed": 1200,
+      "plunge": 300,
+      "safeZ": 10,
+      "stepover": 2.4
+    },
+    "conservativeRaster": true,
+    "limitations": [
+      "Discrete raster envelope; not an exact CAD collision proof",
+      "No holder/clamp or machine simulation",
+      "Stock edge border remains uncut by tool radius"
+    ]
+  },
+  {
+    "mode": "finishing",
+    "tool": {
+      "type": "ballnose",
+      "diameter": 3
+    },
+    "allowance": 0,
+    "parameters": {
+      "width": 200,
+      "height": 220,
+      "thickness": 20,
+      "depth": 6,
+      "diameter": 3,
+      "stepdown": 1,
+      "feed": 1000,
+      "plunge": 200,
+      "safeZ": 10,
+      "stepover": 0.6
+    },
+    "conservativeRaster": true,
+    "limitations": [
+      "Discrete raster envelope; not an exact CAD collision proof",
+      "No holder/clamp or machine simulation",
+      "Stock edge border remains uncut by tool radius"
+    ]
+  }
+]
