@@ -1,5 +1,5 @@
 /* CNC Tools — Service Worker */
-const VER   = 'cnc-tools-v2';
+const VER   = 'cnc-tools-v3-carving-studio';
 const SHELL = VER + '-shell';
 const RUN   = VER + '-run';
 const CDN   = VER + '-cdn';
@@ -17,6 +17,8 @@ const CORE = [
 
 /* หน้าเครื่องมือ — ถ้าโฟลเดอร์ไหนยังไม่มี จะข้ามไป ไม่ทำให้ติดตั้งล้มทั้งชุด */
 const TOOLS = [
+  './carving-studio/',
+  './carving-studio/index.html',
   './sheetcnc/',
   './sheetcnc/index.html',
   './pattern-generator/',
